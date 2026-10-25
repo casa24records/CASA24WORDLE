@@ -29,15 +29,6 @@
     <!-- CSS -->
     <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
 
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-273H1MLL3T"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
-        gtag('config', 'G-273H1MLL3T');
-    </script>
-
     <!-- load backend variables -->
     <script>
         const word_list = JSON.parse('{{language.word_list | tojson | safe}}');
