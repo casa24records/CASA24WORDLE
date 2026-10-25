@@ -10,8 +10,15 @@ import json
 
 import datetime
 import os
+import sys
+
+# Folder of this file. Lets the app run from any working directory
+# (locally from webapp/, on Vercel from the repo root).
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, APP_DIR)
 
 import daily
+from werkzeug.middleware.proxy_fix import ProxyFix
 import glob
 import random
 
@@ -19,6 +26,9 @@ import random
 random.seed(42)
 
 app = Flask(__name__)
+# Behind Vercel (or any proxy) trust X-Forwarded-Proto/Host so the app knows
+# the visitor is on https and the https redirect below cannot loop.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu order (Spanish, English first)
 
 ###############################################################################
@@ -26,7 +36,7 @@ app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu 
 ###############################################################################
 print("Loading data...")
 
-data_dir = "data/"
+data_dir = os.path.join(APP_DIR, "data") + "/"
 # if not glob.glob(data_dir):
 #     data_dir = "../data/"
 # if not glob.glob(data_dir):
@@ -231,8 +241,12 @@ def load_languages():
 languages = load_languages()
 
 # status
-with open("../scripts/out/status_list.txt", "r") as f:
-    status_list = [line.strip() for line in f]
+status_path = os.path.join(APP_DIR, "..", "scripts", "out", "status_list.txt")
+status_list = []
+if os.path.exists(status_path):
+    with open(status_path, "r") as f:
+        status_list = [line.strip() for line in f]
+if True:
     status_list_str = ""
     for status in status_list:
         status_list_str += (
@@ -375,9 +389,10 @@ class Language:
 # before request, redirect to https (unless localhost)
 @app.before_request
 def before_request():
-    print("BEFORE REQUEST")
+    # Vercel already forces https, so only redirect elsewhere
     if (
-        request.url.startswith("http://")
+        not os.environ.get("VERCEL")
+        and request.url.startswith("http://")
         and not "localhost" in request.url
         and not "127.0.0" in request.url
     ):

@@ -1,0 +1,12 @@
+# Not needed on Vercel
+.venv/
+tests/
+.claude/
+drive_export/
+scripts/*.ipynb
+scripts/casa24/*PRIVATE*
+**/__pycache__/
+Dockerfile
+Procfile
+# member aliases never ship
+webapp/data/languages/*/*_casa24_aliases.txt

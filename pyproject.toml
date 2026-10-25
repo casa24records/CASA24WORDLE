@@ -1,0 +1,18 @@
+[project]
+name = "casa24-wordle"
+version = "1.0.0"
+description = "Casa 24 Records' daily word game (based on Hugo0/wordle)"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1",
+]
+
+# --- Vercel -----------------------------------------------------------------
+# The Flask app lives in webapp/app.py (variable `app`).
+[tool.vercel]
+entrypoint = "webapp.app:app"
+
+# Runs on Vercel after installing dependencies: copies webapp/static to
+# public/static so Vercel's CDN serves images, fonts, CSS and JS directly.
+[tool.vercel.scripts]
+build = "python scripts/vercel_build.py"

@@ -143,3 +143,7 @@ needs_ocr.txt
 
 # Gilroy is a commercial font: keep it local until we have a webfont license
 webapp/static/fonts/Gilroy-*
+
+# Vercel build output (made by scripts/vercel_build.py) and CLI link
+public/
+.vercel/
