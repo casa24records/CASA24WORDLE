@@ -26,7 +26,11 @@
         "stats_games": "Games",
         "stats_win_percentage": "Win %",
         "stats_current_streak": "Current streak",
-        "stats_best_streak": "Best streak"
+        "stats_best_streak": "Best streak",
+        "theme": "Theme",
+        "theme_auto": "Automatic",
+        "theme_light": "Light",
+        "theme_dark": "Dark"
     },
     "language_code_3": "",
     "language_code_iso_639_3": "",

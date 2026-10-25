@@ -27,6 +27,54 @@
     --c24-font-display: "VT323", ui-monospace, monospace;
 }
 
+/* ---------- light / dark surfaces ----------
+   Light is the default. Dark follows the device setting unless the player
+   picks a theme (theme.js sets data-theme="light" or "dark" on <html>). */
+:root {
+    color-scheme: light;
+    --c24-bg: var(--c24-cream);
+    --c24-surface: var(--c24-cream);
+    --c24-text: var(--c24-ink);
+    --c24-subtle: var(--c24-muted);
+    --c24-line: var(--c24-sand);
+    --c24-line-strong: #8f877c;
+    --c24-hover: #e9e1d4;
+    --c24-key-fg: var(--c24-ink);
+    --c24-input-bg: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --c24-bg: #0f1a12;
+        --c24-surface: #17241a;
+        --c24-text: #f4efe6;
+        --c24-subtle: #b9b0a3;
+        --c24-line: #34453a;
+        --c24-line-strong: #6f8174;
+        --c24-hover: #223326;
+        --c24-key-bg: #5d6d61;
+        --c24-key-fg: #f4efe6;
+        --c24-input-bg: #17241a;
+        --c24-absent-bg: #2b312d;
+        --c24-correct-bg: #2f7a47;
+    }
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --c24-bg: #0f1a12;
+    --c24-surface: #17241a;
+    --c24-text: #f4efe6;
+    --c24-subtle: #b9b0a3;
+    --c24-line: #34453a;
+    --c24-line-strong: #6f8174;
+    --c24-hover: #223326;
+    --c24-key-bg: #5d6d61;
+    --c24-key-fg: #f4efe6;
+    --c24-input-bg: #17241a;
+    --c24-absent-bg: #2b312d;
+    --c24-correct-bg: #2f7a47;
+}
+
 @font-face { font-family: "VT323"; src: url("fonts/VT323-Regular.ttf") format("truetype"); font-display: swap; }
 @font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-Medium.ttf") format("truetype"); font-weight: 400 500; font-display: swap; }
 @font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-Bold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
@@ -34,15 +82,30 @@
 
 /* ---------- base ---------- */
 body {
-    background-color: var(--c24-cream);
-    color: var(--c24-ink);
+    background-color: var(--c24-bg);
+    color: var(--c24-text);
     font-family: var(--c24-font-body);
 }
 
-/* modals and cards from the original Tailwind markup */
-.bg-white { background-color: var(--c24-cream) !important; }
-.border-neutral-300, .border-gray-300, .border-slate-200 { border-color: var(--c24-sand) !important; }
-.text-neutral-500, .text-neutral-400, .text-gray-700 { color: var(--c24-muted) !important; }
+/* modals, cards and text from the original Tailwind markup */
+.bg-white { background-color: var(--c24-surface) !important; }
+.border-neutral-300, .border-gray-300, .border-gray-400, .border-slate-200 { border-color: var(--c24-line) !important; }
+.border-neutral-500 { border-color: var(--c24-line-strong) !important; }
+.text-neutral-500, .text-neutral-400 { color: var(--c24-subtle) !important; }
+.text-gray-900, .text-gray-700, .text-gray-600 { color: var(--c24-text) !important; }
+.hover\:bg-neutral-200:hover { background-color: var(--c24-hover) !important; }
+input[type="text"] { background-color: var(--c24-input-bg); color: var(--c24-text) !important; }
+select { background-color: var(--c24-input-bg); color: var(--c24-text); }
+
+/* menu theme button */
+.c24-theme-button { color: var(--c24-subtle); }
+.c24-icon-sun { display: none; }
+:root[data-theme="dark"] .c24-icon-sun { display: inline; }
+:root[data-theme="dark"] .c24-icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .c24-icon-sun { display: inline; }
+    :root:not([data-theme="light"]) .c24-icon-moon { display: none; }
+}
 
 /* ---------- Casa 24 pieces ---------- */
 .c24-title {
@@ -69,7 +132,7 @@ body {
 /* ---------- board and keyboard ---------- */
 .key {
     background-color: var(--c24-key-bg);
-    color: var(--c24-ink);
+    color: var(--c24-key-fg);
 }
 .correct {
     background-color: var(--c24-correct-bg) !important;

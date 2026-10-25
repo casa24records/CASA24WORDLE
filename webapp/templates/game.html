@@ -32,6 +32,8 @@
 
     <!-- CSS -->
     <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
+    <!-- light / dark theme (runs first so the page never flashes) -->
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
 
     <!-- load backend variables -->
     <script>
@@ -287,16 +289,23 @@
                             </div>
 
                             <div class=border-t-2 border-gray-300></div>
+                            <div class="flex flex-row items-center">
+                                <p id="theme-label" class="flex-grow">{{ t('theme', 'Theme') }}</p>
+                                <select id="theme-select" aria-labelledby="theme-label" class="rounded border px-2 py-1"
+                                    onchange="casa24SetTheme(this.value)">
+                                    <option value="auto">{{ t('theme_auto', 'Automatic') }}</option>
+                                    <option value="light">{{ t('theme_light', 'Light') }}</option>
+                                    <option value="dark">{{ t('theme_dark', 'Dark') }}</option>
+                                </select>
+                            </div>
+
+                            <div class=border-t-2 border-gray-300></div>
                             <div class="flex">
                                 <p class="flex-grow">{{ t('source_code', 'Source code') }}</p>
                                 <a href="https://www.github.com/Hugo0/wordle" class="underline text-neutral-500">GitHub</a>
                             </div>
 
-                            <div class=border-t-2 border-gray-300></div>
-                            <div class="flex">
-                                <p class="flex-grow">{{ t('feedback', 'Feedback') }}</p>
-                                <a href="https://github.com/Hugo0/wordle/issues" class="underline text-neutral-500">GitHub issues</a>
-                            </div>
+                            
                         </div>
                     </div>
                 </div>
@@ -387,6 +396,12 @@
 
     <!-- JS -->
     <script src="{{ url_for('static', filename='game.js') }}"></script>
+    <script>
+        (function () {
+            var select = document.getElementById("theme-select");
+            if (select) select.value = casa24GetTheme();
+        })();
+    </script>
 </body>
 
 </html>

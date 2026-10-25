@@ -26,7 +26,11 @@
         "stats_games": "Partidas",
         "stats_win_percentage": "% ganadas",
         "stats_current_streak": "Racha actual",
-        "stats_best_streak": "Mejor racha"
+        "stats_best_streak": "Mejor racha",
+        "theme": "Tema",
+        "theme_auto": "Automático",
+        "theme_light": "Claro",
+        "theme_dark": "Oscuro"
     },
     "language_code_3": "",
     "language_code_iso_639_3": "",
