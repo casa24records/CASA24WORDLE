@@ -7,6 +7,10 @@ Casa 24 Records' daily word game, based on [Hugo0/wordle](https://github.com/Hug
 - **Add words:** `scripts/merge_words.py`, then `scripts/validate_words.py` and `.venv/bin/python -m pytest -q tests`.
 - **Accents:** in Spanish you can type with or without accents (`cancion` finds `canción`); ñ always counts as its own letter.
 - **Branding:** colors and fonts are CSS variables at the top of `webapp/static/style.css`; Kolo art is in `webapp/static/images/kolo/`.
+- **Dark mode:** follows the device; players can switch it in Settings or with the moon button on the menu.
+- **Going online:** prepared for Vercel, not deployed. See `DEPLOY.md`.
+- **Screenshots:** `.venv/bin/python scripts/screenshots.py` (phone size, light and dark).
+- **Claude skills:** `.claude/skills/casa24-*` explain every part of the project; start with `casa24-wordle`.
 - Credits and licenses: `CREDITS.md`.
 
 ---

@@ -147,3 +147,6 @@ webapp/static/fonts/Gilroy-*
 # Vercel build output (made by scripts/vercel_build.py) and CLI link
 public/
 .vercel/
+
+# local screenshots
+screenshots/
