@@ -45,3 +45,11 @@ def test_spanish_plurals_accepted():
     )
     for word in ["cosas", "notas", "todos", "voces"]:
         assert word in valid
+
+
+def test_no_proper_names_in_spanish():
+    # people, places and abbreviations were removed from the Spanish lists
+    valid = set(app.language_codes_5words["es"]) | set(app.language_codes_5words_supplements["es"])
+    for name in ["laura", "jesús", "rusia", "ibiza", "pablo", "gómez", "excmo", "world"]:
+        assert name not in valid
+    assert "chile" in app.language_codes_5words["es"]  # the pepper stays

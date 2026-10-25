@@ -49,7 +49,6 @@ bocio
 patio
 galgo
 podón
-bután
 revés
 selva
 judas
@@ -74,7 +73,6 @@ dupla
 flato
 tórax
 monja
-turia
 cerio
 ulema
 rutar
@@ -93,7 +91,6 @@ haber
 dular
 erguí
 teléf
-macau
 ojera
 cebar
 lioso
@@ -121,7 +118,6 @@ facto
 talco
 ascua
 atril
-conil
 jorfe
 sabio
 sport
@@ -142,7 +138,6 @@ aunar
 curso
 marra
 filme
-timor
 ameno
 entro
 dotal
@@ -186,7 +181,6 @@ trona
 úseme
 molle
 araba
-telde
 posar
 yerga
 grana
@@ -205,14 +199,12 @@ tonar
 hozar
 rezar
 amigo
-mario
 ayuno
 pecio
 rugar
 pompa
 tripe
 ronza
-jesús
 yerba
 millo
 amiba
@@ -231,7 +223,6 @@ burda
 mural
 probo
 veloz
-cugat
 digna
 verso
 mando
@@ -242,7 +233,6 @@ bonga
 brear
 gorro
 tajar
-calpe
 archa
 bocha
 brial
@@ -289,7 +279,6 @@ grelo
 ajeno
 sifón
 tocar
-laura
 fango
 quina
 tinto
@@ -357,7 +346,6 @@ biela
 saldo
 argén
 tomín
-genil
 darán
 conde
 coord
@@ -389,7 +377,6 @@ casal
 jerbo
 manir
 efebo
-cuart
 salce
 torda
 regar
@@ -448,7 +435,6 @@ rezón
 abeto
 jalde
 vermú
-vélez
 sacar
 cáliz
 trapa
@@ -466,7 +452,6 @@ azada
 alfoz
 cusir
 óyela
-sudán
 ceder
 macia
 diván
@@ -519,7 +504,6 @@ ultra
 ámalo
 baria
 mitra
-alfaz
 panza
 jasar
 hamez
@@ -579,7 +563,6 @@ grada
 lumbo
 mesón
 visar
-durán
 tañer
 hecho
 litro
@@ -595,7 +578,6 @@ gonce
 pagel
 ichus
 sexar
-mijas
 erraj
 corte
 chacó
@@ -615,7 +597,6 @@ aduar
 radio
 chepa
 latir
-morón
 nadar
 dorar
 final
@@ -625,8 +606,6 @@ zarco
 ricia
 omero
 manía
-bisáu
-aruba
 tueco
 boyar
 etilo
@@ -641,12 +620,9 @@ daría
 musco
 oídla
 sueco
-ardoz
 maese
-jaime
 aleja
 calca
-soria
 cesto
 suero
 venda
@@ -731,13 +707,11 @@ fusil
 hogar
 yezgo
 crono
-despí
 virgo
 buril
 escoa
 mugre
 jerga
-félix
 razar
 bonzo
 mayen
@@ -778,7 +752,6 @@ grupa
 ronce
 serlo
 cribo
-excmo
 jalar
 brasa
 balín
@@ -821,7 +794,6 @@ gluma
 elche
 pixel
 fobia
-faroe
 tormo
 siena
 osudo
@@ -829,7 +801,6 @@ dador
 plano
 revén
 zompo
-isora
 nicho
 pueda
 fieis
@@ -895,13 +866,10 @@ anexo
 tinos
 tazón
 recta
-horts
 borní
-irene
 pafio
 arria
 balde
-elena
 tener
 tesón
 henal
@@ -917,12 +885,10 @@ clavo
 átelo
 supón
 plica
-haití
 ámela
 queda
 noble
 dupdo
-samoa
 pezón
 picar
 meaja
@@ -950,7 +916,6 @@ rehén
 edrar
 suelo
 yagua
-palau
 óbito
 diosa
 vulva
@@ -1014,7 +979,6 @@ visor
 momia
 rasar
 atabe
-ícaro
 fonio
 navío
 mocil
@@ -1061,7 +1025,6 @@ stand
 llera
 pícea
 nidio
-borja
 festa
 mayar
 lejas
@@ -1071,7 +1034,6 @@ rojez
 pizca
 ánimo
 patán
-jávea
 notro
 actea
 plana
@@ -1178,7 +1140,6 @@ peaje
 alajú
 caqui
 cesio
-corán
 danos
 bulto
 ermar
@@ -1228,7 +1189,6 @@ sílex
 notar
 hondo
 tirón
-nevis
 marea
 maría
 móvil
@@ -1238,7 +1198,6 @@ ojoso
 motil
 pasma
 ajete
-besós
 rever
 hedor
 tribu
@@ -1246,7 +1205,6 @@ oídlo
 dente
 ocelo
 igual
-muñoz
 güira
 falsa
 bambú
@@ -1273,7 +1231,6 @@ colón
 mutua
 choto
 golfo
-nerja
 afear
 anden
 nabar
@@ -1302,7 +1259,6 @@ pudio
 hayas
 padre
 únala
-túnez
 cuota
 bujía
 umero
@@ -1322,9 +1278,7 @@ balay
 ángel
 fabla
 trago
-marín
 virus
-gómez
 yendo
 maché
 carla
@@ -1411,7 +1365,6 @@ buque
 bruta
 duque
 muria
-rusia
 señal
 ganar
 calva
@@ -1438,7 +1391,6 @@ hosco
 doble
 tauro
 pique
-gabón
 trabe
 átela
 bravo
@@ -1457,21 +1409,17 @@ lloro
 nacre
 aquél
 llave
-isaac
 espín
 ramio
 layar
 cerno
 mamar
 zenit
-siero
 piche
-jaume
 orear
 mueso
 tenor
 posca
-iltre
 ardor
 mogol
 dique
@@ -1535,7 +1483,6 @@ libra
 zaque
 aviar
 pitón
-jordi
 rabel
 zueco
 sauna
@@ -1548,7 +1495,6 @@ mutis
 limen
 bache
 buceo
-josep
 podía
 guamo
 roque
@@ -1652,7 +1598,6 @@ tajea
 plena
 pecar
 pario
-kitts
 larva
 seico
 zarja
@@ -1670,12 +1615,10 @@ bejín
 chapo
 éster
 circe
-olesa
 colar
 gales
 salso
 cuita
-éibar
 mimar
 ánodo
 óyelo
@@ -1695,7 +1638,6 @@ locro
 ceñir
 redol
 frito
-níger
 birla
 vetar
 rabón
@@ -1715,7 +1657,6 @@ vareo
 trino
 licor
 cesar
-álava
 minal
 lunes
 humor
@@ -1759,7 +1700,6 @@ lucha
 susto
 tejar
 jorro
-ávila
 hoque
 nuera
 polla
@@ -1778,7 +1718,6 @@ tigre
 obstó
 salio
 cequí
-cádiz
 marzo
 diles
 venta
@@ -1889,12 +1828,9 @@ actor
 temor
 lábil
 polca
-world
 brota
 pieza
 quena
-papúa
-kenia
 culta
 cutis
 manís
@@ -1909,7 +1845,6 @@ burka
 foras
 cross
 savia
-sonia
 criba
 apolo
 overo
@@ -1935,7 +1870,6 @@ horma
 aspar
 vinos
 fuñar
-écija
 parco
 aqueo
 fiado
@@ -1991,7 +1925,6 @@ persa
 arreo
 tarea
 marro
-duero
 clisé
 aleda
 oribe
@@ -2004,7 +1937,6 @@ corto
 pilón
 prono
 zopas
-yemen
 loina
 curva
 ozono
@@ -2041,8 +1973,6 @@ rimar
 uvero
 sarza
 época
-benín
-oscar
 ferro
 melsa
 ichal
@@ -2079,13 +2009,11 @@ juego
 henar
 ética
 tumba
-ribas
 briba
 serba
 póney
 pacay
 plomo
-ceuta
 graso
 gesta
 omeya
@@ -2093,7 +2021,6 @@ perro
 cenar
 panal
 ducal
-níjar
 lamín
 culto
 tajón
@@ -2198,7 +2125,6 @@ toesa
 bogar
 símil
 sedar
-arosa
 sesén
 pardo
 dabas
@@ -2210,7 +2136,6 @@ verme
 delas
 tenso
 tumor
-lópez
 remar
 atear
 uncia
@@ -2228,7 +2153,6 @@ libre
 liana
 coxis
 roano
-salou
 talla
 piano
 media
@@ -2247,7 +2171,6 @@ ayuda
 bañar
 melva
 filar
-vidal
 acure
 brazo
 beber
@@ -2312,10 +2235,8 @@ vario
 estés
 mesmo
 aforo
-coria
 saíno
 tondo
-mahón
 fatal
 vendí
 ébano
@@ -2391,7 +2312,6 @@ apego
 bóxer
 jaudo
 brugo
-ibiza
 llena
 musar
 babel
@@ -2460,7 +2380,6 @@ posón
 recre
 jaque
 nácar
-ghana
 nueva
 flexo
 caldo
@@ -2484,7 +2403,6 @@ alada
 jetar
 lores
 santo
-alcoy
 monje
 jabón
 baída
@@ -2493,7 +2411,6 @@ rueda
 zendo
 asmar
 rugir
-valls
 nucir
 iraní
 secar
@@ -2520,7 +2437,6 @@ cazuz
 roñar
 uviar
 dueño
-lorca
 patas
 pajar
 valía
@@ -2567,13 +2483,11 @@ litre
 esmog
 extra
 cuñar
-saint
 falla
 lúteo
 pelma
 testa
 jarra
-arona
 cagar
 apnea
 nunca
@@ -2629,7 +2543,6 @@ manga
 líneo
 estar
 pagar
-feliú
 bagar
 recua
 puñir
@@ -2641,7 +2554,6 @@ acuse
 eguar
 bizco
 sable
-gijón
 ficus
 tarar
 guiri
@@ -2697,7 +2609,6 @@ datar
 vicia
 chopa
 morir
-dorta
 triar
 enema
 penol
@@ -2742,7 +2653,6 @@ latón
 balda
 medra
 samio
-felíu
 gleba
 ragua
 tobar
@@ -2767,7 +2677,6 @@ iguar
 helor
 salud
 fluir
-nuria
 panel
 tanor
 flora
@@ -2791,7 +2700,6 @@ tojal
 liria
 cisma
 segar
-rivas
 abajo
 rases
 titán
@@ -2821,7 +2729,6 @@ borra
 lamer
 quima
 armar
-ortiz
 resal
 orgía
 pegar
@@ -2855,7 +2762,6 @@ catar
 mamón
 himen
 pajuz
-lanka
 salir
 trama
 huelo
@@ -2939,9 +2845,7 @@ llama
 antia
 playo
 vergé
-óscar
 adive
-narón
 budín
 cisco
 vayan
@@ -2973,7 +2877,6 @@ tecla
 tazar
 etapa
 figón
-adeje
 norte
 jalea
 fiada
@@ -3030,13 +2933,11 @@ gorda
 lavar
 peral
 banco
-vícar
 tonel
 parar
 vivir
 dombo
 tilde
-pablo
 galas
 tóner
 rosal
@@ -3051,7 +2952,6 @@ fémur
 impto
 chulo
 relax
-mogán
 cubil
 curda
 filón
@@ -3060,7 +2960,6 @@ loica
 cisne
 cuark
 macho
-yecla
 hitar
 banca
 ónice
@@ -3073,7 +2972,6 @@ jemal
 galla
 úsalo
 celia
-nauru
 jeque
 cebón
 canoa
@@ -3106,7 +3004,6 @@ bular
 sabor
 turar
 vinta
-denia
 ollao
 ladys
 secta
@@ -3174,7 +3071,6 @@ babis
 orate
 popar
 local
-david
 antes
 tarja
 torce
@@ -3260,7 +3156,6 @@ carca
 dance
 tasto
 atroz
-heard
 niazo
 raspa
 aguay
@@ -3290,7 +3185,6 @@ racor
 raudo
 rodar
 ajuar
-úbeda
 lupus
 jedar
 justo
@@ -3325,7 +3219,6 @@ aleto
 pucia
 sello
 andén
-cieza
 óbice
 pavor
 curvo
@@ -3379,11 +3272,9 @@ firme
 usura
 güero
 barro
-lalín
 meato
 fugir
 pesar
-aitor
 nabal
 tonto
 nenia
@@ -3405,7 +3296,6 @@ milla
 dorso
 sigma
 sirio
-baena
 litis
 calda
 laxar
@@ -3421,7 +3311,6 @@ rozar
 batos
 silla
 roses
-elisa
 oasis
 diana
 módem
@@ -3474,7 +3363,6 @@ ducha
 irgue
 foral
 urgir
-rubén
 veste
 curry
 albor
@@ -3575,13 +3463,11 @@ ranas
 sexto
 cirro
 ollar
-núñez
 picor
 misal
 cómic
 creer
 atrás
-pérez
 rozas
 junio
 pebre
@@ -3596,6 +3482,5 @@ cucar
 demos
 elote
 tacha
-nepal
 bario
 púgil
