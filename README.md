@@ -6,7 +6,8 @@ Casa 24 Records' daily word game, based on [Hugo0/wordle](https://github.com/Hug
 - **Run locally:** `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt`, then `cd webapp && ../.venv/bin/flask --app app run`.
 - **Add words:** `scripts/merge_words.py`, then `scripts/validate_words.py` and `.venv/bin/python -m pytest -q tests`.
 - **Accents:** in Spanish you can type with or without accents (`cancion` finds `canción`); ñ always counts as its own letter.
-- Credits and word-list licenses: `CREDITS.md`.
+- **Branding:** colors and fonts are CSS variables at the top of `webapp/static/style.css`; Kolo art is in `webapp/static/images/kolo/`.
+- Credits and licenses: `CREDITS.md`.
 
 ---
 

@@ -46,6 +46,10 @@ Never add member aliases as `answer`, and never commit the alias files.
 
 All UI text is in `language_config.json` per language (`text`, `help`, `meta`). Missing keys fall back to English (`t()` macro in `game.html`, `this.text()` in `game.js`). Spanish uses Latin American "tú" form.
 
+## Branding
+
+All colors and fonts are CSS variables at the top of `webapp/static/style.css` (Kolo orange `#ff7944`, hoodie green `#1f5a33`, cream background). Correct tiles are green, wrong-spot tiles orange (dark text), absent gray; the share grid uses 🟩 🟧 ⬜. Kolo images are in `webapp/static/images/kolo/` (face = header logo slot, hero = menu, win/lose = end-of-game modal). Do not use "Kolo ft. Pikachu" (trademark) or art with alcohol in the public game. Gilroy font files are git-ignored (commercial license); VT323 (OFL) is the pixel title/tile font.
+
 ## Running
 
 ```

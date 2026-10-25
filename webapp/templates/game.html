@@ -8,18 +8,20 @@
     <meta name="viewport" content="minimum-scale=1, initial-scale=1, width=device-width, user-scalable=no">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon/favicon.ico') }}">
 
-    <title>Wordle {{ language.config.name_native }}/{{ language.config.name }}</title>
+    <title>Casa 24 Wordle · {{ language.config.name_native }}</title>
     <meta name="description" content="{{ language.config.meta.description }}">
     <meta property="description" content="{{ language.config.meta.description }}">
     <meta name="keywords" content="wordle, {{ language.config.name}}, {{ language.config.name_native }}">
-    <meta property="og:title" content="Wordle {{ language.config.name_native }}/{{ language.config.name }}">
-    <meta property="og:url" content="https://wordle.global/{{ language.config.language_code }}">
+    <meta property="og:title" content="Casa 24 Wordle · {{ language.config.name_native }}">
+    <meta property="og:url" content="{{ request.url_root }}{{ language.config.language_code }}">
+    <meta property="og:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
     <meta property="og:type" content="website">
     <meta property="og:description" content="{{ language.config.meta.description }}">
-    <meta property="twitter:domain" content="https://wordle.global">
-    <meta property="twitter:title" content="Wordle {{ language.config.name_native }}/{{ language.config.name }}">
+    <meta property="twitter:title" content="Casa 24 Wordle · {{ language.config.name_native }}">
     <meta property="twitter:description" content="{{ language.config.meta.description }}">
-    <meta property="twitter:image" content="https://wordle.global/static/images/logo.png">
+    <meta property="twitter:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='favicon/site.webmanifest') }}">
     
     <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -64,10 +66,11 @@
                         </svg>
                     </button>
                     <div class="absolute text-center right-0 left-0">
-                        <h1 class="uppercase font-bold text-2xl sm:text-4xl tracking-wider"><a href="/">Wordle <span
-                                    class="text-xl sm:text-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded px-1 py-0">
-                                    {{ language.config.language_code }}</span></a></h1>
-                        </h1>
+                        <h1 class="c24-title uppercase text-3xl sm:text-4xl"><a href="/" class="inline-flex items-center gap-2">
+                                <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
+                                <img src="{{ url_for('static', filename='images/kolo/kolo-face.png') }}" alt="Casa 24" class="c24-logo">
+                                <span>Casa 24</span>
+                                <span class="c24-badge text-2xl">{{ language.config.language_code }}</span></a></h1>
                     </div>
                     <div class="flex flex-row gap-3 z-30">
                         <button class="m-0 sm:my-1" v-on:click="show_stats_modal = !show_stats_modal">
@@ -307,8 +310,8 @@
                     class="border-0 rounded-lg drop-shadow-xl relative flex flex-col w-full bg-white outline-none focus:outline-none">
 
                     <div class="flex-initial relative mx-5 mt-5 z-50">
-                        <h3 class="flex-auto text-center text-xl font-bold">Wordle {{
-                            language.config.name_native }}
+                        <h3 class="flex-auto text-center text-xl font-bold">Casa 24 Wordle {{
+                            language.config.language_code | upper }}
                             #[[ todays_idx ]] [[attempts]]/6
                         </h3>
                         <button class="absolute top-0 right-0 p-1 ml-auto z-50">
@@ -318,6 +321,9 @@
                     </div>
 
                     <div class="relative flex-auto mx-6 my-3 mb-8">
+                        <!-- Kolo celebrates a win, naps after a loss -->
+                        <img v-if="game_won" src="{{ url_for('static', filename='images/kolo/kolo-win.png') }}" alt="Kolo" class="c24-kolo mb-2">
+                        <img v-if="game_over && !game_won" src="{{ url_for('static', filename='images/kolo/kolo-lose.png') }}" alt="Kolo" class="c24-kolo mb-2">
                         <p class="text-md text-center whitespace-pre-line" id="emoji_board" v-html="emoji_board">
                         </p>
                         <p v-if="attempts=='0'" class="text-center text-sm text-gray-600">
@@ -343,22 +349,22 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-row justify-center border-t border-solid px-10 py-5">
+                    <div class="flex flex-row justify-center items-start gap-2 border-t border-solid px-3 py-5">
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl text-center">[[stats.n_games]]</p>
-                            <p class="text-sm">{{ t('stats_games', 'Games') }}</p>
+                            <p class="text-xs leading-tight mt-1">{{ t('stats_games', 'Games') }}</p>
                         </div>
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl" v-html="stats.win_percentage.toLocaleString('en') + '%'"></p>
-                            <p class="text-sm">{{ t('stats_win_percentage', 'Win %') }}</p>
+                            <p class="text-xs leading-tight mt-1">{{ t('stats_win_percentage', 'Win %') }}</p>
                         </div>
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl">[[stats.current_streak]]</p>
-                            <p class="text-sm">{{ t('stats_current_streak', 'Current streak') }}</p>
+                            <p class="text-xs leading-tight mt-1">{{ t('stats_current_streak', 'Current streak') }}</p>
                         </div>
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl">[[stats.longest_streak]]</p>
-                            <p class="text-sm">{{ t('stats_best_streak', 'Best streak') }}</p>
+                            <p class="text-xs leading-tight mt-1">{{ t('stats_best_streak', 'Best streak') }}</p>
                         </div>
                     </div>
 

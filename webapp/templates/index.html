@@ -7,18 +7,20 @@
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon/favicon.ico') }}">
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
 
-    <title>Wordle Global - {{ languages | length }} languages available</title>
-    <meta name="description" content="Wordle, the daily word puzzle. Free, Open-Source & available in (most) languages">
-    <meta property="description" content="Wordle, the daily word puzzle. Free, Open-Source & available in (most) languages">
-    <meta name="keywords" content="wordle, english, puzzle, word, play, game, online, guess, free, daily">
-    <meta property="og:title" content="Wordle Global - {{ languages | length }} languages available">
-    <meta property="og:url" content="https://wordle.global/">
+    <title>Casa 24 Wordle</title>
+    <meta name="description" content="Casa 24 Wordle: el juego diario de palabras de Casa 24 Records. / Casa 24 Records' daily word game.">
+    <meta property="description" content="Casa 24 Wordle: el juego diario de palabras de Casa 24 Records. / Casa 24 Records' daily word game.">
+    <meta name="keywords" content="casa 24, casa 24 records, wordle, español, english, juego de palabras, word game, panamá">
+    <meta property="og:title" content="Casa 24 Wordle">
+    <meta property="og:url" content="{{ request.url_root }}">
+    <meta property="og:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
     <meta property="og:type" content="website">
-    <meta property="og:description" content="Wordle, the daily word puzzle. Free, Open-Source & available in (most) languages">
-    <meta property="twitter:domain" content="https://wordle.global">
-    <meta property="twitter:title" content="Wordle Global - {{ languages | length }} languages available">
-    <meta property="twitter:description" content="Wordle, the daily word puzzle. Free, Open-Source & available in (most) languages">
-    <meta property="twitter:image" content="https://wordle.global/static/images/logo.png">
+    <meta property="og:description" content="Casa 24 Wordle: el juego diario de palabras de Casa 24 Records. / Casa 24 Records' daily word game.">
+    <meta property="twitter:title" content="Casa 24 Wordle">
+    <meta property="twitter:description" content="Casa 24 Wordle: el juego diario de palabras de Casa 24 Records. / Casa 24 Records' daily word game.">
+    <meta property="twitter:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='favicon/site.webmanifest') }}">
 
     <!-- Vue -->
     <script src="https://unpkg.com/vue@3.0.2"></script>
@@ -56,9 +58,10 @@
                 </svg>
             </button>
             <div class="absolute right-0 left-0 text-center">
-                <h1 class="uppercase font-bold text-xl tiny:text-3xl sm:text-4xl tracking-wider"><a href="/">WORDLE
-                        🌍</a></h1>
-                </h1>
+                <h1 class="c24-title uppercase text-3xl sm:text-4xl"><a href="/" class="inline-flex items-center gap-2">
+                    <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
+                    <img src="{{ url_for('static', filename='images/kolo/kolo-face.png') }}" alt="Casa 24" class="c24-logo">
+                    <span>Casa 24 Wordle</span></a></h1>
             </div>
             <div class="flex flex-row gap-3 z-30">
                 <button class="m-0 sm:my-1" v-on:click="showStatsModal = !showStatsModal">
@@ -75,6 +78,12 @@
             </div>
         </header>
 
+        <!-- Casa 24 hero: Kolo and a one-line intro in both languages -->
+        <div class="flex flex-col items-center text-center mt-8 px-4 gap-2">
+            <img src="{{ url_for('static', filename='images/kolo/kolo-hero.png') }}" alt="Kolo, la mascota de Casa 24 / Casa 24's mascot" class="c24-kolo">
+            <p class="text-base font-bold"><span lang="es">Adivina la palabra del día en 6 intentos.</span></p>
+            <p class="text-sm text-neutral-500"><span lang="en">Guess the word of the day in 6 tries.</span></p>
+        </div>
         <!-- language search box -->
         <div class="flex justify-center mt-12">
             <div
@@ -133,22 +142,10 @@
                 <div class="bg-white rounded-lg shadow-lg p-5 m-4 border-2 border-slate-200 mx-auto w-full max-w-xs sm:max-w-lg"
                     v-cloak>
                     <div class="flex flex-col gap-2 relative ">
-                        <h3 class="flex mx-auto uppercase font-bold text-2xl tracking-wider mb-2">About</h3>
-                        <p class="text-center text-sm">Hi! You probably know about Wordle already. It's a <span
-                                class="italic">really</span> fun game.</p>
-                        <p class="text-center text-sm">My skills are mostly in backend/ML, with lacking
-                            frontend experience. I wanted to change that, so why not recreate one of my favorite
-                            current
-                            games? The aim was to make something useful whilst also getting comfortable with TailwindCSS & Vue.js</p>
-                        <p class="text-center text-sm">The whole thing is open-source, and you can (and actually,
-                            please
-                            do) suggest improvements or fixes over at <a href="https://github.com/Hugo0/wordle/issues"
-                                class="text-neutral-500 underline">GitHub</a></p>
-                        <p class="text-center text-sm">There's fun languages, like Klingon or
-                            Tolkien's Elvish that you can measure yourself on, as well as right to left languages like Arabic or
-                            Hebrew. Stats <a href="/stats" target="_blank" class="text-neutral-500 underline">here</a>.</p>
-                        <p class="text-center text-sm">A lot of other great Wordle spin-offs exist, and I've linked a bunch below for easy access. (credit: <a href="https://rwmpelstilzchen.gitlab.io/wordles/" class="text-neutral-500 underline">Wordles of the World</a>)</p>
-                        <p class="text-center text-sm">Have fun, and I hope you enjoy!</p>
+                        <h3 class="flex mx-auto c24-title uppercase text-3xl mb-2">Casa 24 Wordle</h3>
+                        <p class="text-center text-sm" lang="es">El juego diario de palabras de <span class="font-bold">Casa 24 Records</span>, sello independiente y colectivo artístico de Ciudad de Panamá. Una palabra nueva cada día, igual para todos. Algunos días la palabra es nuestra.</p>
+                        <p class="text-center text-sm" lang="en">The daily word game from <span class="font-bold">Casa 24 Records</span>, an independent label and art collective in Panama City. A new word every day, the same for everyone. Some days the word is one of ours.</p>
+                        <p class="text-center text-xs text-neutral-500">Basado en / Based on <a href="https://github.com/Hugo0/wordle" class="underline">Hugo0/wordle</a> (MIT). Mascota / Mascot: Kolo.</p>
                         <button
                             class="uppercase font-bold text-sm tracking-wider mt-2 border-t-2 border-gray-300 mt-2 pt-2"
                             v-on:click="showAboutModal = !showAboutModal">close</button>

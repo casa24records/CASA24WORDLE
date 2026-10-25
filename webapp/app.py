@@ -19,6 +19,7 @@ import random
 random.seed(42)
 
 app = Flask(__name__)
+app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu order (Spanish, English first)
 
 ###############################################################################
 # DATA
@@ -57,6 +58,8 @@ def load_characters(lang):
 
 
 language_codes = [f.split("/")[-1] for f in glob.glob(f"{data_dir}/languages/*")]
+# Spanish and English first on the menu, then the rest alphabetically
+language_codes = sorted(language_codes, key=lambda c: (c not in ("es", "en"), c != "es", c))
 language_characters = {lang: load_characters(lang) for lang in language_codes}
 
 

@@ -140,3 +140,6 @@ __pycache__/
 webapp/data/languages/*/*_casa24_aliases.txt
 scripts/casa24/*PRIVATE*
 needs_ocr.txt
+
+# Gilroy is a commercial font: keep it local until we have a webfont license
+webapp/static/fonts/Gilroy-*

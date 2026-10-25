@@ -1,20 +1,100 @@
+/* ==========================================================================
+   CASA 24 THEME: change colors, fonts and images here, in one place.
+   Colors sampled from the Kolo artwork.
+   ========================================================================== */
+:root {
+    /* brand */
+    --c24-orange: #ff7944;        /* Kolo's fur */
+    --c24-green: #1f5a33;         /* hoodie green */
+    --c24-forest: #163119;        /* dark forest green */
+    --c24-cream: #f4efe6;         /* page background */
+    --c24-sand: #cfc5b6;          /* hoodie cream: borders, keys */
+    --c24-ink: #0a0b09;           /* text */
+    --c24-muted: #5f5a55;         /* secondary text */
+
+    /* game tiles (text color chosen for contrast on each) */
+    --c24-correct-bg: var(--c24-green);
+    --c24-correct-fg: #ffffff;
+    --c24-present-bg: var(--c24-orange);
+    --c24-present-fg: var(--c24-ink);
+    --c24-absent-bg: #77716b;
+    --c24-absent-fg: #ffffff;
+    --c24-key-bg: #e4dccf;
+
+    /* fonts: Gilroy if the files are present (license needed for the web),
+       otherwise the system font. VT323 (free, OFL) is the pixel font. */
+    --c24-font-body: "Gilroy", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --c24-font-display: "VT323", ui-monospace, monospace;
+}
+
+@font-face { font-family: "VT323"; src: url("fonts/VT323-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-Medium.ttf") format("truetype"); font-weight: 400 500; font-display: swap; }
+@font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-Bold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-ExtraBold.ttf") format("truetype"); font-weight: 800 900; font-display: swap; }
+
+/* ---------- base ---------- */
+body {
+    background-color: var(--c24-cream);
+    color: var(--c24-ink);
+    font-family: var(--c24-font-body);
+}
+
+/* modals and cards from the original Tailwind markup */
+.bg-white { background-color: var(--c24-cream) !important; }
+.border-neutral-300, .border-gray-300, .border-slate-200 { border-color: var(--c24-sand) !important; }
+.text-neutral-500, .text-neutral-400, .text-gray-700 { color: var(--c24-muted) !important; }
+
+/* ---------- Casa 24 pieces ---------- */
+.c24-title {
+    font-family: var(--c24-font-display);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    line-height: 1;
+}
+.c24-logo {               /* LOGO SLOT: Kolo's face; swap the <img> src to change it */
+    height: 36px;
+    width: 36px;
+    border-radius: 9999px;
+    background: var(--c24-orange);
+    object-fit: cover;
+}
+.c24-badge {
+    background: var(--c24-orange);
+    color: var(--c24-ink);
+    border-radius: 4px;
+    padding: 0 0.3em;
+}
+.c24-kolo { margin: 0 auto; max-height: 160px; width: auto; }
+
+/* ---------- board and keyboard ---------- */
 .key {
-    background-color: #d3d6da;
+    background-color: var(--c24-key-bg);
+    color: var(--c24-ink);
 }
-
 .correct {
-    background-color: #6aaa63 !important;
-    color: white;
+    background-color: var(--c24-correct-bg) !important;
+    border-color: var(--c24-correct-bg) !important;
+    color: var(--c24-correct-fg) !important;
 }
-
 .semicorrect {
-    background-color: #ccb757 !important;
-    color: white;
+    background-color: var(--c24-present-bg) !important;
+    border-color: var(--c24-present-bg) !important;
+    color: var(--c24-present-fg) !important;
 }
-
 .incorrect {
-    background-color: #939598 !important;
-    color: white;
+    background-color: var(--c24-absent-bg) !important;
+    border-color: var(--c24-absent-bg) !important;
+    color: var(--c24-absent-fg) !important;
+}
+/* pixel font on the tiles */
+#app .grid-cols-5 > div { font-family: var(--c24-font-display); }
+
+/* share button and other green buttons from the original */
+.bg-green-500, .bg-green-600 { background-color: var(--c24-green) !important; }
+
+/* the original's blue gradient accents become Kolo orange to green */
+.bg-gradient-to-r.from-cyan-500 {
+    background-image: linear-gradient(to right, var(--c24-orange), var(--c24-green)) !important;
 }
 
 /* hides vue elements initially */

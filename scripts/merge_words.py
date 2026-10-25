@@ -2,7 +2,7 @@
 
 Usage:
     python scripts/merge_words.py scripts/casa24/seed_words.csv
-    python scripts/merge_words.py mined_candidates.csv
+    python scripts/merge_words.py my_reviewed_words.csv
 
 The CSV needs the columns: lang, word, decision
   decision = answer      -> can be the daily word (about 1 day in 5) and is a valid guess

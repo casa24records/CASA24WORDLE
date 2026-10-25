@@ -470,7 +470,7 @@ const app = Vue.createApp({
         getEmojiBoard() {
             // turns tiles board into emojis
             // correct: 🟩
-            // semi-correct: 🟨
+            // semi-correct: 🟧 (Kolo orange)
             // incorrect: ⬜
             var emoji_board = "";
             for (let i = 0; i < this.tile_classes.length; i++) {
@@ -480,7 +480,7 @@ const app = Vue.createApp({
                     if (tile_class.indexOf("correct") >= 0 && tile_class.indexOf("semicorrect") == -1 && tile_class.indexOf("incorrect") == -1) {
                         emoji_board += "🟩";
                     } else if (tile_class.indexOf("semicorrect") >= 0) {
-                        emoji_board += "🟨";
+                        emoji_board += "🟧";
                     } else if (tile_class.indexOf("incorrect") >= 0) {
                         emoji_board += "⬜";
                     } else {
@@ -583,7 +583,7 @@ const app = Vue.createApp({
                 n_attempts += result.attempts;
             }
             var avg_attempts = n_attempts / results.length;
-            var win_percentage = n_wins / (((n_wins + n_losses) * 100) || 0);
+            var win_percentage = Math.round(n_wins / (n_wins + n_losses) * 100) || 0;
 
             return {
                 "n_wins": n_wins,
