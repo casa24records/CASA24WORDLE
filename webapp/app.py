@@ -385,7 +385,8 @@ def site_map():
 @app.route("/<lang_code>")
 def language(lang_code):
     if lang_code not in language_codes:
-        return "Language not found"
+        # removed or unknown languages go back to the menu instead of an error
+        return redirect("/")
     word_list = language_codes_5words[lang_code]
     cookie_key = f"keyboard_layout_{lang_code}"
     requested_layout = request.args.get("layout") or request.cookies.get(cookie_key)

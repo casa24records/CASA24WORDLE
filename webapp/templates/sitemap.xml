@@ -5,7 +5,7 @@
   </url>
   {% for language in languages %}
   <url>
-    <loc>{{ base_url }}/{{ language }}</loc>s
+    <loc>{{ base_url }}/{{ language }}</loc>
   </url>
   {% endfor %}
 </urlset>
