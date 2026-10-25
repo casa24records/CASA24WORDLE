@@ -9,6 +9,9 @@ from flask import (
 import json
 
 import datetime
+import os
+
+import daily
 import glob
 import random
 
@@ -168,14 +171,39 @@ def load_keyboard(lang):
 
 
 def get_todays_idx():
-    n_days = (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).days
-    idx = n_days - 18992 + 195
-    return idx
+    """Puzzle number for today in Panama time (see daily.py)."""
+    return daily.day_index(daily.panama_today())
+
+
+def load_casa24_words(lang, tier):
+    """Casa 24 word files: 'answers', 'guesses', or private 'aliases'."""
+    path = f"{data_dir}languages/{lang}/{lang}_5words_casa24_{tier}.txt"
+    if not os.path.exists(path):
+        return []
+    with open(path, "r", encoding="utf-8") as f:
+        words = [line.strip().lower() for line in f]
+    return [w for w in words if w and not w.startswith("#")]
+
+
+def load_casa24(lang):
+    answers = load_casa24_words(lang, "answers")
+    guesses = load_casa24_words(lang, "guesses")
+    # member aliases stay off unless explicitly turned on
+    if os.environ.get("CASA24_ENABLE_ALIASES") == "1":
+        guesses += load_casa24_words(lang, "aliases")
+    return answers, guesses
 
 
 language_codes_5words = {l_code: load_words(l_code) for l_code in language_codes}
+casa24_words = {l_code: load_casa24(l_code) for l_code in language_codes}
+# Valid guesses that are not in the main list: the supplement plus all Casa 24 words.
 language_codes_5words_supplements = {
-    l_code: load_supplemental_words(l_code) for l_code in language_codes
+    l_code: sorted(
+        set(load_supplemental_words(l_code))
+        | set(casa24_words[l_code][0])
+        | set(casa24_words[l_code][1])
+    )
+    for l_code in language_codes
 }
 language_configs = {l_code: load_language_config(l_code) for l_code in language_codes}
 
@@ -255,7 +283,9 @@ class Language:
         self.word_list = word_list
         self.word_list_supplement = language_codes_5words_supplements[language_code]
         todays_idx = get_todays_idx()
-        self.daily_word = word_list[todays_idx % len(word_list)]
+        self.daily_word = daily.pick_daily_word(
+            language_code, todays_idx, word_list, casa24_words[language_code][0]
+        )
         self.todays_idx = todays_idx
         self.config = language_configs[language_code]
 

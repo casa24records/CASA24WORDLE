@@ -181,10 +181,10 @@ const app = Vue.createApp({
     },
     methods: {
         get_time_until_next_day() {
-            // returns time until next UTC day formatted as "h m s"
+            // returns time until the next day in Panama (UTC-5) formatted as "h m s"
 
             var d = new Date();
-            var h = d.getUTCHours();
+            var h = (d.getUTCHours() + 24 - 5) % 24; // Panama time, UTC-5
             var m = d.getUTCMinutes();
             var s = d.getUTCSeconds();
             

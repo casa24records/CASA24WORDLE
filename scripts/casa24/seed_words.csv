@@ -1,0 +1,60 @@
+lang,word,category,source,already_in_base_list,decision,decision
+es,priti,slang,00-CORE.md (house slang list),NEW,guess-only,guess-only
+es,frene,slang,00-CORE.md (house slang list),NEW,guess-only,guess-only
+es,fokop,slang,00-CORE.md (house slang list),NEW,guess-only,guess-only
+es,plena,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,juego,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,nieve,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,notas,casa24,00-CORE/03-CATALOG/12-MEETINGS,NEW,answer,answer
+es,sismo,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,canal,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,fecha,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,pausa,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,voces,casa24,00-CORE/03-CATALOG/12-MEETINGS,NEW,answer,answer
+es,corte,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,pieza,casa24,00-CORE/03-CATALOG/12-MEETINGS,yes,answer,answer
+es,gente,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+es,cosas,spoken,04-BRAND.md quotes / team speech,NEW,answer,answer
+es,grupo,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+es,punto,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+es,somos,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+es,viven,spoken,04-BRAND.md quotes / team speech,NEW,answer,answer
+es,hacer,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+es,queda,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+es,falla,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+es,todos,spoken,04-BRAND.md quotes / team speech,NEW,answer,answer
+es,ideas,spoken,04-BRAND.md quotes / team speech,NEW,answer,answer
+es,marca,spoken,04-BRAND.md quotes / team speech,yes,answer,answer
+en,beats,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,merch,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,radio,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,album,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,audio,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,video,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,cover,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,drums,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,piano,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,synth,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,organ,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,foley,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,vinyl,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,reels,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,story,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,posts,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,canva,casa24,00-CORE/03-CATALOG/05-MARKETING,NEW,guess-only,guess-only
+en,crate,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,label,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,chill,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,sound,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,music,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,track,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,mixed,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,house,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,night,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,glass,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,joint,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,birds,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,tweet,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,party,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,beach,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer
+en,level,casa24,00-CORE/03-CATALOG/05-MARKETING,yes,answer,answer

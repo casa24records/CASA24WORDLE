@@ -135,3 +135,7 @@ drive_export/
 mined_candidates.csv
 .venv/
 __pycache__/
+
+# Casa 24: member aliases stay off git until members confirm
+webapp/data/languages/*/*_casa24_aliases.txt
+scripts/casa24/*PRIVATE*
