@@ -139,3 +139,4 @@ __pycache__/
 # Casa 24: member aliases stay off git until members confirm
 webapp/data/languages/*/*_casa24_aliases.txt
 scripts/casa24/*PRIVATE*
+needs_ocr.txt

@@ -1,3 +1,5 @@
 pytest
 playwright
 pytest-playwright
+python-docx
+pdfplumber

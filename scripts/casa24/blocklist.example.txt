@@ -1,0 +1,5 @@
+# Copy this file to scripts/casa24/blocklist_PRIVATE.txt (git-ignored) and list,
+# one per line, words the miner must NEVER output:
+#   - members' legal names, external contacts, attorneys, departed members
+#   - record labels, sponsors, brands, trademarked characters
+# Any length is fine; only 5-letter entries matter. Lines starting with # are ignored.
