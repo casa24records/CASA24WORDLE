@@ -9,7 +9,8 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Scope and working style
 - The owner is the admin at Casa 24 Records (Panama City). They are a beginner developer and watch token usage. Explain in plain language, keep changes small, commit after each step, and don't paste long outputs.
-- **Keep the original upstream game and menu.** An early rewrite of the menu as a two-button page was rejected and stashed (`git stash list`). Add Casa 24 things on top instead of rebuilding.
+- **Keep the original upstream game.** An early two-language-only rewrite was rejected (stashed, see `git stash list`) because it cut languages.
+- **Start screen redesigned** (owner asked for "a better starting screen"): Kolo hero, today's puzzle number and countdown, big Español/English buttons, the other 8 languages as small chips. The upstream **External Links** section (1,264 links to other Wordle sites, which looked like "extra modes that change the colors"), the search box and the `/stats` page were **removed**. Don't bring them back.
 - **Languages:** the 10 most spoken that upstream had: en, es, ar, fr, pt, ru, de, tr, vi, ko. English and Spanish are required.
 - **Name:** "Casa 24 Wordle".
 

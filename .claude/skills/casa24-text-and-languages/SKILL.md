@@ -13,7 +13,7 @@ description: Change any visible text or translation in Casa 24 Wordle, follow th
 - Templates: use `{{ t('key', 'English fallback') }}` (macro at the top of `game.html`).
 - `game.js`: use `this.text("key", "English fallback")`.
 - Missing keys fall back to English, so the 8 other languages still work.
-- The menu (`index.html`) shows Spanish and English side by side, with `lang="es"`/`lang="en"` spans.
+- The start screen (`index.html`) is bilingual on purpose: Spanish and English side by side in `lang="es"`/`lang="en"` spans. The Play/Jugar and "Jugada hoy"/"Played today" labels are in the template's Vue expressions.
 
 **Rule:** never hard-code a user-visible string. Add the key to **both** `es` and `en` configs, with an English fallback in the code.
 

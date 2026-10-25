@@ -28,7 +28,7 @@ cd webapp && ../.venv/bin/flask --app app run      # http://127.0.0.1:5000
 |---|---|
 | `test_words.py` | validator passes, tiers don't overlap, Casa 24 words are valid guesses, aliases off, Spanish plurals accepted, no proper names |
 | `test_daily.py` | same date same word, Panama midnight, 1 in 5 Casa 24 days |
-| `test_smoke_browser.py` | menu loads, a guess colors tiles in es/en at phone size, accents optional in Spanish (Playwright) |
+| `test_smoke_browser.py` | start screen (10 local links, es/en first, fits a phone, remembers language, "Jugada hoy" after a win), a guess colors tiles in es/en, accents optional in Spanish, `/stats` gone (Playwright) |
 | `test_vercel_ready.py` | `webapp.app:app` loads from the repo root behind a proxy, build step copies static files |
 
 `tests/conftest.py` puts `webapp/` and `scripts/` on the import path and changes into `webapp/`.

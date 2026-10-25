@@ -115,6 +115,8 @@ const app = Vue.createApp({
         }
     },
     created() {
+        // remember the last language played, for the start screen
+        try { localStorage.setItem("casa24_lang", this.config.language_code); } catch (e) { }
         // listen for any keypresses
         window.addEventListener('keydown', this.keyDown);
 

@@ -129,6 +129,46 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 }
 .c24-kolo { margin: 0 auto; max-height: 160px; width: auto; }
 
+/* ---------- start screen ---------- */
+.c24-hero-kolo { height: 150px; width: auto; }
+.c24-today { font-size: 0.8rem; color: var(--c24-subtle); }
+.c24-play {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1.1rem;
+    border-radius: 14px;
+    border: 2px solid var(--c24-green);
+    transition: transform 0.08s ease, box-shadow 0.15s ease;
+}
+.c24-play:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15); }
+.c24-play:active { transform: scale(0.98); }
+.c24-play-main { background: var(--c24-correct-bg); border-color: var(--c24-correct-bg); color: #fff; }
+.c24-play-alt { background: transparent; color: var(--c24-text); }
+.c24-play-name { font-family: var(--c24-font-display); font-size: 2rem; line-height: 1; text-transform: uppercase; letter-spacing: 0.04em; }
+.c24-play-status { font-size: 0.8rem; font-weight: 600; opacity: 0.9; }
+.c24-section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--c24-subtle);
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+.c24-chip {
+    display: flex;
+    flex-direction: column;
+    padding: 0.45rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid var(--c24-line);
+    background: var(--c24-surface);
+    line-height: 1.2;
+}
+.c24-chip > span { display: block; }
+.c24-chip > span:first-child::first-letter { text-transform: uppercase; }
+.c24-chip:hover { background: var(--c24-hover); border-color: var(--c24-orange); }
+
 /* ---------- board and keyboard ---------- */
 .key {
     background-color: var(--c24-key-bg);

@@ -82,3 +82,36 @@ def test_spanish_accents_optional(server, page):
         "JSON.parse(localStorage.getItem('game_results') || '{}').es?.slice(-1)[0]?.won === true",
         timeout=5000,
     )
+
+
+def test_start_screen(server, page):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(server + "/")
+    page.wait_for_function("document.querySelector('.c24-play')")
+    links = page.locator("a[data-lang]")
+    codes = [links.nth(i).get_attribute("data-lang") for i in range(links.count())]
+    assert len(codes) == 10 and set(codes[:2]) == {"es", "en"}
+    hrefs = [links.nth(i).get_attribute("href") for i in range(links.count())]
+    assert all(h.startswith("/") for h in hrefs)  # nothing points to other sites
+    assert page.evaluate("document.body.scrollHeight") < 2000
+    assert "#" in page.locator(".c24-today").inner_text()
+
+
+def test_start_screen_remembers_language_and_played_today(server, page):
+    today = app.Language("es", app.language_codes_5words["es"]).daily_word
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    type_word(page, fold(today))
+    page.wait_for_function(
+        "JSON.parse(localStorage.getItem('game_results') || '{}').es?.slice(-1)[0]?.won === true"
+    )
+    page.goto(server + "/")
+    page.wait_for_function("document.querySelector('.c24-play')")
+    first = page.locator(".c24-play").first
+    assert first.get_attribute("data-lang") == "es"
+    assert "Jugada hoy" in first.inner_text()
+
+
+def test_stats_page_removed(server, page):
+    page.goto(server + "/stats")
+    assert page.url.rstrip("/") == server

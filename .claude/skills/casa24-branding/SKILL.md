@@ -24,6 +24,9 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 - The original Tailwind classes (`bg-white`, `text-neutral-500`, `border-gray-300`, ...) are remapped to tokens in the "base" section. A newly used Tailwind color class needs a mapping there, or it will look wrong in dark mode.
 - **Dark-mode keys:** unused keys (`#5d6d61`) must be *lighter* than ruled-out letters (`#2b312d`), or players can't tell them apart.
 
+## Start screen styles
+`.c24-hero-kolo`, `.c24-today`, `.c24-play` / `.c24-play-main` (filled green, the player's language) / `.c24-play-alt` (outlined), `.c24-section-title`, `.c24-chip` (other languages) in `style.css`. They only use `--c24-*` tokens, so dark mode works automatically. The start screen must fit one phone screen (a test checks the height is under 2,000 px).
+
 ## Dark mode: `webapp/static/theme.js`
 - Loaded in `<head>` of both pages, before anything renders, so there is no flash.
 - Stores `casa24_theme` in localStorage as `auto`, `light` or `dark`. `auto` follows the device.

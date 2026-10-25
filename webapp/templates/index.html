@@ -39,7 +39,6 @@
         var language_codes = JSON.parse('{{language_codes | tojson | safe}}');
         var languages = JSON.parse('{{languages | tojson | safe}}');
         var todays_idx = "{{todays_idx}}";
-        var other_wordles = JSON.parse('{{other_wordles | tojson | safe}}');
     </script>
 </head>
 
@@ -85,58 +84,58 @@
             </div>
         </header>
 
-        <!-- Casa 24 hero: Kolo and a one-line intro in both languages -->
-        <div class="flex flex-col items-center text-center mt-8 px-4 gap-2">
-            <img src="{{ url_for('static', filename='images/kolo/kolo-hero.png') }}" alt="Kolo, la mascota de Casa 24 / Casa 24's mascot" class="c24-kolo">
-            <p class="text-base font-bold"><span lang="es">Adivina la palabra del día en 6 intentos.</span></p>
-            <p class="text-sm text-neutral-500"><span lang="en">Guess the word of the day in 6 tries.</span></p>
-        </div>
-        <!-- language search box -->
-        <div class="flex justify-center mt-12">
-            <div
-                class="flex flex-col break-words bg-white border border-2 rounded shadow-md mx-4 mb-2 sm:mb-6 w-full max-w-xs md:max-w-sm  lg:max-w-md">
-                <input v-model="search_text"
-                    class="shadow appearance-none w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline hover:shadow-xl"
-                    type="text" placeholder="Search language...">
-            </div>
-        </div>
+        <!-- ===================== CASA 24 START SCREEN ===================== -->
+        <main class="c24-start max-w-sm mx-auto px-4 pt-6 pb-8 flex flex-col gap-5">
 
-        <!-- tailwind grid of language cards that fill max space -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-7 mt-7 sm:gap-10 sm:mt-10 md:gap-14 mt-14 w-2/3 mx-auto">
-            <!-- card for each language -->
-            <button v-for="language in languages_vis" class="col-span-1 hover:bg-neutral-200 rounded-lg shadow-lg"
-                v-on:click='selectLanguageWithCode(language.language_code)'>
-                <div class="shadow-lg h-full border-2 border-neutral-300 rounded-lg hover:shadow-2xl hover:font-bold">
-                    <div class="px-5 py-4">
-                        <h5 class=""> [[ language.language_name_native ]] </h5>
-                        <p class="text-sm italic">[[ language.language_name ]]</p>
-                    </div>
+            <!-- Hero: Kolo, tagline, today's puzzle and countdown -->
+            <section class="flex flex-col items-center text-center gap-1">
+                <img src="{{ url_for('static', filename='images/kolo/kolo-hero.png') }}"
+                    alt="Kolo, la mascota de Casa 24 / Casa 24's mascot" class="c24-hero-kolo">
+                <p class="text-lg font-bold leading-tight mt-2" lang="es">Adivina la palabra del día en 6 intentos.</p>
+                <p class="text-sm text-neutral-500" lang="en">Guess the word of the day in 6 tries.</p>
+                <p class="c24-today mt-2" v-cloak>
+                    <span class="c24-title text-xl">#[[ todays_idx ]]</span>
+                    <span class="mx-1">·</span>
+                    <span lang="es">Nueva palabra en</span> / <span lang="en">New word in</span>&nbsp;<span class="font-bold">[[ countdown ]]</span>
+                </p>
+            </section>
+
+            <!-- Español / English: the player's language first -->
+            <section class="flex flex-col gap-3" aria-label="Español / English">
+                <a v-for="(lang, i) in primaryLanguages" :key="lang.language_code"
+                    :href="'/' + lang.language_code" :lang="lang.language_code"
+                    :data-lang="lang.language_code"
+                    class="c24-play" :class="i === 0 ? 'c24-play-main' : 'c24-play-alt'">
+                    <span class="c24-play-name">[[ lang.language_name_native ]]</span>
+                    <span class="c24-play-status">
+                        <span v-if="status[lang.language_code].played_today">✓ [[ lang.language_code === 'es' ? 'Jugada hoy' : 'Played today' ]]</span>
+                        <span v-else>[[ lang.language_code === 'es' ? 'Jugar' : 'Play' ]] →</span>
+                        <span v-if="status[lang.language_code].streak > 0" class="ml-2">🔥 [[ status[lang.language_code].streak ]]</span>
+                    </span>
+                </a>
+            </section>
+
+            <!-- The other 8 languages, smaller -->
+            <section aria-labelledby="more-languages">
+                <h2 id="more-languages" class="c24-section-title">
+                    <span lang="es">Más idiomas</span> · <span lang="en">More languages</span>
+                </h2>
+                <div class="grid grid-cols-2 gap-2">
+                    {% for code in language_codes if code not in ("es", "en") %}
+                    <a href="/{{ code }}" lang="{{ code }}" data-lang="{{ code }}" class="c24-chip"
+                        {% if languages[code].right_to_left == "true" %}dir="rtl"{% endif %}>
+                        <span class="font-bold">{{ languages[code].language_name_native }}</span>
+                        <span class="text-xs text-neutral-500" lang="en">{{ languages[code].language_name }}</span>
+                    </a>
+                    {% endfor %}
                 </div>
-            </button>
-        </div>
+            </section>
 
-
-        <!-- separator -->
-        <div class="w-full mt-16 mx-auto text-center">
-            <hr class="border-b-1 border-gray-400 w-1/2 mx-auto">
-            <h2 class="text-2xl text-neutral-500 mt-4">
-                External Links
-            </h2>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-16 mt-16 w-2/3 mx-auto">
-            <!-- vue for each item in other_wordles make a button that leads to item.url when clicked -->
-            <button v-for="other_wordle in other_wordles_vis"
-                class="col-span-1 hover:bg-neutral-200 rounded-lg shadow-lg" v-on:click="openLink(other_wordle.url)">
-                <div class="shadow-lg h-full border-2 border-neutral-300 rounded-lg hover:shadow-2xl hover:font-bold">
-                    <div class="px-5 py-4">
-                        <h5 class="">[[ other_wordle.name ]]</h5>
-                        <p class="text-sm italic">[[ other_wordle.language ]]</p>
-                    </div>
-                </div>
-            </button>
-        </div>
-
+            <footer class="text-center text-xs text-neutral-500 pt-2">
+                <p class="font-bold">Casa 24 Records · Ciudad de Panamá</p>
+                <p>Basado en / Based on <a href="https://github.com/Hugo0/wordle" class="underline">Hugo0/wordle</a> (MIT)</p>
+            </footer>
+        </main>
 
         <!-- NOTIFICATIONS & MODALS-->
         <div class="container mx-auto flex w-full max-w-lg justify-center items-center overflow-auto z-1" v-cloak>

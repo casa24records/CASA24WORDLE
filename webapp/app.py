@@ -34,7 +34,6 @@ app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu 
 ###############################################################################
 # DATA
 ###############################################################################
-print("Loading data...")
 
 data_dir = os.path.join(APP_DIR, "data") + "/"
 # if not glob.glob(data_dir):
@@ -44,9 +43,6 @@ data_dir = os.path.join(APP_DIR, "data") + "/"
 # print(f"data_dir: {data_dir}")
 
 
-# load other_wordles.json file
-with open(f"{data_dir}other_wordles.json", "r") as f:
-    other_wordles = json.load(f)
 
 
 def load_characters(lang):
@@ -234,49 +230,13 @@ def load_languages():
             "language_name": language_config["name"],
             "language_name_native": language_config["name_native"],
             "language_code": lang,
+            "right_to_left": str(language_config.get("right_to_left", "false")).lower(),
         }
     return languages
 
 
 languages = load_languages()
 
-# status
-status_path = os.path.join(APP_DIR, "..", "scripts", "out", "status_list.txt")
-status_list = []
-if os.path.exists(status_path):
-    with open(status_path, "r") as f:
-        status_list = [line.strip() for line in f]
-if True:
-    status_list_str = ""
-    for status in status_list:
-        status_list_str += (
-            f"<option value='{status}'>{status}{'&nbsp;'*(20-len(status))}</option>"
-        )
-    status_list_str += (
-        "<a href='https://github.com/Hugo0/wordle' target='_blank'>more at Github</a>"
-    )
-
-# print stats about how many languages we have
-print("\n***********************************************")
-print(f"                    STATS")
-print(f"- {len(languages)} languages")
-print(
-    f"- {len([k for (k, v) in language_codes_5words_supplements.items() if v !=[]])} languages with supplemental words"
-)
-print(
-    f"- The language with least words is {min(language_codes_5words, key=lambda k: len(language_codes_5words[k]))}, with {len(language_codes_5words[min(language_codes_5words, key=lambda k: len(language_codes_5words[k]))])} words"
-)
-print(
-    f"- The language with most words is {max(language_codes_5words, key=lambda k: len(language_codes_5words[k]))}, with {len(language_codes_5words[max(language_codes_5words, key=lambda k: len(language_codes_5words[k]))])} words"
-)
-print(
-    f"- Average number of words per language is {sum(len(language_codes_5words[l_code]) for l_code in language_codes)/len(language_codes):.2f}"
-)
-print(
-    f"- Average length of supplemental words per language is {sum(len(language_codes_5words_supplements[l_code]) for l_code in language_codes)/len(language_codes):.2f}"
-)
-print(f"- There are {len(other_wordles)} other wordles")
-print(f"***********************************************\n")
 
 
 ###############################################################################
@@ -408,13 +368,7 @@ def index():
         languages=languages,
         language_codes=language_codes,
         todays_idx=get_todays_idx(),
-        other_wordles=other_wordles,
     )
-
-
-@app.route("/stats")
-def stats():
-    return status_list_str
 
 
 # sitemap

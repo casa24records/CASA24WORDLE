@@ -1,109 +1,82 @@
+// Casa 24 Wordle start screen.
+// Shows Español/English first (last language played, else the browser language),
+// today's puzzle number with a countdown to midnight Panama time, and stats.
+
+function panamaDay(date) {
+    // calendar day in Panama (UTC-5, no daylight saving), e.g. "2026-10-25"
+    return new Date(date.getTime() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+function readStorage(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+
 const app = Vue.createApp({
-    // data, functions
     delimiters: ['[[', ']]'],
     data() {
+        var results = {};
+        try { results = JSON.parse(readStorage("game_results")) || {}; } catch (e) { results = {}; }
         return {
             showPopup: false,
             showAboutModal: false,
             showStatsModal: false,
             clickedLanguage: "",
-
-            // flask data
-            other_wordles: other_wordles,
             languages: languages,
             todays_idx: todays_idx,
-
-            // copy of data for visualization
-            other_wordles_vis: other_wordles,
-            languages_vis: languages,
-
-            search_text: "",
+            game_results: results,
             total_stats: {},
+            countdown: "",
         }
     },
     computed: {
-    },
-    beforeCreate() {
-        // if http redirect to https unless we are in localhost/127.0.0.1:5000
-        if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" && window.location.protocol !== "https:") {
-            window.location.href = "https://" + window.location.hostname + window.location.pathname;
-        }
+        preferredLanguage() {
+            var saved = readStorage("casa24_lang");
+            if (saved === "es" || saved === "en") return saved;
+            var browser = (navigator.language || "es").toLowerCase();
+            return browser.indexOf("es") === 0 ? "es" : "en";
+        },
+        primaryLanguages() {
+            var first = this.preferredLanguage;
+            var second = first === "es" ? "en" : "es";
+            return [this.languages[first], this.languages[second]];
+        },
+        status() {
+            // per language: played today? current streak?
+            var today = panamaDay(new Date());
+            var out = {};
+            for (var code in this.languages) {
+                var list = this.game_results[code] || [];
+                var last = list[list.length - 1];
+                out[code] = {
+                    played_today: !!(last && last.date && panamaDay(new Date(last.date)) === today),
+                    streak: this.calculateStats(code).current_streak,
+                };
+            }
+            return out;
+        },
     },
     created() {
-        
-
-        if (localStorage.getItem("game_results") === null) {
-            this.game_results = {};
-            localStorage.setItem("game_results", JSON.stringify(this.game_results));
-        } else {
-            this.game_results = JSON.parse(localStorage.getItem("game_results"));
-        }
-
-        // calculate total stats
         this.total_stats = this.calculateTotalStats();
+        document.documentElement.lang = this.preferredLanguage;
+        this.tick();
+        setInterval(this.tick, 1000);
     },
     mounted() {
         window.addEventListener('keydown', this.keyDown);
     },
-    beforeUpdate() {
-        this.filterWordles(this.search_text.toLowerCase());
-    },
-    updated() {
-    },
     methods: {
+        tick() {
+            // time left until midnight in Panama, as "11h 48m 03s"
+            var now = new Date();
+            var panama = new Date(now.getTime() - 5 * 3600 * 1000);
+            var left = 86400 - (panama.getUTCHours() * 3600 + panama.getUTCMinutes() * 60 + panama.getUTCSeconds());
+            var h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), sec = left % 60;
+            this.countdown = h + "h " + (m < 10 ? "0" : "") + m + "m " + (sec < 10 ? "0" : "") + sec + "s";
+        },
         keyDown(event) {
-            key = event.key;
-            if (key === "Escape") { // QoL
+            if (event.key === "Escape") {
                 this.showStatsModal = false;
                 this.showAboutModal = false;
-            }
-        },
-        selectLanguage(language_index) {
-            // redirect to the language page
-            if (this.languages_vue[language_index].ready) {
-                window.location.href = "/" + this.languages_vue[language_index].code;
-            } else {
-                this.clickedLanguage = this.languages_vue[language_index].name;
-                this.showPopup = true;
-            }
-        },
-        selectLanguageWithCode(language_code) {
-            window.location.href = "/" + language_code;
-        },
-        openLink(url) {
-            console.log("open link: " + url);
-            window.open(url);
-        },
-        filterWordles(search_text) {
-            // hide items that don't match the search text
-            // languages: language.name and language.name_native
-            // other_wordles: wordle.name and wordle.language
-            if (search_text == "") {
-                this.other_wordles_vis = this.other_wordles;
-                this.languages_vis = this.languages;
-            } else {
-                var visible_languages = [];
-                var visible_wordles = [];
-
-                // iterate through languages dictionary and update the visible languages
-                var language_keys = Object.keys(this.languages);
-                for (var i = 0; i < language_keys.length; i++) {
-                    var language_code = language_keys[i];
-                    var language = this.languages[language_code];
-                    // if the language name or native name matches the search text
-                    if (language.language_name.toLowerCase().includes(search_text) || language.language_name_native.toLowerCase().includes(search_text)) {
-                        // add the language to the visible languages
-                        visible_languages.push(language);
-                    }
-                }
-
-                for (var i = 0; i < this.other_wordles.length; i++) {
-                    if (this.other_wordles[i].name.toLowerCase().includes(search_text) || this.other_wordles[i].language.toLowerCase().includes(search_text)) {
-                        visible_wordles.push(this.other_wordles[i]);
-                    }
-                }
-                this.other_wordles_vis = visible_wordles;
-                this.languages_vis = visible_languages;
             }
         },
         calculateStats(language_code) {

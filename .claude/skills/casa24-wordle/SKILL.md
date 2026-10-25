@@ -12,6 +12,7 @@ Casa 24 Records' daily word game, a fork of Hugo0/wordle on branch `casa24`. The
 - 10 languages in `webapp/data/languages/`: en, es, ar, fr, pt, ru, de, tr, vi, ko. Casa 24 words only in **es** and **en**.
 - **One word per language per day, the same for every player.** It changes at midnight Panama time (UTC-5). About 1 day in 5 the es/en word is a Casa 24 word. Details: `casa24-daily-word`.
 - No database, no accounts, no analytics. Player stats live in the browser's localStorage.
+- Start screen (`/`): Español/English first (last played, else browser language) with "played today" and streak, then the other 8 languages. No links to other sites.
 
 ## Which skill to use
 | Task | Skill |
@@ -29,7 +30,7 @@ Casa 24 Records' daily word game, a fork of Hugo0/wordle on branch `casa24`. The
 webapp/app.py            routes, data loading, Language class
 webapp/daily.py          daily-word schedule (pure functions)
 webapp/data/languages/   word lists, language_config.json, keyboards
-webapp/templates/        index.html (menu), game.html (game)
+webapp/templates/        index.html (start screen), game.html (game)
 webapp/static/           game.js, index.js, theme.js, style.css, images/, fonts/, favicon/
 scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py
 tests/                   pytest + Playwright
