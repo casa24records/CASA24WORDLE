@@ -1,3 +1,5 @@
+{# t(key, fallback): text from language_config.json "text", English if missing #}
+{% macro t(key, default) %}{{ language.config.text.get(key, default) | trim }}{% endmacro %}
 <!DOCTYPE html>
 <html lang="{{ language.language_code }}" class="min-h-full">
 
@@ -228,11 +230,11 @@
                             <span v-on:click="show_options_modal = !show_options_modal"
                                 class="leading-[0.25] h-5 w-5 text-3xl text-neutral-400 block outline-none focus:outline-none">×</span>
                         </button>
-                        <h3 class="uppercase font-bold text-xl tracking-wider mb-5">SETTINGS</h3>
+                        <h3 class="uppercase font-bold text-xl tracking-wider mb-5">{{ t('settings', 'Settings') }}</h3>
                         <div class=" space-y-4">
                             <!-- toggle button for right_to_left -->
                             <div class="flex flex-row">
-                                <p class="flex-grow">Right to left</p>
+                                <p class="flex-grow">{{ t('right_to_left', 'Right to left') }}</p>
                                 <!-- toggle at the end -->
                                 <div class="flex flex-row items-center">
                                     <label for="right_to_left" class="flex items-center ml-2 animate-bounce">
@@ -260,7 +262,7 @@
                             <div class=border-t-2 border-gray-300></div>
                             <form method="get" class="flex flex-row"
                                 aria-label="Keyboard layout selector">
-                                <p id="keyboard-layout-label" class="flex-grow">Keyboard layout</p>
+                                <p id="keyboard-layout-label" class="flex-grow">{{ t('keyboard_layout', 'Keyboard layout') }}</p>
                                 <select id="keyboard-layout-select" name="layout" aria-labelledby="keyboard-layout-label"
                                     class="border border-neutral-300 rounded px-2 py-1 bg-white"
                                     onchange="this.form.submit()">
@@ -276,20 +278,20 @@
 
                             <div class=border-t-2 border-gray-300></div>
                             <div class="flex flex-row">
-                                <p class="flex-grow">Allow any word (<span class="italic">easy mode</span>)</p>
+                                <p class="flex-grow">{{ t('easy_mode', 'Allow any word (easy mode)') }}</p>
                                 <!-- toggle at the end -->
                                 <input type="checkbox" v-model="allow_any_word" />
                             </div>
 
                             <div class=border-t-2 border-gray-300></div>
                             <div class="flex">
-                                <p class="flex-grow">Source Code</p>
+                                <p class="flex-grow">{{ t('source_code', 'Source code') }}</p>
                                 <a href="https://www.github.com/Hugo0/wordle" class="underline text-neutral-500">GitHub</a>
                             </div>
 
                             <div class=border-t-2 border-gray-300></div>
                             <div class="flex">
-                                <p class="flex-grow">Feedback</p>
+                                <p class="flex-grow">{{ t('feedback', 'Feedback') }}</p>
                                 <a href="https://github.com/Hugo0/wordle/issues" class="underline text-neutral-500">GitHub issues</a>
                             </div>
                         </div>
@@ -344,19 +346,19 @@
                     <div class="flex flex-row justify-center border-t border-solid px-10 py-5">
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl text-center">[[stats.n_games]]</p>
-                            <p class="text-sm">Games</p>
+                            <p class="text-sm">{{ t('stats_games', 'Games') }}</p>
                         </div>
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl" v-html="stats.win_percentage.toLocaleString('en') + '%'"></p>
-                            <p class="text-sm">Win %</p>
+                            <p class="text-sm">{{ t('stats_win_percentage', 'Win %') }}</p>
                         </div>
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl">[[stats.current_streak]]</p>
-                            <p class="text-sm">Current Streak</p>
+                            <p class="text-sm">{{ t('stats_current_streak', 'Current streak') }}</p>
                         </div>
                         <div class="flex flex-col text-center flex-grow">
                             <p class="text-3xl">[[stats.longest_streak]]</p>
-                            <p class="text-sm">Best Streak</p>
+                            <p class="text-sm">{{ t('stats_best_streak', 'Best streak') }}</p>
                         </div>
                     </div>
 

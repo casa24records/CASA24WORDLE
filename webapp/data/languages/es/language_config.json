@@ -4,32 +4,44 @@
     "name_native": "Español",
     "meta": {
         "locale": "es",
-        "title": "El juego diario de palabras ",
-        "description": "Adivina la palabra oculta en 6 intentos (o menos). ¡Un nuevo rompecabezas está disponible cada día! ",
-        "keywords": "Inglés, rompecabezas, palabra, juego, juego, en línea, supongo, diariamente "
+        "title": "El juego diario de palabras",
+        "description": "Adivina la palabra oculta en 6 intentos o menos. ¡Hay una palabra nueva cada día!",
+        "keywords": "wordle, español, juego de palabras, adivinanza, diario, en línea, gratis"
     },
     "text": {
         "subheader": "Español",
-        "next_word": "Palabra siguiente ",
-        "no_attempts": "¡No has probado ninguna palabra todavía! ",
-        "share": "Cuota ",
-        "notification-copied": "Copiado al portapapeles ",
-        "notification-partial-word": "Por favor ingrese una palabra completa "
+        "next_word": "Próxima palabra",
+        "no_attempts": "¡Todavía no has probado ninguna palabra!",
+        "share": "Compartir",
+        "notification-copied": "Copiado al portapapeles",
+        "notification-partial-word": "Escribe una palabra completa",
+        "notification-not-valid": "Esa palabra no está en la lista",
+        "notification-share-unsupported": "Tu navegador no permite compartir. Copia el texto y compártelo tú.",
+        "settings": "Ajustes",
+        "right_to_left": "De derecha a izquierda",
+        "keyboard_layout": "Distribución del teclado",
+        "easy_mode": "Aceptar cualquier palabra (modo fácil)",
+        "source_code": "Código fuente",
+        "feedback": "Comentarios",
+        "stats_games": "Partidas",
+        "stats_win_percentage": "% de victorias",
+        "stats_current_streak": "Racha actual",
+        "stats_best_streak": "Mejor racha"
     },
     "language_code_3": "",
     "language_code_iso_639_3": "",
     "right_to_left": "false",
     "help": {
-        "title": "Cómo jugar ",
-        "title_2": "Ejemplos ",
-        "close": "Cierra este mensaje ",
-        "text_1_1_1": "Adivina la ",
-        "text_1_1_2": "en seis intentos o menos. ",
-        "text_1_2": "Cada conjetura debe ser una palabra válida de cinco letras. Presione el botón ENTER para enviar su conjetura. ",
-        "text_1_3": "Después de adivinar, los azulejos cambiarán de color para indicar qué letras de su palabra son correctas o casi correctas. ",
-        "text_2_1": "está en la palabra y en la ubicación correcta! ",
-        "text_2_2": "está en la palabra, pero no en la ubicación correcta. ",
-        "text_2_3": "no está presente en la palabra que está tratando de adivinar. ",
-        "text_3": "¡Una nueva palabra estará disponible cada día! "
+        "title": "Cómo jugar",
+        "title_2": "Ejemplos",
+        "close": "Cerrar",
+        "text_1_1_1": "Adivina el",
+        "text_1_1_2": "en seis intentos o menos.",
+        "text_1_2": "Cada intento debe ser una palabra válida de cinco letras. Pulsa ENTER para enviarla.",
+        "text_1_3": "Después de cada intento, las casillas cambian de color para mostrarte qué tan cerca estás.",
+        "text_2_1": "está en la palabra y en el lugar correcto.",
+        "text_2_2": "está en la palabra, pero en otro lugar.",
+        "text_2_3": "no está en la palabra.",
+        "text_3": "¡Cada día hay una palabra nueva!"
     }
 }

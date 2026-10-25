@@ -154,13 +154,8 @@ const app = Vue.createApp({
     },
     updated() {
         if (this.show_stats_modal) {
-            // if config.name_native is not set, use to config.language_code
-            var text_to_share;
-            if (!this.config.name_native) {
-                text_to_share = "Wordle (" + this.config.language_code + ") #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + "www.wordle.global/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
-            } else {
-                text_to_share = "Wordle " + this.config.name_native + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + "www.wordle.global/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
-            }
+            // share text, e.g. "Casa 24 Wordle ES #123 3/6" + link + emoji grid
+            var text_to_share = "Casa 24 Wordle " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + window.location.origin + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
             document.querySelector('#copy_button').addEventListener('click', async event => {
                 if (navigator.share) {
                     try {
@@ -173,13 +168,13 @@ const app = Vue.createApp({
                 } else if (navigator.clipboard) {
                     try {
                         await navigator.clipboard.writeText(text_to_share);
-                        this.showNotification("Copied to clipboard");
+                        this.showNotification(this.text("notification-copied", "Copied to clipboard"));
                     } catch (error) {
                         console.log('Error copying: ', error);
                     }
                 } else {
                     console.log("No navigator.share or navigator.clipboard");
-                    alert("I'm sorry, but your browser doesn't support sharing. Please copy the text and share it yourself.");
+                    alert(this.text("notification-share-unsupported", "Sorry, your browser doesn't support sharing. Please copy the text and share it yourself."));
                 }
             });
         }
@@ -299,7 +294,7 @@ const app = Vue.createApp({
             // console.log('keyDown', this.active_cell, this.active_row, event.key);
             if (key === "Enter" || key === "⇨") {
                 if (!this.full_word_inputted) {
-                    this.showNotification("Please enter a full word");
+                    this.showNotification(this.text("notification-partial-word", "Please enter a full word"));
                     return;
                 }
                 // if checkWord returns true, then go to next row
@@ -311,7 +306,7 @@ const app = Vue.createApp({
                     this.active_cell = 0;
                     this.full_word_inputted = false;
                 } else {
-                    this.showNotification("Word is not valid");
+                    this.showNotification(this.text("notification-not-valid", "Word is not valid"));
                 }
 
                 if (word === this.todays_word) {
@@ -452,6 +447,11 @@ const app = Vue.createApp({
             return emoji_board;
         },
 
+        text(key, fallback) {
+            // UI text from language_config.json "text", English fallback if missing
+            var value = this.config.text && this.config.text[key];
+            return value ? value.trim() : fallback;
+        },
         saveToLocalStorage() {
             // saves tiles, tile_classes, active_row and active_cell to local storage with key: page_name
             var url = window.location.href;
