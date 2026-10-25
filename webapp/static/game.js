@@ -218,6 +218,42 @@ const app = Vue.createApp({
             }
         },
 
+        foldAccents(text) {
+            // "canción" -> "cancion", but ñ stays ñ (it is its own letter)
+            return text.split("").map(function (c) {
+                return c === "ñ" ? c : c.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            }).join("");
+        },
+        accentInsensitive() {
+            return this.config.accent_insensitive === true || this.config.accent_insensitive === "true";
+        },
+        resolveAccents(word) {
+            // In accent-insensitive languages, find the real (accented) word the
+            // player meant: "cancion" -> "canción". Today's word wins ties.
+            if (!this.accentInsensitive()) {
+                return word;
+            }
+            var folded = this.foldAccents(word);
+            if (folded === this.foldAccents(this.todays_word)) {
+                return this.todays_word;
+            }
+            if (this.checkWord(word) && !this.allow_any_word) {
+                return word;
+            }
+            if (!this.fold_map) {
+                this.fold_map = {};
+                var lists = [word_list, word_list_supplement];
+                for (var l = 0; l < lists.length; l++) {
+                    for (var i = 0; i < lists[l].length; i++) {
+                        var key = this.foldAccents(lists[l][i]);
+                        if (!(key in this.fold_map)) {
+                            this.fold_map[key] = lists[l][i];
+                        }
+                    }
+                }
+            }
+            return this.fold_map[folded] || word;
+        },
         checkWord(word) {
             if (this.allow_any_word) {
                 return true;
@@ -233,13 +269,15 @@ const app = Vue.createApp({
         updateColors() {
             // NOTE: if a character appears only once in the final word, but multiple times in submitted word
             // then we want to only color one. The hierarchy is correct first, then the semi-correct ones by position.
-            var todays_word = this.todays_word;
+            var self = this;
+            var same = this.accentInsensitive() ? function (c) { return self.foldAccents(c); } : function (c) { return c; };
+            var todays_word = this.todays_word.split("").map(same).join("");
             const base_class = "text-2xl tiny:text-4xl uppercase font-bold select-none text-white";
             var charcounts = {};
 
             // count characters
             for (let i = 0; i < todays_word.length; i++) {
-                var character = todays_word[i];
+                var character = todays_word[i];  // already accent-folded if needed
                 if (charcounts[character] == undefined) {
                     charcounts[character] = 1;
                 } else {
@@ -249,26 +287,35 @@ const app = Vue.createApp({
 
             // color correct characters
             for (let i = 0; i < this.tiles[this.active_row].length; i++) {
-                var character = this.tiles[this.active_row][i];
+                var shown = this.tiles[this.active_row][i];
+                var character = same(shown);
                 if (character == todays_word[i]) {
                     this.tile_classes[this.active_row][i] = "correct" + " " + base_class;
                     this.key_classes[character] = "correct"
+                    this.key_classes[shown] = "correct"
                     charcounts[character] -= 1;
                 }
             }
             for (let i = 0; i < this.tiles[this.active_row].length; i++) {
-                var character = this.tiles[this.active_row][i];
+                var shown = this.tiles[this.active_row][i];
+                var character = same(shown);
                 if (todays_word.indexOf(character) != -1 && charcounts[character] > 0 && this.tile_classes[this.active_row][i].indexOf("correct") == -1) {
                     // if the tile is not already colored
                     this.tile_classes[this.active_row][i] = "semicorrect" + " " + base_class;
                     if (this.key_classes[character] != "correct") {
                         this.key_classes[character] = "semicorrect"
                     }
+                    if (this.key_classes[shown] != "correct") {
+                        this.key_classes[shown] = "semicorrect"
+                    }
                     charcounts[character] -= 1;
                 } else if (this.tile_classes[this.active_row][i].indexOf("correct") == -1) {
                     this.tile_classes[this.active_row][i] = "incorrect" + " " + base_class;
                     if (this.key_classes[character] != "correct" && this.key_classes[character] != "semicorrect") {
                         this.key_classes[character] = "incorrect"
+                    }
+                    if (this.key_classes[shown] != "correct" && this.key_classes[shown] != "semicorrect") {
+                        this.key_classes[shown] = "incorrect"
                     }
                 }
             }
@@ -299,6 +346,14 @@ const app = Vue.createApp({
                 }
                 // if checkWord returns true, then go to next row
                 var word = this.tiles[this.active_row].join("").toLowerCase();
+                // "cancion" becomes "canción": the board then shows the accented word
+                var resolved = this.resolveAccents(word);
+                if (resolved !== word) {
+                    word = resolved;
+                    for (let i = 0; i < 5; i++) {
+                        this.tiles[this.active_row][i] = word[i];
+                    }
+                }
                 var word_is_valid = this.checkWord(word);
                 if (word_is_valid) {
                     this.updateColors();

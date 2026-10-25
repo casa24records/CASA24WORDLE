@@ -48,3 +48,37 @@ def test_guess_colors_tiles(server, page, lang):
     colored.first.wait_for(timeout=5000)
     assert colored.count() >= 5
     assert errors == []
+
+
+def fold(word):
+    import unicodedata
+
+    return "".join(
+        c if c == "ñ" else unicodedata.normalize("NFD", c)[0] for c in word
+    )
+
+
+def type_word(page, word):
+    for letter in word:
+        page.keyboard.press(letter)
+    page.keyboard.press("Enter")
+
+
+def test_spanish_accents_optional(server, page):
+    today = app.Language("es", app.language_codes_5words["es"]).daily_word
+    accented = next(
+        w for w in app.language_codes_5words["es"]
+        if "ó" in w and fold(w) != fold(today)
+        and fold(w) not in {fold(x) for x in app.language_codes_5words["es"] if x != w}
+    )
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    type_word(page, fold(accented))  # e.g. "jamon"
+    page.locator(".correct, .semicorrect, .incorrect").first.wait_for(timeout=5000)
+    assert "Ó" in page.locator("#app").inner_text()  # board shows "JAMÓN"
+
+    type_word(page, fold(today))  # today's word typed without accents still wins
+    page.wait_for_function(
+        "JSON.parse(localStorage.getItem('game_results') || '{}').es?.slice(-1)[0]?.won === true",
+        timeout=5000,
+    )

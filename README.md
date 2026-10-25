@@ -5,7 +5,7 @@ Casa 24 Records' daily word game, based on [Hugo0/wordle](https://github.com/Hug
 - **Daily word:** one word per language per day, the same for everyone, changing at midnight Panama time (UTC-5). About 1 day in 5 the Spanish or English word comes from the Casa 24 list. Details in `webapp/daily.py` and `.claude/skills/casa24-wordle/SKILL.md`.
 - **Run locally:** `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt`, then `cd webapp && ../.venv/bin/flask --app app run`.
 - **Add words:** `scripts/merge_words.py`, then `scripts/validate_words.py` and `.venv/bin/python -m pytest -q tests`.
-- **Find words in the Drive export:** put it in `drive_export/` (never committed) and run `scripts/mine_words.py`.
+- **Accents:** in Spanish you can type with or without accents (`cancion` finds `canción`); ñ always counts as its own letter.
 - Credits and word-list licenses: `CREDITS.md`.
 
 ---

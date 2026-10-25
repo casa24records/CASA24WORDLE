@@ -31,7 +31,7 @@ Flask app (`webapp/app.py`) with Vue in the browser (`webapp/static/game.js`). T
 
 Rules (enforced by `scripts/validate_words.py`): exactly 5 letters, lowercase, letters only (a-z, ñ, á é í ó ú ü), no word in two Casa 24 tiers.
 
-Guess matching is exact: accents matter (`cancion` ≠ `canción`), and accented letters are separate keys.
+Accents: languages with `"accent_insensitive": true` in `language_config.json` (Spanish) let players type without accents. On Enter, `resolveAccents()` in `game.js` turns `cancion` into the real word `canción` and the board shows the accented letters. Typing today's answer without accents counts as a win. Tile and key colors compare letters without accents. `ñ` is never folded into `n`. The Spanish keyboard (`es_keyboard.json`) is QWERTY with Ñ plus a row of á é í ó ú ü; an alphabetical layout is in Settings. Other languages still match exactly.
 
 ## Adding words
 
@@ -40,7 +40,7 @@ Guess matching is exact: accents matter (`cancion` ≠ `canción`), and accented
 3. `.venv/bin/python scripts/validate_words.py` then `.venv/bin/python -m pytest -q tests`.
 4. To remove a word, delete its line from the casa24 file by hand.
 
-Never add member aliases as `answer`. Never commit `drive_export/`, `mined_candidates.csv`, or alias files.
+Never add member aliases as `answer`, and never commit the alias files.
 
 ## Text and translations
 
