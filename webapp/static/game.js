@@ -72,10 +72,8 @@ const app = Vue.createApp({
                 ["border-2 border-neutral-300", "border-2 border-neutral-300", "border-2 border-neutral-300", "border-2 border-neutral-300", "border-2 border-neutral-300"],
             ],
 
-            // constantly updating time until next day
-            time_until_next_day() {
-                return this.get_time_until_next_day();
-            },
+            // countdown to the next word, updated every second
+            time_until_next_day: "",
 
             // true while the last guess is flipping, typing is ignored meanwhile
             revealing: false,
@@ -156,34 +154,31 @@ const app = Vue.createApp({
             this.emoji_board = this.getEmojiBoard();
         }
     },
-    updated() {
-        if (this.show_stats_modal) {
-            // share text, e.g. "Casa 24 Wordle ES #123 3/6" + link + emoji grid
-            var text_to_share = "Casa 24 Wordle " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + window.location.origin + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
-            document.querySelector('#copy_button').addEventListener('click', async event => {
-                if (navigator.share) {
-                    try {
-                        await navigator.share({
-                            text: text_to_share,
-                        });
-                    } catch (error) {
-                        console.log('Error sharing: ', error);
-                    }
-                } else if (navigator.clipboard) {
-                    try {
-                        await navigator.clipboard.writeText(text_to_share);
-                        this.showNotification(this.text("notification-copied", "Copied to clipboard"));
-                    } catch (error) {
-                        console.log('Error copying: ', error);
-                    }
-                } else {
-                    console.log("No navigator.share or navigator.clipboard");
-                    alert(this.text("notification-share-unsupported", "Sorry, your browser doesn't support sharing. Please copy the text and share it yourself."));
-                }
-            });
-        }
-    },
     methods: {
+        async shareResults() {
+            // share text, e.g. "Casa 24 Wordle ES #123 3/6" + link + emoji grid
+            this.emoji_board = this.getEmojiBoard();
+            var text_to_share = "Casa 24 Wordle " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + window.location.origin + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        text: text_to_share,
+                    });
+                } catch (error) {
+                    console.log('Error sharing: ', error);
+                }
+            } else if (navigator.clipboard) {
+                try {
+                    await navigator.clipboard.writeText(text_to_share);
+                    this.showNotification(this.text("notification-copied", "Copied to clipboard"));
+                } catch (error) {
+                    console.log('Error copying: ', error);
+                }
+            } else {
+                console.log("No navigator.share or navigator.clipboard");
+                alert(this.text("notification-share-unsupported", "Sorry, your browser doesn't support sharing. Please copy the text and share it yourself."));
+            }
+        },
         get_time_until_next_day() {
             // returns time until the next day in Panama (UTC-5) formatted as "h m s"
 
@@ -212,7 +207,7 @@ const app = Vue.createApp({
         },
         addChar(char) {
             this.tiles[this.active_row][this.active_cell] = char;
-            this.tile_classes[this.active_row][this.active_cell] = "text-2xl tiny:text-4xl uppercase font-bold select-none border-2 border-neutral-500 pop";
+            this.tile_classes[this.active_row][this.active_cell] = "uppercase font-bold select-none border-2 border-neutral-500 pop";
             this.active_cell = Math.min(this.active_cell + 1, 5);
             if (this.active_cell == 5) {
                 this.full_word_inputted = true;
@@ -268,7 +263,7 @@ const app = Vue.createApp({
             // Letters are compared exactly: typing may skip accents (resolveAccents fixes the
             // spelling first), but a plain "a" never counts for an "á" in today's word.
             var todays_word = this.todays_word;
-            const base_class = "text-2xl tiny:text-4xl uppercase font-bold select-none text-white";
+            const base_class = "uppercase font-bold select-none text-white";
             var charcounts = {};
 
             // count characters
@@ -308,18 +303,54 @@ const app = Vue.createApp({
             }
         },
         keyClick(key) {
-            // emit event that key was pressed
-            var event = new Event('keydown');
-            event.key = key;
-            this.keyDown(event);
+            // an on-screen key was tapped: handle it like a typed key
+            this.keyDown({ key: key });
+            // drop focus from the tapped key, so a physical Enter afterwards
+            // submits the word instead of pressing that key again
+            var focused = document.activeElement;
+            if (focused && focused.classList && focused.classList.contains("key")) {
+                focused.blur();
+            }
+        },
+        normalizeKey(key) {
+            // Shift/Caps Lock letters ("A") become the letter we use ("a").
+            // Named keys ("Enter", "Backspace") and ⇨/⌫ stay as they are.
+            if (typeof key !== "string" || Array.from(key).length !== 1) {
+                return key;
+            }
+            var chars = this.acceptable_characters;
+            if (chars.indexOf(key) >= 0) {
+                return key;
+            }
+            // locale-aware first, so Turkish "I" -> "ı" and "İ" -> "i"
+            try {
+                var local = key.toLocaleLowerCase(this.config.language_code);
+                if (chars.indexOf(local) >= 0) {
+                    return local;
+                }
+            } catch (e) { }
+            return key.toLowerCase();
         },
         keyDown(event) {
-            key = event.key;
+            var key = event.key;
             if (key === "Escape") { // QoL
                 this.showHelpModal = false;
                 this.show_stats_modal = false;
                 this.show_options_modal = false;
+                return;
             }
+            // shortcuts (Ctrl+R, Cmd+C...) and IME composition are not typing;
+            // AltGr (Ctrl+Alt on Windows) still types letters on some layouts
+            var alt_graph = event.getModifierState && event.getModifierState("AltGraph");
+            if (event.metaKey || ((event.ctrlKey || event.altKey) && !alt_graph) || event.isComposing) {
+                return;
+            }
+            // typing in the settings (a select or input) is not a guess
+            var target = event.target;
+            if (target && target.tagName && (/^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName) || target.isContentEditable)) {
+                return;
+            }
+            key = this.normalizeKey(key);
 
             if (this.game_over || this.revealing) {
                 return;
@@ -387,7 +418,7 @@ const app = Vue.createApp({
 
             } else {
                 if (!this.full_word_inputted) {
-                    if (this.acceptable_characters.indexOf(key) >= 0) {
+                    if (Array.from(key).length === 1 && this.acceptable_characters.indexOf(key) >= 0) {
                         this.addChar(key);
                     }
                 }
@@ -429,7 +460,7 @@ const app = Vue.createApp({
                 return 0;
             }
             const final = this.tile_classes[row].map(x => x);
-            const typed = "text-2xl tiny:text-4xl uppercase font-bold select-none border-2 border-neutral-500";
+            const typed = "uppercase font-bold select-none border-2 border-neutral-500";
             const vis = (i) => this.right_to_left ? final.length - 1 - i : i;
             const classes = this.tile_classes_visual[row];
             this.revealing = true;

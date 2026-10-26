@@ -287,27 +287,30 @@ class Language:
         return next(iter(self.keyboard_layouts))
 
     def _generate_alphabetical_keyboard(self):
-        keyboard = []
-        for i, c in enumerate(self.characters):
-            if i % 10 == 0:
-                keyboard.append([])
-            keyboard[-1].append(c)
-        if not keyboard:
-            return keyboard
-        keyboard[-1].insert(0, "⇨")
-        keyboard[-1].append("⌫")
+        """
+        Lay the letters out in alphabetical order, about 10 keys per row.
 
-        # Deal with bottom row being too crammed:
-        if len(keyboard) >= 2 and len(keyboard[-1]) == 11:
-            popped_c = keyboard[-1].pop(1)
-            keyboard[-2].insert(-1, popped_c)
-        if len(keyboard) >= 3 and len(keyboard[-1]) == 12:
-            popped_c = keyboard[-2].pop(0)
-            keyboard[-3].insert(-1, popped_c)
-            popped_c = keyboard[-1].pop(2)
-            keyboard[-2].insert(-1, popped_c)
-            popped_c = keyboard[-1].pop(2)
-            keyboard[-2].insert(-1, popped_c)
+        ⇨ (Enter) starts the last row and ⌫ ends it. Keys are spread evenly
+        over the rows (earlier rows get the extra key), so no row has more
+        than 11 keys and the last row isn't crammed or nearly empty.
+        """
+        letters = list(self.characters)
+        if not letters:
+            return []
+        total = len(letters) + 2  # plus ⇨ and ⌫
+        n_rows = max(1, -(-len(letters) // 10))
+        while -(-total // n_rows) > 11:
+            n_rows += 1
+        base, extra = divmod(total, n_rows)
+        sizes = [base + 1 if i < extra else base for i in range(n_rows)]
+        keyboard = []
+        pos = 0
+        for i, size in enumerate(sizes):
+            if i == n_rows - 1:
+                keyboard.append(["⇨"] + letters[pos:] + ["⌫"])
+            else:
+                keyboard.append(letters[pos:pos + size])
+                pos += size
         return keyboard
 
 
