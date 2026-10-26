@@ -5,7 +5,7 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 
 # Deploy
 
-**Current state:** not deployed, no domain chosen. Vercel is the only host (there is no Docker or other backup setup). **Never run `vercel deploy`, link a project, or change DNS unless the owner explicitly asks in that conversation.** Full guide: `DEPLOY.md`.
+**Current state (2026-10-26):** **live** at https://casa24-wordle-seven.vercel.app (`casa24-wordle.vercel.app` belongs to someone else). Vercel account **casa24records**, team **Casa 24** (scope `casa-24`, Hobby plan), project **casa24-wordle**, deployed with the CLI (`vercel deploy --prod --scope casa-24`). The GitHub repo is not connected for auto-deploys yet, and there is no custom domain yet. `DEMO_PASSWORD` is set for Production and Preview. Previews are behind Vercel login: check them with `vercel curl <path> --deployment <url> --scope casa-24`. **Known issue:** the `vercel.json` year-long cache rule is not applied (static files come back `cache-control: no-cache`); harmless, just slower repeat visits. To investigate: whether the Python/Flask preset ignores `headers` for `public/`, or whether the `has: query` condition is the problem. Never deploy to the personal "fer's projects" account (an empty `casa24-wordle` project was created there by mistake on 2026-10-26). Only deploy or touch DNS when the owner asks.
 
 ## What is already set up
 - `pyproject.toml`:
