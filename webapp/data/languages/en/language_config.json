@@ -27,7 +27,14 @@
         "theme_dark": "Dark",
         "result_won": "You won!",
         "result_lost": "You lost",
-        "notification-repeated": "You already tried that word"
+        "notification-repeated": "You already tried that word",
+        "demo_restart": "↻ Restart",
+        "demo_fill": "✓ Fill in word",
+        "demo_password": "Password",
+        "demo_enter": "Enter",
+        "demo_wrong_password": "Wrong password",
+        "demo_title": "Developer view",
+        "demo_intro": "For the Casa 24 team: the same game, with buttons to restart with another word and to fill in the word. Doesn't count in your stats."
     },
     "right_to_left": "false",
     "help": {

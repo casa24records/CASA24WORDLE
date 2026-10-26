@@ -115,6 +115,15 @@
                         <span v-if="status[lang.language_code].streak > 0" class="ml-2">🔥 [[ status[lang.language_code].streak ]]</span>
                     </span>
                 </a>
+                {% if demo_enabled %}
+                <div class="c24-play c24-play-demo" data-demo>
+                    <span class="c24-play-name">🔒 Developer view</span>
+                    <span class="c24-play-status c24-demo-langs">
+                        <a href="/demo/es" lang="es">Español</a>
+                        <a href="/demo/en" lang="en">English</a>
+                    </span>
+                </div>
+                {% endif %}
             </section>
 
             <!-- The other 8 languages, smaller -->

@@ -52,13 +52,14 @@
         const todays_word = "{{ language.daily_word }}";
         const KOLO_BASE = "{{ url_for('static', filename='images/kolo/') }}";
         const ASSET_V = "{{ asset_version('images/kolo/') }}";  // version of the whole kolo/ folder
+        const DEMO = {{ 'true' if demo else 'false' }};  // Developer view: same game + Restart / Fill in word buttons; nothing is saved
     </script>
 </head>
 
 <body class="c24-game-page">
     <div id="app">
         <!-- Header, board and keyboard: one centered column that fills the screen (style.css "game layout") -->
-        <div class="c24-game">
+        <div class="c24-game{% if demo %} c24-demo{% endif %}">
             <!-- The Header: 3 columns (help / title / stats + settings), so nothing overlaps -->
             <header class="c24-header border-b border-neutral-300">
                 <div class="c24-header-side">
@@ -106,6 +107,12 @@
                     </button>
                 </div>
             </header>
+            {% if demo %}
+            <nav class="c24-demo-bar" aria-label="Developer view">
+                <button type="button" class="c24-demo-btn" data-demo-restart v-on:click="demoRestart">{{ t('demo_restart', '↻ Restart') }}</button>
+                <button type="button" class="c24-demo-btn" data-demo-fill v-on:click="demoFillAnswer">{{ t('demo_fill', '✓ Fill in word') }}</button>
+            </nav>
+            {% endif %}
             <!-- The game board: sized from the space left between header and keyboard -->
             <main class="c24-board-area">
                 <div class="c24-board">

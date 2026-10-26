@@ -489,3 +489,84 @@ main .grid-cols-5 > div {
 /* keep modal titles clear of the × button */
 .c24-close + div > :first-child { padding-inline-end: 40px; }
 .c24-close + div > .mx-auto:first-child { padding-inline: 40px; }
+
+/* ---------- demo mode (team only, /demo) ---------- */
+.c24-play-demo {
+    grid-column: 1 / -1;
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--c24-line-strong);
+    color: var(--c24-subtle);
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+}
+.c24-play-demo .c24-play-name { font-size: 1.4rem; }
+.c24-demo-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px dashed var(--c24-line-strong);
+    font-size: 0.8rem;
+}
+.c24-demo-lang {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-weight: 700;
+    color: var(--c24-subtle);
+}
+.c24-demo-lang.is-active { color: var(--c24-text); background: var(--c24-hover); }
+.c24-demo-btn {
+    min-height: 32px;
+    padding: 0.25rem 0.7rem;
+    border-radius: 8px;
+    border: 2px solid var(--c24-line-strong);
+    font-weight: 700;
+    touch-action: manipulation;
+    color: var(--c24-text);
+}
+.c24-demo-btn-big { min-height: 44px; padding: 0.5rem 1.2rem; font-size: 1rem; }
+@media (hover: hover) and (pointer: fine) {
+    .c24-demo-btn:hover, .c24-demo-lang:hover { background: var(--c24-hover); }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+    .c24-game.c24-demo { grid-template-rows: auto auto minmax(0, 1fr); }
+    .c24-demo .c24-demo-bar { grid-column: 1 / -1; grid-row: 2; padding: 0.15rem 0.5rem; }
+    .c24-demo .c24-board-area, .c24-demo .c24-keyboard { grid-row: 3; }
+}
+.c24-demo-login-page { min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; }
+.c24-demo-login {
+    width: min(380px, 100% - 32px);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+    padding: 1.5rem 0;
+}
+.c24-demo-login-logo { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 1.6rem; color: inherit; text-decoration: none; }
+.c24-demo-login-title { font-size: 1.6rem; }
+.c24-demo-login-intro { font-size: 0.85rem; color: var(--c24-subtle); }
+.c24-demo-login-form { display: flex; flex-direction: column; gap: 0.6rem; text-align: left; }
+.c24-demo-login-form input {
+    font-size: 16px;  /* 16px+ so iOS doesn't zoom in */
+    padding: 0.7rem 0.8rem;
+    border-radius: 10px;
+    border: 2px solid var(--c24-line-strong);
+    background: var(--c24-surface);
+    color: var(--c24-text);
+}
+.c24-demo-login-form .c24-play { justify-content: center; font-weight: 700; cursor: pointer; }
+.c24-demo-login-error { color: #d9534f; font-weight: 700; font-size: 0.9rem; }
+.c24-demo-langs { display: flex; gap: 0.5rem; }
+.c24-demo-langs a {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.7rem;
+    border-radius: 8px;
+    border: 2px solid var(--c24-line-strong);
+    color: var(--c24-text);
+}
+@media (hover: hover) and (pointer: fine) { .c24-demo-langs a:hover { background: var(--c24-hover); } }

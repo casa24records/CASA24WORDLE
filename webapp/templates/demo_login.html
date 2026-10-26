@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+{% set es = texts['es'] %}{% set en = texts['en'] %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="robots" content="noindex">
+    <title>Casa 24 Wordle · Developer view</title>
+    <link rel="shortcut icon" href="{{ asset('favicon/favicon.ico') }}">
+    <style>
+        @font-face { font-family: "VT323"; src: url("{{ asset('fonts/VT323-Regular.ttf') }}") format("truetype"); font-display: swap; }
+    </style>
+    <link rel="stylesheet" href="{{ asset('style.css') }}">
+    <script src="{{ asset('theme.js') }}"></script>
+</head>
+
+<body class="c24-demo-login-page">
+    <main class="c24-demo-login">
+        <a href="/" class="c24-demo-login-logo">
+            <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
+            <span class="c24-title">Casa 24 Wordle</span>
+        </a>
+        <h1 class="c24-title c24-demo-login-title">🔒 {{ es.demo_title }} / {{ en.demo_title }}</h1>
+        <p class="c24-demo-login-intro"><span lang="es">{{ es.demo_intro }}</span><br><span lang="en">{{ en.demo_intro }}</span></p>
+        <form method="post" action="/demo" class="c24-demo-login-form">
+            <label for="demo-password">{{ es.demo_password }} / {{ en.demo_password }}</label>
+            <input id="demo-password" name="password" type="password" autocomplete="current-password" required autofocus>
+            {% if error %}<p class="c24-demo-login-error" role="alert">{{ es.demo_wrong_password }} / {{ en.demo_wrong_password }}</p>{% endif %}
+            <button type="submit" class="c24-play c24-play-main">{{ es.demo_enter }} / {{ en.demo_enter }}</button>
+        </form>
+    </main>
+</body>
+
+</html>

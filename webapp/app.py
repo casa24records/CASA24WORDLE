@@ -4,10 +4,14 @@ from flask import (
     make_response,
     redirect,
     request,
+    session,
     url_for,
+    abort,
 )
 from markupsafe import Markup
+import datetime
 import hashlib
+import hmac
 import json
 import time
 import os
@@ -20,6 +24,7 @@ sys.path.insert(0, APP_DIR)
 
 import daily
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask.sessions import SecureCookieSessionInterface
 import glob
 import random
 
@@ -30,6 +35,48 @@ app = Flask(__name__)
 # Behind Vercel (or any proxy) trust X-Forwarded-Proto/Host so request.url_root
 # (sitemap, share links) shows the visitor's real https address.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Demo mode (/demo) is for the Casa 24 team. Its password lives ONLY in the
+# DEMO_PASSWORD environment variable (the repo is public, never commit it).
+# No DEMO_PASSWORD -> no Demo button and /demo answers 404.
+DEMO_LANGS = ("es", "en")
+
+
+def demo_password():
+    return os.environ.get("DEMO_PASSWORD", "")
+
+
+def demo_enabled():
+    return bool(demo_password())
+
+
+def _secret_key():
+    # SECRET_KEY if set; otherwise derived from the demo password, so every
+    # Vercel instance signs the demo session cookie the same way.
+    key = os.environ.get("SECRET_KEY")
+    if key:
+        return key
+    return hashlib.sha256(("casa24-demo-session:" + demo_password()).encode()).hexdigest()
+
+
+app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=30)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+
+class _EnvKeySessionInterface(SecureCookieSessionInterface):
+    """Signs the session with a key read from the environment on every use.
+
+    Setting app.secret_key in before_request is too late (Flask opens the
+    session first), so a cold Vercel instance would fail the first login.
+    Reading it here also means a new DEMO_PASSWORD logs everyone out at once.
+    """
+
+    def get_signing_serializer(self, app):
+        app.secret_key = _secret_key()
+        return super().get_signing_serializer(app)
+
+
+app.session_interface = _EnvKeySessionInterface()
 app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu order (Spanish, English first)
 
 ###############################################################################
@@ -415,6 +462,7 @@ def index():
         languages=languages,
         language_codes=language_codes,
         todays_idx=get_todays_idx(),
+        demo_enabled=demo_enabled(),
     )
 
 
@@ -430,6 +478,55 @@ def site_map():
     return response
 
 
+# demo mode for the team: random word, restart, fill in the answer
+def _demo_logged_in():
+    return demo_enabled() and session.get("demo") is True
+
+
+@app.route("/demo", methods=["GET", "POST"])
+def demo_login():
+    if not demo_enabled():
+        abort(404)
+    error = False
+    if request.method == "POST":
+        given = request.form.get("password", "")
+        if hmac.compare_digest(given.encode(), demo_password().encode()):
+            session.permanent = True
+            session["demo"] = True
+            return redirect("/demo/es")
+        error = True
+    elif _demo_logged_in():
+        return redirect("/demo/es")
+    texts = {lang: language_configs[lang]["text"] for lang in DEMO_LANGS}
+    response = make_response(
+        render_template("demo_login.html", error=error, texts=texts), 401 if error else 200
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/demo/<lang_code>")
+def demo_game(lang_code):
+    if not demo_enabled():
+        abort(404)
+    if not _demo_logged_in():
+        return redirect("/demo")
+    if lang_code not in DEMO_LANGS:
+        return redirect("/demo/es")
+    word_list = language_codes_5words[lang_code]
+    language = Language(lang_code, word_list, request.cookies.get(f"keyboard_layout_{lang_code}"))
+    # first open: the real word of the day, like the normal game.
+    # Restart (?skip=<current word>): a random answer from the same pool, never the same word.
+    if "skip" in request.args:
+        pool = sorted(set(word_list) | set(casa24_words[lang_code][0]))
+        skip = request.args.get("skip", "")
+        choices = [w for w in pool if w != skip] or pool
+        language.daily_word = random.SystemRandom().choice(choices)
+    response = make_response(render_template("game.html", language=language, demo=True))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 # arbitrary app route
 @app.route("/<lang_code>")
 def language(lang_code):
@@ -440,7 +537,7 @@ def language(lang_code):
     cookie_key = f"keyboard_layout_{lang_code}"
     requested_layout = request.args.get("layout") or request.cookies.get(cookie_key)
     language = Language(lang_code, word_list, requested_layout)
-    response = make_response(render_template("game.html", language=language))
+    response = make_response(render_template("game.html", language=language, demo=False))
     selected_layout = language.keyboard_layout_name
     if request.cookies.get(cookie_key) != selected_layout:
         response.set_cookie(

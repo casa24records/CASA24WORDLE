@@ -116,7 +116,9 @@ const app = Vue.createApp({
     },
     created() {
         // remember the last language played, for the start screen
-        try { localStorage.setItem("casa24_lang", this.config.language_code); } catch (e) { }
+        if (!DEMO) {
+            try { localStorage.setItem("casa24_lang", this.config.language_code); } catch (e) { }
+        }
         // listen for any keypresses
         window.addEventListener('keydown', this.keyDown);
 
@@ -517,6 +519,7 @@ const app = Vue.createApp({
                 this.show_stats_modal = true;
             }, delay + (delay > 0 ? 1600 : 400));
 
+            if (DEMO) { return; }  // demo results don't count
             // save a win to localStorage
             const result = { "won": true, "attempts": this.attempts, "date": new Date() };
             this.game_results[this.config.language_code].push(result);
@@ -539,6 +542,7 @@ const app = Vue.createApp({
                 this.hideNotification();  // the answer toast would cover the window title
                 this.show_stats_modal = true;
             }, delay + 400);
+            if (DEMO) { return; }  // demo results don't count
             // save a loss to local storage game results
             this.game_results[this.config.language_code].push({ "won": false, "attempts": this.attempts, "date": new Date() });
             localStorage.setItem("game_results", JSON.stringify(this.game_results));
@@ -546,6 +550,17 @@ const app = Vue.createApp({
             // refresh stats
             this.stats = this.calculateStats(this.config.language_code);
 
+        },
+        demoRestart() {
+            // new random word (the server skips the current one)
+            window.location.href = "/demo/" + this.config.language_code + "?skip=" + encodeURIComponent(this.todays_word);
+        },
+        demoFillAnswer() {
+            // type today's (demo) answer into the current row and press Enter, like a player would
+            if (this.game_over || this.revealing) { return; }
+            while (this.active_cell > 0) { this.keyDown({ key: "Backspace" }); }
+            for (const c of this.todays_word) { this.keyDown({ key: c }); }
+            this.keyDown({ key: "Enter" });
         },
         hideNotification() {
             clearTimeout(this.notification.timeout);
@@ -621,6 +636,7 @@ const app = Vue.createApp({
             return value ? value.trim() : fallback;
         },
         saveToLocalStorage() {
+            if (DEMO) { return; }  // demo games are never saved
             // saves tiles, tile_classes, active_row and active_cell to local storage with key: page_name
             var url = window.location.href;
             var page_name = url.substring(url.lastIndexOf('/') + 1);
@@ -641,6 +657,7 @@ const app = Vue.createApp({
             localStorage.setItem(page_name, JSON.stringify(data));
         },
         loadFromLocalStorage() {
+            if (DEMO) { return; }
             // if local storage has data and the daily word is the same as the todays word, then load data
             var url = window.location.href;
             var page_name = url.substring(url.lastIndexOf('/') + 1);

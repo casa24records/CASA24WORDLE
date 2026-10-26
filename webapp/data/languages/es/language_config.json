@@ -27,7 +27,14 @@
         "theme_dark": "Oscuro",
         "result_won": "¡Ganaste!",
         "result_lost": "Perdiste",
-        "notification-repeated": "Ya probaste esa palabra"
+        "notification-repeated": "Ya probaste esa palabra",
+        "demo_restart": "↻ Reiniciar",
+        "demo_fill": "✓ Poner la palabra",
+        "demo_password": "Contraseña",
+        "demo_enter": "Entrar",
+        "demo_wrong_password": "Contraseña incorrecta",
+        "demo_title": "Vista de desarrollador",
+        "demo_intro": "Para el equipo de Casa 24: el mismo juego, con botones para reiniciar con otra palabra y para poner la palabra. No cuenta en tus estadísticas."
     },
     "right_to_left": "false",
     "help": {
