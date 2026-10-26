@@ -15,3 +15,7 @@ webapp/data/languages/*/*_casa24_aliases.txt
 # Gilroy is commercial and git-ignored; keep it out of CLI uploads too
 # (Vercel uses this file instead of .gitignore when it exists)
 webapp/static/fonts/Gilroy-*
+
+# local Vercel link and env files (never upload)
+.vercel
+.env*
