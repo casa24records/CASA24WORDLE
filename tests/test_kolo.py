@@ -19,7 +19,15 @@ def js_pool(name):
 
 
 def folder(name):
-    return {f for f in os.listdir(os.path.join(KOLO_DIR, name)) if not f.startswith(".")}
+    """PNG files in win/ or lose/ (each also has a .webp twin, checked below)."""
+    return {f for f in os.listdir(os.path.join(KOLO_DIR, name)) if f.endswith(".png")}
+
+
+def test_every_kolo_png_has_a_webp():
+    for name in ("win", "lose"):
+        files = set(os.listdir(os.path.join(KOLO_DIR, name)))
+        for png in folder(name):
+            assert png[:-4] + ".webp" in files, f"{name}/{png} has no .webp"
 
 
 def test_brand_assets_is_the_script():

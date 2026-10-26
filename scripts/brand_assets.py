@@ -5,7 +5,8 @@ Usage:
 
 The brand pack folder must contain KOLO/ with the PNGs named below. Change
 the IMAGES, WIN and LOSE tables to use different Kolo art. Outputs go to
-webapp/static/. WIN and LOSE must match KOLO_WIN and KOLO_LOSE in game.js
+webapp/static/. Every Kolo PNG also gets a .webp twin (same name, quality
+85, alpha kept) for <picture> tags; the PNG stays as the fallback. WIN and LOSE must match KOLO_WIN and KOLO_LOSE in game.js
 (tests/test_kolo.py checks this).
 """
 
@@ -46,19 +47,31 @@ WIN_HEIGHT, LOSE_HEIGHT = 300, 240
 FAVICONS = [(180, "apple-touch-icon.png"), (192, "android-chrome-192x192.png"), (512, "android-chrome-512x512.png")]
 
 
+WEBP_QUALITY = 85
+
+
+def save(im, path):
+    """Write the PNG and a WebP twin next to it."""
+    im.save(path, optimize=True)
+    im.save(os.path.splitext(path)[0] + ".webp", "WEBP", quality=WEBP_QUALITY, method=6, exact=False)
+
+
 def load(path):
     im = Image.open(path).convert("RGBA")
     return im.crop(im.getbbox())  # trim transparent edges
 
 
 def main(pack):
+    from PIL import features
+    if not features.check("webp"):
+        sys.exit("This Pillow build has no WebP support")
     kolo = os.path.join(pack, "KOLO")
     out_dir = os.path.join(STATIC, "images", "kolo")
     os.makedirs(out_dir, exist_ok=True)
     for out, (src, height) in IMAGES.items():
         im = load(os.path.join(kolo, src))
         im.thumbnail((height * 2, height))
-        im.save(os.path.join(out_dir, out), optimize=True)
+        save(im, os.path.join(out_dir, out))
         print(f"{out}: {im.size}")
     for folder, table, height in (("win", WIN, WIN_HEIGHT), ("lose", LOSE, LOSE_HEIGHT)):
         sub = os.path.join(out_dir, folder)
@@ -66,7 +79,7 @@ def main(pack):
         for out, src in table.items():
             im = load(os.path.join(kolo, src))
             im.thumbnail((height * 2, height))
-            im.save(os.path.join(sub, out), optimize=True)
+            save(im, os.path.join(sub, out))
             print(f"{folder}/{out}: {im.size}")
 
     face = load(os.path.join(kolo, IMAGES["kolo-face.png"][0]))

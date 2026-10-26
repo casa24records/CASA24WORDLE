@@ -1,5 +1,8 @@
 """Vercel build step: copy webapp/static/ to public/static/.
 
+Copies the whole folder as-is (PNG + WebP images, TTF/WOFF2 fonts, any
+vendor/ folder added later), so new asset types need no change here.
+
 Vercel serves everything in public/ from its CDN, so /static/... requests
 never reach Flask. Locally Flask serves webapp/static/ itself, so you never
 need to run this by hand (public/ is git-ignored).
