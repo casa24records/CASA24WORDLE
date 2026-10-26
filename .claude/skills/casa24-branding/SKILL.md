@@ -37,11 +37,19 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 - In use, in `webapp/static/images/kolo/`:
   - `kolo-face.png`: Kolo Face, used for the **logo slot** in both headers and the favicons
   - `kolo-hero.png`: Young Kolo, on the menu
-  - `kolo-win.png`: Rap Battle Kolo, on the win screen
-  - `kolo-lose.png`: Baby Kolo, on the lose screen
+  - `win/` and `lose/`: the end-of-game window shows **one Kolo picked at random per game** (decided 2026-10-26).
+    - Win (any number of guesses), 12 pictures: `car` (Car Kolo), `chill` (Chill Kolo), `dj` (DJ Kolo), `face` (Kolo Face), `hoodie` (Hoodie Kolo), `montuno` (Montuno), `pizza` (Pizza Kolo), `prod` (Prod by Kolo), `rap-battle` (Rap Battle Kolo), `ross` (Kolo Ross (Stained)), `young` (Young Kolo), `young-cropped` (Cropped - Young Kolo).
+    - Loss, 2 pictures: `baby` (Baby Kolo), `toilet` (Kolo Toilet).
+    - Win pictures are at most 300 px tall, loss pictures 240 px.
+    - In `game.js`, `pickKolo()` chooses one in `gameWon()` / `gameLost()`. The choice is saved as `kolo_image` in localStorage, so reloading the page that day shows the same Kolo.
 - Favicons in `webapp/static/favicon/`: `favicon.ico` (holds 16, 32 and 48 px), `apple-touch-icon.png`, `android-chrome-192x192.png`, `android-chrome-512x512.png`, `site.webmanifest`. There are no separate 16/32 px pngs.
-- Rebuild or swap with `.venv/bin/python scripts/brand_assets.py "<brand pack folder>"`. Edit its `IMAGES` table to change which art is used. Output is reproducible.
-- **Don't use:** "Kolo ft. Pikachu" (trademark), art showing alcohol (Chill Kolo, DJ Kolo), or Kolo Toilet in the public game. Never draw or invent new Kolo art.
+- Rebuild or swap with `.venv/bin/python scripts/brand_assets.py "<brand pack folder>"` (the folder that has `KOLO/` inside). Edit its `IMAGES` table to change the logo or menu art. Output is reproducible.
+- **To add or remove an end-screen Kolo:**
+  1. Add or remove the line in `WIN` or `LOSE` in `scripts/brand_assets.py` (new file name -> original file name in `KOLO/`).
+  2. Rerun the script above (delete a removed picture's file from `win/` or `lose/` yourself).
+  3. Add or remove the same file name in `KOLO_WIN` or `KOLO_LOSE` at the top of `game.js`.
+  4. Run the tests: `tests/test_kolo.py` checks that the lists, the folders and `brand_assets.py` all match.
+- **Don't use:** "Kolo ft. Pikachu" (trademark), anywhere, ever. A test checks for it. The owner allowed the alcohol art (Chill Kolo, DJ Kolo) and Kolo Toilet on 2026-10-26. Never draw or invent new Kolo art.
 - **Member logos:** not used. Using them needs each member's OK, and HEISEN's logo contains a swear word.
 - Kolo art is © Casa 24 Records. It is listed in `CREDITS.md` and is not MIT-licensed.
 

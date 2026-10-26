@@ -41,6 +41,7 @@
         const config = JSON.parse('{{language.config | tojson | safe}}');
         const todays_idx = "{{ language.todays_idx }}";
         const todays_word = "{{ language.daily_word }}";
+        const KOLO_BASE = "{{ url_for('static', filename='images/kolo/') }}";
     </script>
 </head>
 
@@ -312,8 +313,7 @@
 
                     <div class="relative flex-auto mx-6 my-3 mb-8">
                         <!-- Kolo celebrates a win, naps after a loss -->
-                        <img v-if="game_won" src="{{ url_for('static', filename='images/kolo/kolo-win.png') }}" alt="Kolo" class="c24-kolo mb-2">
-                        <img v-if="game_over && !game_won" src="{{ url_for('static', filename='images/kolo/kolo-lose.png') }}" alt="Kolo" class="c24-kolo mb-2">
+                        <img v-if="game_over && kolo_image" :src="kolo_base + kolo_image" alt="Kolo" class="c24-kolo mb-2">
                         <p class="text-md text-center whitespace-pre-line" id="emoji_board" v-html="emoji_board">
                         </p>
                         <p v-if="attempts=='0'" class="text-center text-sm text-gray-600">

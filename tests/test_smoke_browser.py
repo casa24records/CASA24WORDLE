@@ -198,3 +198,52 @@ def test_accents_optional(server, page, lang):
     board = page.locator("main .grid-cols-5").first.inner_text()
     letter = next(c for c in accented if not c.isascii())
     assert letter.upper() in board, (accented, board)
+
+
+KOLO_IMG = "img.c24-kolo"
+KOLO_LOADED = (
+    f"(() => {{ const i = document.querySelector('{KOLO_IMG}');"
+    " return i && i.offsetParent !== null && i.complete && i.naturalWidth > 0; })()"
+)
+
+
+def kolo_src(page):
+    page.wait_for_function(KOLO_LOADED, timeout=8000)  # stats modal opens after the flip
+    return page.locator(KOLO_IMG).get_attribute("src")
+
+
+def test_kolo_after_win(server, page):
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    today = app.Language("en", app.language_codes_5words["en"]).daily_word
+    page.goto(f"{server}/en")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    type_word(page, today)
+    src = kolo_src(page)
+    assert "/kolo/win/" in src and src.endswith(".png"), src
+    assert page.locator(KOLO_IMG).count() == 1
+    saved = page.evaluate("JSON.parse(localStorage.getItem('en') || '{}').kolo_image")
+    assert saved and src.endswith("/kolo/" + saved), (saved, src)  # saved, not re-picked
+
+    page.reload()
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    assert kolo_src(page) == src  # the same Kolo comes back
+    assert errors == []
+
+
+def test_kolo_after_loss(server, page):
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    words = app.language_codes_5words["es"]
+    today = app.Language("es", words).daily_word
+    guesses = [w for w in words if w.isascii() and fold(w) != fold(today)][:6]
+    assert len(guesses) == 6
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    for n, word in enumerate(guesses, 1):
+        type_word(page, word)
+        wait_reveal(page, n)
+    src = kolo_src(page)
+    assert "/kolo/lose/" in src and src.endswith(".png"), src
+    assert page.locator(KOLO_IMG).count() == 1
+    assert errors == []

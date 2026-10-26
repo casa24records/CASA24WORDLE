@@ -33,7 +33,8 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.
 
 ## Branding
-- Kolo, the orange dachshund, is the mascot. The palette comes from his art. Avoid trademarked or alcohol art in the public game. Member logos are not used.
+- Kolo, the orange dachshund, is the mascot. The palette comes from his art. Member logos are not used.
+- **Random Kolo on the end screen** (decided 2026-10-26): each game shows one Kolo picked at random, 12 for a win and 2 for a loss (Baby Kolo, Kolo Toilet). The owner allowed the alcohol art (Chill Kolo, DJ Kolo) and Kolo Toilet; this replaces the earlier "avoid alcohol art" rule. **Kolo ft. Pikachu is never used** (trademark). List and how to change it: `casa24-branding`.
 - Gilroy needs a webfont license, so it is git-ignored. VT323 is the pixel font.
 - Dark mode exists: it follows the device by default and can be picked in Settings or on the menu.
 

@@ -1,5 +1,12 @@
 // Casa 24 Wordle game page (Vue 3). Word lists, characters and config come
 // from Jinja as globals in game.html.
+
+// Kolo shown on the end screen, one picked at random per game. These must match
+// the files in static/images/kolo/win/ and lose/ (scripts/brand_assets.py makes them).
+const KOLO_WIN = ["car.png", "chill.png", "dj.png", "face.png", "hoodie.png", "montuno.png", "pizza.png",
+    "prod.png", "rap-battle.png", "ross.png", "young.png", "young-cropped.png"];
+const KOLO_LOSE = ["baby.png", "toilet.png"];
+
 const app = Vue.createApp({
     delimiters: ['[[', ']]'],  // don't want to clash with Jinja (backend templating coming from flask)
     data() {
@@ -74,6 +81,9 @@ const app = Vue.createApp({
             revealing: false,
             revealing_row: -1,
             pending_key_classes: null,  // keyboard colors waiting for the flip to end
+
+            kolo_image: "",  // e.g. "win/pizza.png", chosen when the game ends
+            kolo_base: KOLO_BASE,
 
             emoji_board: "⬜⬜⬜⬜⬜\n",
             attempts: "0",
@@ -447,10 +457,16 @@ const app = Vue.createApp({
             }
             setTimeout(() => { this.showTiles(); }, 1500);
         },
+        pickKolo() {
+            var pool = this.game_won ? KOLO_WIN : KOLO_LOSE;
+            var folder = this.game_won ? "win/" : "lose/";
+            this.kolo_image = folder + pool[Math.floor(Math.random() * pool.length)];
+        },
         gameWon(delay = 0) {
             // the game ends now (and is saved); the word and stats show after the tiles flip
             this.game_over = true;
             this.game_won = true;
+            this.pickKolo();
             this.emoji_board = this.getEmojiBoard();
             setTimeout(() => {
                 this.showNotification(this.todays_word.toUpperCase(), 12);
@@ -475,6 +491,7 @@ const app = Vue.createApp({
 
             this.game_over = true;
             this.game_won = false;
+            this.pickKolo();
             this.attempts = "X";
             setTimeout(() => {
                 this.show_stats_modal = true;
@@ -572,6 +589,7 @@ const app = Vue.createApp({
                 emoji_board: this.emoji_board,
                 attempts: this.attempts,
                 full_word_inputted: this.full_word_inputted,
+                kolo_image: this.kolo_image,
             };
             localStorage.setItem(page_name, JSON.stringify(data));
         },
@@ -592,6 +610,11 @@ const app = Vue.createApp({
                 this.emoji_board = data.emoji_board;
                 this.attempts = data.attempts;
                 this.full_word_inputted = data.full_word_inputted;
+                this.kolo_image = data.kolo_image || "";
+                if (this.game_over && !this.kolo_image) {
+                    // games saved before random Kolos existed
+                    this.pickKolo();
+                }
             }
         },
         calculateStats(language_code) {

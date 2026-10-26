@@ -4,7 +4,9 @@ Usage:
     .venv/bin/python scripts/brand_assets.py "/path/to/brand pack"
 
 The brand pack folder must contain KOLO/ with the PNGs named below. Change
-the IMAGES table to use different Kolo art. Outputs go to webapp/static/.
+the IMAGES, WIN and LOSE tables to use different Kolo art. Outputs go to
+webapp/static/. WIN and LOSE must match KOLO_WIN and KOLO_LOSE in game.js
+(tests/test_kolo.py checks this).
 """
 
 import os
@@ -20,9 +22,27 @@ CREAM = (244, 239, 230, 255)
 IMAGES = {
     "kolo-face.png": ("Kolo Face.png", 256),          # header logo slot + favicon
     "kolo-hero.png": ("Young Kolo.png", 360),          # menu
-    "kolo-win.png": ("Rap Battle Kolo.png", 300),      # win screen
-    "kolo-lose.png": ("Baby Kolo.png", 240),           # lose screen
 }
+# end screen: one picked at random per game. Never add "Kolo ft. Pikachu" (trademark).
+WIN = {  # output file in images/kolo/win/ -> source file in KOLO/
+    "car.png": "Car Kolo.png",
+    "chill.png": "Chill Kolo.png",
+    "dj.png": "DJ Kolo.png",
+    "face.png": "Kolo Face.png",
+    "hoodie.png": "Hoodie Kolo.png",
+    "montuno.png": "Montuno.png",
+    "pizza.png": "Pizza Kolo.png",
+    "prod.png": "Prod by Kolo.png",
+    "rap-battle.png": "Rap Battle Kolo.png",
+    "ross.png": "Kolo Ross (Stained).png",
+    "young.png": "Young Kolo.png",
+    "young-cropped.png": "Cropped - Young Kolo.png",
+}
+LOSE = {  # output file in images/kolo/lose/ -> source file in KOLO/
+    "baby.png": "Baby Kolo.png",
+    "toilet.png": "Kolo Toilet.png",
+}
+WIN_HEIGHT, LOSE_HEIGHT = 300, 240
 FAVICONS = [(180, "apple-touch-icon.png"), (192, "android-chrome-192x192.png"), (512, "android-chrome-512x512.png")]
 
 
@@ -40,6 +60,14 @@ def main(pack):
         im.thumbnail((height * 2, height))
         im.save(os.path.join(out_dir, out), optimize=True)
         print(f"{out}: {im.size}")
+    for folder, table, height in (("win", WIN, WIN_HEIGHT), ("lose", LOSE, LOSE_HEIGHT)):
+        sub = os.path.join(out_dir, folder)
+        os.makedirs(sub, exist_ok=True)
+        for out, src in table.items():
+            im = load(os.path.join(kolo, src))
+            im.thumbnail((height * 2, height))
+            im.save(os.path.join(sub, out), optimize=True)
+            print(f"{folder}/{out}: {im.size}")
 
     face = load(os.path.join(kolo, IMAGES["kolo-face.png"][0]))
 
