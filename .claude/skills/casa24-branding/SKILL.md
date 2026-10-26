@@ -1,6 +1,6 @@
 ---
 name: casa24-branding
-description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kolo mascot art, logo slot, fonts and their licenses, favicons. Use when editing style.css, theme.js, images, fonts, or when the owner shares new brand assets.
+description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kolo mascot art, logo slot, fonts and their licenses, favicons, tile animations. Use when editing style.css, theme.js, the tile animations in game.js, images, fonts, or when the owner shares new brand assets.
 ---
 
 # Branding and themes
@@ -48,6 +48,18 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 - **VT323** (pixel font, SIL OFL) is used for titles and tiles. It is committed, with `VT323-OFL.txt`.
 - **Gilroy** is commercial. Its files are in `webapp/static/fonts/` locally but **git-ignored**, so production falls back to the system font. Only commit them if the owner confirms a **webfont** license.
 - Fonts are defined by `--c24-font-body` and `--c24-font-display`.
+
+## Animations (tiles)
+- **What happens:** a letter "pops" when typed, tiles flip one by one on Enter, and the winning row bounces (each tile 100 ms after the last).
+- **Where it lives:**
+  - `style.css`: keyframes `c24-pop`, `c24-flip`, `c24-bounce` and classes `.pop` (100 ms), `.flip` (500 ms), `.bounce` (1000 ms). The bounce delays are the `.bounce-d1`…`.bounce-d4` lines (`bounceRow()` adds them in reading order, so right-to-left rows bounce from the right).
+  - `game.js`: `addChar` adds `.pop`; `revealRow()` does the flip; `bounceRow()` the win bounce.
+- **Timing knobs** (in `revealRow()`): `STAGGER = 300` (wait between tiles) and `FLIP = 500` (one tile's flip). To change the flip speed, change `FLIP` **and** `.flip` in `style.css` to the same number, or colors change at the wrong moment. The win/lose pop-up waits for the reveal; the win waits 1600 ms more for the bounce (in `gameWon()`). If you make the bounce longer, raise that too.
+- **Only the picture is animated.** `tile_classes_visual` is what the screen shows and is animated. `tile_classes` (saved in localStorage) gets the final colors right away, and the result is saved right away too. So a reload in the middle of a flip still shows the full, correct game. Never delay saving to match an animation.
+- **Typing is blocked while tiles flip** (`revealing` / `revealing_row`). On-screen keyboard colors update after the flip, so they don't give the answer away early.
+- **Right-to-left languages** flip from right to left (`final.length-1-i` in `revealRow()`).
+- **Reduced motion:** if the device asks for less motion, the `@media (prefers-reduced-motion: reduce)` block in CSS turns animations off and `reduceMotion()` in JS skips them; colors appear at once. Keep both when adding a new animation.
+- **Tests:** after Enter, browser tests must call `wait_reveal(page, rows)` (in `tests/test_smoke_browser.py`) before typing the next word, or the typing is ignored.
 
 ## Checking a visual change
 Run `.venv/bin/python scripts/screenshots.py`. It saves menu and game screenshots in light and dark mode at phone size to `screenshots/`. Look at them and check contrast before committing.

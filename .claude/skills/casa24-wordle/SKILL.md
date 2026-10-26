@@ -20,7 +20,7 @@ Casa 24 Records' daily word game, a fork of Hugo0/wordle on branch `casa24`. The
 | How the daily word is picked, change the 1-in-5 rate | `casa24-daily-word` |
 | Add/remove/review words, tiers, aliases | `casa24-words` |
 | UI text, translations, Spanish style, accents, keyboards, languages | `casa24-text-and-languages` |
-| Colors, dark mode, Kolo art, fonts, logo, favicons | `casa24-branding` |
+| Colors, dark mode, Kolo art, fonts, logo, favicons, animations | `casa24-branding` |
 | Run locally, tests, screenshots | `casa24-test-and-preview` |
 | Put it online (Vercel), domain | `casa24-deploy` |
 | Why things are the way they are (decisions already made) | `casa24-decisions` |

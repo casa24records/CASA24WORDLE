@@ -44,9 +44,8 @@ def test_guess_colors_tiles(server, page, lang):
     for letter in word:
         page.keyboard.press(letter)
     page.keyboard.press("Enter")
-    colored = page.locator(".correct, .semicorrect, .incorrect")
-    colored.first.wait_for(timeout=5000)
-    assert colored.count() >= 5
+    wait_reveal(page)
+    assert page.locator(BOARD_COLORED).count() == 5
     assert errors == []
 
 
@@ -55,6 +54,19 @@ def fold(word):
 
     return "".join(
         c if c == "ñ" else unicodedata.normalize("NFD", c)[0] for c in word
+    )
+
+
+# colored tiles on the board only (the help modal has example tiles too)
+BOARD_COLORED = "main .grid-cols-5 > .correct, main .grid-cols-5 > .semicorrect, main .grid-cols-5 > .incorrect"
+
+
+def wait_reveal(page, rows=1):
+    """Wait until `rows` guesses have finished their letter-by-letter flip."""
+    page.wait_for_function(
+        f"document.querySelectorAll('{BOARD_COLORED}').length >= {5 * rows}"
+        " && !document.querySelector('.flip')",
+        timeout=5000,
     )
 
 
@@ -74,7 +86,7 @@ def test_spanish_accents_optional(server, page):
     page.goto(f"{server}/es")
     page.wait_for_function("document.querySelector('#app') && window.Vue")
     type_word(page, fold(accented))  # e.g. "jamon"
-    page.locator(".correct, .semicorrect, .incorrect").first.wait_for(timeout=5000)
+    wait_reveal(page)
     assert "Ó" in page.locator("#app").inner_text()  # board shows "JAMÓN"
 
     type_word(page, fold(today))  # today's word typed without accents still wins

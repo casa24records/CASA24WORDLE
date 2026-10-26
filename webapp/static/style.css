@@ -189,6 +189,35 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     border-color: var(--c24-absent-bg) !important;
     color: var(--c24-absent-fg) !important;
 }
+/* tile animations: pop when typing, flip one by one on Enter, bounce on a win */
+@keyframes c24-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+@keyframes c24-flip {
+    0% { transform: rotateX(0); }
+    50% { transform: rotateX(90deg); }
+    100% { transform: rotateX(0); }
+}
+@keyframes c24-bounce {
+    0%, 20% { transform: translateY(0); }
+    40% { transform: translateY(-30%); }
+    50% { transform: translateY(5%); }
+    60% { transform: translateY(-15%); }
+    80%, 100% { transform: translateY(0); }
+}
+.pop { animation: c24-pop 100ms ease-in-out; }
+.flip { animation: c24-flip 500ms ease-in-out; }
+.bounce { animation: c24-bounce 1000ms ease; }
+.bounce-d1 { animation-delay: 100ms; }
+.bounce-d2 { animation-delay: 200ms; }
+.bounce-d3 { animation-delay: 300ms; }
+.bounce-d4 { animation-delay: 400ms; }
+@media (prefers-reduced-motion: reduce) {
+    .pop, .flip, .bounce { animation: none; }
+}
+
 /* pixel font on the tiles */
 #app .grid-cols-5 > div { font-family: var(--c24-font-display); }
 

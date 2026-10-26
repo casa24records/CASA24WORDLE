@@ -75,6 +75,11 @@ const app = Vue.createApp({
                 return this.get_time_until_next_day();
             },
 
+            // true while the last guess is flipping, typing is ignored meanwhile
+            revealing: false,
+            revealing_row: -1,
+            pending_key_classes: null,  // keyboard colors waiting for the flip to end
+
             emoji_board: "⬜⬜⬜⬜⬜\n",
             attempts: "0",
 
@@ -337,7 +342,7 @@ const app = Vue.createApp({
                 this.show_not_valid_notif = false;
             }
 
-            if (this.game_over) {
+            if (this.game_over || this.revealing) {
                 return;
             }
             // console.log('keyDown', this.active_cell, this.active_row, event.key);
@@ -358,18 +363,35 @@ const app = Vue.createApp({
                 }
                 var word_is_valid = this.checkWord(word);
                 if (word_is_valid) {
+                    var row = this.active_row;
+                    // color the keyboard only after the tiles finish flipping
+                    var keys_before = Object.assign({}, this.key_classes);
                     this.updateColors();
+                    var keys_after = Object.assign({}, this.key_classes);
+                    Object.assign(this.key_classes, keys_before);
+                    // saved right away, so a reload mid-flip keeps the keyboard colors
+                    this.pending_key_classes = keys_after;
                     this.active_row++;
                     this.active_cell = 0;
                     this.full_word_inputted = false;
+
+                    var won = word === this.todays_word;
+                    var reveal_ms = this.revealRow(row, () => {
+                        Object.assign(this.key_classes, keys_after);
+                        this.pending_key_classes = null;
+                        this.showTiles();
+                        if (won) {
+                            this.bounceRow(row);
+                        }
+                        this.saveToLocalStorage();
+                    });
+                    if (won) {
+                        this.gameWon(reveal_ms);
+                    } else if (this.active_row == 6) {
+                        this.gameLost(reveal_ms);
+                    }
                 } else {
                     this.showNotification(this.text("notification-not-valid", "Word is not valid"));
-                }
-
-                if (word === this.todays_word) {
-                    this.gameWon();
-                } else if (this.active_row == 6) {
-                    this.gameLost();
                 }
 
             } else if ((key === "Backspace" || key === "Delete" || key === "⌫") && this.active_cell > 0) {
@@ -392,27 +414,81 @@ const app = Vue.createApp({
         },
         showTiles() {
             // if left to right, then reverse the tiles visuals. else copy normally.
+            // The row that is flipping keeps its own classes (revealRow handles it).
             if (!this.right_to_left) {
                 for (let i = 0; i < this.tiles.length; i++) {
                     this.tiles_visual[i] = this.tiles[i].map(x => x)
-                    this.tile_classes_visual[i] = this.tile_classes[i].map(x => x)
+                    if (i !== this.revealing_row) {
+                        this.tile_classes_visual[i] = this.tile_classes[i].map(x => x)
+                    }
                 }
             } else {
                 for (let i = 0; i < this.tiles.length; i++) {
                     this.tiles_visual[i] = this.tiles[i].map(x => x).reverse();
-                    this.tile_classes_visual[i] = this.tile_classes[i].map(x => x).reverse();
+                    if (i !== this.revealing_row) {
+                        this.tile_classes_visual[i] = this.tile_classes[i].map(x => x).reverse();
+                    }
                 }
             }
         },
-        gameWon() {
-            // set game_over to true with time delay
+        reduceMotion() {
+            return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        },
+        revealRow(row, onDone) {
+            // Flip the tiles of a just-guessed row one by one; each shows its color
+            // halfway through the flip. Only the visual classes change: tile_classes
+            // (what gets saved) already has the final colors.
+            // Returns how long the whole reveal takes, in ms.
+            const STAGGER = 300;  // time between one tile and the next
+            const FLIP = 500;     // one tile's flip, must match .flip in style.css
+            if (this.reduceMotion()) {
+                onDone();
+                return 0;
+            }
+            const final = this.tile_classes[row].map(x => x);
+            const typed = "text-2xl tiny:text-4xl uppercase font-bold select-none border-2 border-neutral-500";
+            const vis = (i) => this.right_to_left ? final.length - 1 - i : i;
+            const classes = this.tile_classes_visual[row];
+            this.revealing = true;
+            this.revealing_row = row;
+            for (let i = 0; i < final.length; i++) {
+                classes[vis(i)] = typed;
+                setTimeout(() => { classes[vis(i)] = typed + " flip"; }, i * STAGGER);
+                setTimeout(() => { classes[vis(i)] = final[i] + " flip"; }, i * STAGGER + FLIP / 2);
+                setTimeout(() => { classes[vis(i)] = final[i]; }, i * STAGGER + FLIP);
+            }
+            const total = (final.length - 1) * STAGGER + FLIP;
+            setTimeout(() => {
+                this.revealing = false;
+                this.revealing_row = -1;
+                onDone();
+            }, total);
+            return total;
+        },
+        bounceRow(row) {
+            // the winning row jumps letter by letter (delays are in style.css)
+            if (this.reduceMotion()) {
+                return;
+            }
+            const classes = this.tile_classes_visual[row];
+            for (let i = 0; i < classes.length; i++) {
+                // bounce-dN delays follow reading order, so right-to-left rows bounce from the right
+                var order = this.right_to_left ? classes.length - 1 - i : i;
+                classes[i] = classes[i] + " bounce bounce-d" + order;
+            }
+            setTimeout(() => { this.showTiles(); }, 1500);
+        },
+        gameWon(delay = 0) {
+            // the game ends now (and is saved); the word and stats show after the tiles flip
             this.game_over = true;
             this.game_won = true;
             this.emoji_board = this.getEmojiBoard();
-            this.showNotification(this.todays_word.toUpperCase(), 12);
+            setTimeout(() => {
+                this.showNotification(this.todays_word.toUpperCase(), 12);
+            }, delay);
             setTimeout(() => {
                 this.show_stats_modal = true;
-            }, 400);
+            }, delay + (delay > 0 ? 1600 : 400));
 
             // save a win to localStorage
             const result = { "won": true, "attempts": this.attempts, "date": new Date() };
@@ -423,15 +499,17 @@ const app = Vue.createApp({
             this.stats = this.calculateStats(this.config.language_code);
 
         },
-        gameLost() {
-            this.showNotification(this.todays_word.toUpperCase(), 12);
+        gameLost(delay = 0) {
+            setTimeout(() => {
+                this.showNotification(this.todays_word.toUpperCase(), 12);
+            }, delay);
 
             this.game_over = true;
             this.game_won = false;
             this.attempts = "X";
             setTimeout(() => {
                 this.show_stats_modal = true;
-            }, 400);
+            }, delay + 400);
             // save a loss to local storage game results
             this.game_results[this.config.language_code].push({ "won": false, "attempts": this.attempts, "date": new Date() });
             localStorage.setItem("game_results", JSON.stringify(this.game_results));
@@ -516,7 +594,7 @@ const app = Vue.createApp({
             var data = {
                 tiles: this.tiles,
                 tile_classes: this.tile_classes,
-                key_classes: this.key_classes,
+                key_classes: this.pending_key_classes || this.key_classes,
                 active_row: this.active_row,
                 active_cell: this.active_cell,
                 todays_word: this.todays_word,
