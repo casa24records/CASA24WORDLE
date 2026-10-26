@@ -49,7 +49,7 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
   - `updateColors()` compares letters **exactly**. A plain "a" never counts for an "á" in the answer (it is gray unless the answer also has a plain "a"). An "á" is green or yellow only against an "á". Only the key of the exact letter on the tile gets colored.
   - The repeated-guess check runs on the resolved word, so typing `jamon` after `jamón` is also blocked.
   - When several accented words share one plain spelling, a plain spelling that is itself a word wins; otherwise the first match in the list wins. French has 11 of these groups, Portuguese 82.
-- French and Portuguese keyboards are built automatically in alphabetical order (they have no `<lang>_keyboard.json`), so every accented letter has its own key. œ and æ can't be typed without accents, so those words still need the œ/æ key.
+- French and Portuguese keyboards are built automatically in alphabetical order (only es and en have a `<lang>_keyboard.json`), so every accented letter has its own key. œ and æ can't be typed without accents, so those words still need the œ/æ key.
 
 | Language | Accents optional? | Why |
 |---|---|---|
@@ -64,10 +64,17 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
 - Tested by the accent tests in `tests/test_smoke_browser.py` (for example `test_spanish_accents_optional`).
 
 ## Keyboards
-- `<lang>_keyboard.json` is optional. When it is missing, an alphabetical keyboard is built automatically from the word list, so don't add empty keyboard files. When present, it has `{"default": ..., "layouts": {name: {"label", "rows"}}}`.
+- `<lang>_keyboard.json` is optional; only **es** and **en** have one. When it is missing, `_generate_alphabetical_keyboard()` in `app.py` builds one from the letters of the word list, so don't add empty keyboard files. When present, it has `{"default": ..., "layouts": {name: {"label", "rows"}}}`.
+- **Generated keyboard rule:** letters in alphabetical order (never reordered), about 10 per row and **never more than 11 per row** (the rows are evened out; earlier rows get the extra key), `⇨` first and `⌫` last on the bottom row. `tests/test_input_bugs.py` checks this for all 8 languages. Row sizes per language: `casa24-responsive`.
 - `⇨` is Enter and `⌫` is Backspace.
 - The Spanish default is QWERTY with Ñ plus an accent row (á é í ó ú ü). The alternative is "Alfabético", chosen in Settings.
 - A key only works if its letter appears in that language's main word list (`Language.characters`).
+- **Physical keyboard** (`keyDown()` / `normalizeKey()` in `game.js`):
+  - Shift/Caps Lock letters are lowercased: first with the language's own rules (`toLocaleLowerCase(language_code)`, so Turkish `I` → `ı` and `İ` → `i`), then plain `toLowerCase()`.
+  - Ctrl/Cmd/Alt shortcuts and IME composition (`isComposing`) are ignored; AltGr still types.
+  - Typing inside a Settings field (input/select/textarea) is not a guess.
+  - Tapping an on-screen key (`keyClick()`) blurs it, so a physical Enter afterwards submits the word.
+  - Esc closes every window.
 
 ## Languages
 - Kept: en, es, ar, fr, pt, ru, de, tr, vi, ko. These are the 10 most spoken languages that the original game had.

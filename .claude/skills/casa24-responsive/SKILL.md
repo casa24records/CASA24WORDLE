@@ -1,11 +1,11 @@
 ---
 name: casa24-responsive
-description: Make Casa 24 Wordle work well on every screen — small/large phones, landscape, tablets, laptops, big desktops. Layout rules (dvh, board sized from leftover height, square tiles, key sizes, modals that scroll, safe areas), the measured problems from the 2026-10-26 audit, NYT Wordle's measured layout, performance (Tailwind/Vue CDN, fonts, images, caching) and the sizes to test. Use for any mobile, desktop, responsive, layout, zoom, landscape, or page-speed question.
+description: Make Casa 24 Wordle work well on every screen — small/large phones, landscape, tablets, laptops, big desktops. Layout rules (dvh, board sized from leftover height, square tiles, key sizes, modals that scroll, safe areas), where each layout class lives, what the 2026-10-26 fixes changed and what is still to do (Tailwind compile, WOFF2), NYT Wordle's measured layout, performance (Vue/Tailwind CDN, fonts, WebP, caching) and the sizes to test. Use for any mobile, desktop, responsive, layout, zoom, landscape, or page-speed question.
 ---
 
 # Responsive layout (phones → desktop)
 
-Research done on 2026-10-26 by measuring 9 screen sizes, reading the code, and reading NYT Wordle's live CSS/JS. Update the "Current state" section when you fix things.
+Research done on 2026-10-26 by measuring 9 screen sizes, reading the code, and reading NYT Wordle's live CSS/JS. Update "Current state" and "Still to do" when you fix things.
 
 ## Target layout (what "good" looks like)
 Based on NYT Wordle, which was measured directly.
@@ -26,44 +26,52 @@ Based on NYT Wordle, which was measured directly.
 - **Safe areas:** `padding-bottom: max(8px, env(safe-area-inset-bottom))` on the keyboard, `env(safe-area-inset-top)` on the header, plus left and right insets in landscape.
 - **Touch vs mouse:** put hover styles inside `@media (hover:hover) and (pointer:fine)` so they don't stick on phones. Add `-webkit-tap-highlight-color`, `user-select:none` on keys, a `:focus-visible` outline on keys, and `overscroll-behavior:none` on html/body (no pull-to-refresh).
 - **Physical keyboard:**
-  - Lowercase `event.key` (Shift and Caps Lock are dropped today).
+  - Lowercase `event.key`, so Shift and Caps Lock letters work (locale-aware for Turkish).
   - Ignore Ctrl/Meta/Alt and `isComposing`.
   - Blur the on-screen button after a click, so a physical Enter doesn't re-press the last tapped key.
 - **theme-color:** light and dark meta tags (`media="(prefers-color-scheme: …)"`), plus `color-scheme: light dark`. Install settings belong in `site.webmanifest`; `apple-mobile-web-app-capable` is deprecated.
 
-## Current state (audit 2026-10-26, before fixes)
-Problems, most important first, measured with Playwright:
-1. **Landscape phone 844×390 is unplayable.** The page is 545px tall on a 390px screen, the bottom keyboard rows are off-screen, and tiles are 62×32.
-2. **Modals can't scroll.** The stats modal is cut by 87px at 320×568, 37px at 375×667, and 136px in landscape. The help modal is 658px tall. The cause is `fixed top-10 h-full` with no `max-h`/`overflow`.
-3. **`h-screen` (100vh)** on the game page (`game.html` body). No `dvh`, no safe areas.
-4. **Tiles not square on short phones:** 56×36 at 320×568, 62×53 at 375×667. The board is `max-w-[350px] max-h-[420px]` with no aspect ratio.
-5. **Tile text always 24px:** `tiny:text-4xl` does nothing, because the `tiny` breakpoint was never configured.
-6. **Touch targets:** keys are 27px wide at 320 and 32–34px at 375/390. Header icons are 24px. Enter and Backspace are as narrow as letters.
-7. **Header title overlaps the icons** at 320 and 375 (absolutely centered title).
-8. **`user-scalable=no`** on the game page.
-9. **Desktop:** the 350px board leaves big empty gaps (183px at 1920×1080).
-10. **The start screen scrolls** on small phones (926px at 320×568).
+## Where things live
+All layout CSS is in the "LAYOUT" section of `webapp/static/style.css`; the class names are used in `game.html` / `index.html`.
+- `--vh`: `1vh`, or `1dvh` where the browser has it. Write `calc(var(--vh) * N)`, not `vh`.
+- `.c24-game`: the game page column (header, board, keyboard). `height: calc(var(--vh) * 100)`, max 500px wide, side safe areas.
+- `.c24-header`: 3-column grid (`1fr auto 1fr`), 52px + top safe area, so the title never covers the icons. `.c24-header-title` font is `clamp(1.25rem, …, 2.25rem)`. `.c24-icon-btn`: 44×44 icon buttons.
+- `.c24-board-area` (the `<main>`): takes the leftover height, `container-type: size`.
+- `.c24-board`: `--w: min(420px, 100cqw - 20px, (100cqh - 20px - 5*gap) / 1.2 + 4*gap)`, i.e. as big as fits, max 420px. Tiles are square; their font follows the tile size (`main .grid-cols-5 > div`: 62% of a tile, at least 14px).
+- `.c24-keyboard` with `style="--rows: N"` (set in `game.html` from the row count) and one `.c24-key-row` per row. Key height `--kh` = `clamp(24px, …, 58px)`: about 7dvh, less when there are many rows (all rows share about 42dvh). Keys `flex: 1 1 0`; ⇨ and ⌫ get `flex-grow: 1.5`. Bottom padding `max(8px, env(safe-area-inset-bottom))`.
+- Landscape phones, `@media (orientation: landscape) and (max-height: 500px)`: 40px header on top, board left, keyboard right (CSS grid), max 900px wide.
+- Modals: `.c24-modal-wrap` (fixed, centered, safe areas) holds `.c24-modal` (`width: min(500px, 100% - 32px)`, `max-height: calc(100dvh - 32px - safe areas)`, scrolls inside). `.c24-modal-sm` is 420px. `.c24-close` is the 44px ×. Esc closes every modal.
+- `.c24-kolo` (end-screen picture): at most `min(160px, 22dvh)` tall. `.c24-hero-kolo` (menu): 150px, 96px on screens under 700px tall.
+- Start screen: `.c24-start`, `.c24-primary` (two big buttons side by side at ≥640px), `.c24-chips` (2 columns, 4 at ≥640px).
+- Hover styles only inside `@media (hover: hover) and (pointer: fine)`.
+- Viewport meta: `width=device-width, initial-scale=1, viewport-fit=cover` (pinch-zoom allowed). theme-color: light `#f4efe6`, dark `#0f1a12`.
+- Physical keys: `keyDown()` / `normalizeKey()` in `game.js` (rules in `casa24-text-and-languages`).
 
-Bugs found along the way:
-- The share button adds a new click listener on every Vue `updated()`, so one tap can share many times.
-- Physical Shift/Caps Lock letters are ignored.
-- `key = event.key` has no `var`.
-- The alphabetical keyboard rebalancing in `app.py` scrambles letter order for de, fr and tr (`insert(-1, …)`).
-- Invalid classes: `z-1`, `overflow`, `top-50`.
-- The index.html charset meta is broken.
+## Current state (fixed on 2026-10-26)
+From the audit (before → now):
+- Landscape 844×390 was unplayable (page 545px tall on a 390px screen, keys off-screen, tiles 62×32). Now the board and keyboard sit side by side, all visible, tiles square.
+- Modals were cut off (stats by 87px at 320×568, 136px in landscape). Now they fit and scroll inside.
+- `h-screen` (100vh) replaced with `dvh` plus safe areas.
+- Tiles were not square on short phones (56×36 at 320×568). Now always square, and the board grows up to 420px (was a fixed 350px that left big gaps on desktop).
+- Tile text was always 24px. Now it scales with the tile.
+- Keys were 27–34px wide on phones, header icons 24px. Now keys are at least 24px wide, icons and close buttons 44px, Enter/Backspace 1.5× wide.
+- Header title overlapped the icons at 320/375. Now a 3-column grid.
+- `user-scalable=no` removed.
+- Bugs fixed (tested in `tests/test_input_bugs.py`): Shift/Caps Lock letters, Ctrl/Cmd shortcuts and IME typing, typing in Settings fields, Turkish I/İ, a physical Enter re-pressing the last tapped key, the share button firing many times per tap, de/fr/tr alphabetical keyboards out of order.
+
+Performance done:
+- Vue is the pinned production build `vue@3.5.13` from jsdelivr, with `defer` (was the 2020 dev build 3.0.2 from unpkg).
+- Kolo pictures are WebP only, with width/height set; the end-screen Kolo has `loading="lazy"`.
+- Word lists and config are raw UTF-8 JSON in `<script type="application/json" id="c24-data">` (`json_script()` in `app.py`): ar page 381 → 172 KB, ko 347 → 208 KB. The HTML itself can't be cached (it holds the daily word).
+- Every static URL has `?v=<hash>` (`asset()` in `app.py`) and `vercel.json` caches those for a year. Details: `casa24-deploy`.
+- VT323 is preloaded; its `@font-face` is inline in both templates' `<head>` so it uses the same versioned URL.
+
+## Still to do
+- **Tailwind Play CDN** (`cdn.tailwindcss.com`) is development-only; it builds the CSS in the browser on every load. Fix: run the Tailwind standalone CLI in `scripts/vercel_build.py` to write one minified CSS file (no Node needed). **Waiting for the owner's OK to download the Tailwind CLI.** Until then the script tag must stay synchronous (no `defer`), or the page flashes unstyled.
+- **VT323 is still TTF** (about 150 KB). WOFF2 needs `fontTools` and `brotli` in `.venv`. **Waiting for the owner's OK to install them.**
+- **The start screen may still scroll a little on phones** (about 780–886px of content at 375–390px wide). If the owner wants it on one screen, tighten `.c24-start` gaps and the `.c24-hero-kolo` height.
 - The index stats modal is English-only.
-
-## Performance (fix before launch)
-- **Tailwind Play CDN** (`cdn.tailwindcss.com`) is development-only, per Tailwind's docs. It compiles CSS in the browser on every load. Replace it with the **Tailwind standalone CLI**, run in `scripts/vercel_build.py`, which outputs one minified CSS file into `public/static/`. No Node needed.
-- **Vue `unpkg.com/vue@3.0.2`** is the 2020 *development* build. Use the pinned production build: `https://cdn.jsdelivr.net/npm/vue@3.5.x/dist/vue.global.prod.js`. It must be the full build, because templates compile in the browser.
-- **Fonts:** about 564 KB of TTF. Convert to WOFF2, preload the main one (VT323), and subset if possible.
-- **Images:** all PNG with no width/height. Kolo win pictures are 40–108 KB each. Use WebP with a PNG fallback, set width/height, and use `loading="lazy"` on the end-screen Kolo.
-- **Page weight:**
-  - Word lists are inlined with `tojson`, which escapes non-ASCII as `\uXXXX`. The ar page is 396 KB, ko 362 KB, es 111 KB.
-  - Emitting raw UTF-8 (or a separate cacheable JSON file) cuts ar/ko roughly in half.
-  - The HTML itself can't be cached, because it holds the daily word.
-- **Caching:** Vercel's static default is `max-age=0, must-revalidate`. Use long `immutable` caching in `vercel.json` only once asset URLs carry a version, for example `?v=<git hash>`.
-- **Targets (Core Web Vitals, mobile):** LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1. Check with Lighthouse in mobile mode.
+- Targets (Core Web Vitals, mobile): LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1. Check with Lighthouse in mobile mode.
 
 ## Sizes to test
 320×568, 375×667, 390×844, 430×932, 844×390 (landscape), 768×1024, 1024×768, 1366×768, 1920×1080. Use `is_mobile`/`has_touch` for phones and tablets.
@@ -73,23 +81,23 @@ Bugs found along the way:
   - square tiles
   - key width at least 24px
   - modal fully visible or scrollable
-- Extend `scripts/screenshots.py` for this. Combine the shots into one contact sheet to save tokens.
+- `scripts/screenshots.py` only shoots 390×844. For other sizes, write a short throwaway Playwright script in the scratchpad: open `/es` (and `/vi`, `/ko`) per size, then read `document.documentElement.scrollHeight` vs `innerHeight`, `scrollWidth` vs `innerWidth`, a tile's `getBoundingClientRect()` (width = height) and the narrowest `.key` width. Combine the screenshots into one contact sheet with Pillow to save tokens.
 
 ## Keyboards per language (rows × keys)
-| Lang | Rows | Keys per row |
+| Lang | Layout | Keys per row (⇨ and ⌫ included) |
 |---|---|---|
-| es (qwerty + accent row) | 4 | 6/10/10/9 |
-| en | 3 | 10/9/9 |
-| de | 3 | 11/11/10 |
-| fr | 4 | 10/11/11/10 |
-| tr | 3 | 10/11/10 |
-| ar | 4 | 10/10/10/8 |
-| pt | 4 | 10 per row |
-| ru | 4 | 10/10/10/4 |
-| ko | 7 | 7 rows |
-| vi | 9 | 9 rows of 10 |
+| es | qwerty + accent row (`es_keyboard.json`) | 6/10/10/9 |
+| en | qwerty (`en_keyboard.json`) | 10/9/9 |
+| de | alphabetical | 11/11/10 |
+| fr | alphabetical | 11/11/10/10 |
+| tr | alphabetical | 11/10/10 |
+| ar | alphabetical | 10/10/9/9 |
+| pt | alphabetical | 10/10/10/10 |
+| ru | alphabetical | 9/9/8/8 |
+| ko | alphabetical | 7 rows (10/10/10/10/9/9/9) |
+| vi | alphabetical | 9 rows of 10 |
 
-Keyboard height today is rows × 56px + gaps, so vi is about 576px and ko about 440px.
+Only es and en have keyboard files; the rest are built by `_generate_alphabetical_keyboard()` in `app.py`. Key height shrinks with `--rows`, so vi and ko still fit (keys never go below 24px tall).
 
 ## Sources
 NYT Wordle live CSS/JS (Oct 2026); tailwindcss.com/docs/installation/play-cdn; web.dev/blog/viewport-units; MDN viewport meta, env(), ScreenOrientation.lock; dequeuniversity target-size (WCAG 2.5.8); web.dev/learn/design/interaction; vercel.com/docs/frameworks/backend/flask and caching docs; web.dev font and preload guides.

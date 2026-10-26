@@ -38,6 +38,8 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 - Kolo, the orange dachshund, is the mascot. The palette comes from his art. Member logos are not used.
 - **Random Kolo on the end screen** (decided 2026-10-26): each game shows one Kolo picked at random, 12 for a win and 2 for a loss (Baby Kolo, Kolo Toilet). The owner allowed the alcohol art (Chill Kolo, DJ Kolo) and Kolo Toilet; this replaces the earlier "avoid alcohol art" rule. **Kolo ft. Pikachu is never used** (trademark). List and how to change it: `casa24-branding`.
 - Gilroy needs a webfont license, so it is git-ignored. VT323 is the pixel font.
+- **Kolo pictures are WebP only** (decided by the owner, 2026-10-26): all Kolo PNGs were deleted. The one exception is `kolo-hero.png`, kept for link previews (og:image). Don't bring PNGs back; `brand_assets.py` writes WebP.
+- **Pending the owner's OK** (both need a download/install): compiling Tailwind with the Tailwind CLI instead of the Play CDN, and converting VT323 to WOFF2 (needs fontTools + brotli). Ask before downloading either. Details: `casa24-responsive`.
 - Dark mode exists: it follows the device by default and can be picked in Settings or on the menu.
 
 ## Hosting
