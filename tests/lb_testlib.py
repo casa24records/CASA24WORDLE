@@ -1,5 +1,5 @@
 """Shared fixtures for the leaderboard tests: an in-memory store, fake env
-values and a fake Discord. Nothing here talks to Discord or a real Redis."""
+values and a fake Discord. Nothing here talks to Discord or a real database."""
 
 import datetime
 from urllib.parse import parse_qs, urlparse
@@ -138,9 +138,19 @@ def guess(client, word, lang="es", **extra):
 
 
 def all_store_text(s):
-    """Every key and value in the memory store, as one string."""
-    parts = []
-    for k in s.keys():
-        parts.append(k)
-        parts.append(repr(s.data[k]))
-    return "\n".join(parts)
+    """Every table, key and value in the memory store, as one string."""
+    return repr(s.dump())
+
+
+def day_of(idx):
+    """The Panama date of puzzle number idx."""
+    return daily.EPOCH + datetime.timedelta(days=idx + daily.DAY_OFFSET)
+
+
+def row_of(s, pid, tab):
+    """The leaderboard row (with streaks) for one player, or None."""
+    mine = s.standing(pid, tab)
+    if not mine:
+        return None
+    _, today_idx = app.lb_today()
+    return app._lb_rows(s, [mine], tab, today_idx, None)[0]

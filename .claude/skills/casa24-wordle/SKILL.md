@@ -1,29 +1,49 @@
 ---
 name: casa24-wordle
-description: Start here for anything about Casa 24 Wordle — what the game is, how it is built, what happens when a player presses Enter (game flow, repeated guesses, win/lose end screen), the one-word-per-day rule, and which casa24-* skill covers words, text/accents, branding/dark mode/Kolo/animations, testing, deployment, git/GitHub, or past decisions.
+description: Start here for anything about Casa 24 Wordle — what the game is, how it is built, guest vs leaderboard (Discord) modes and their routes, what happens when a player presses Enter (game flow, repeated guesses, win/lose end screen), the one-word-per-day rule, and which casa24-* skill covers words, text/accents, branding/dark mode/Kolo/animations, testing, deployment, git/GitHub, or past decisions.
 ---
 
 # Casa 24 Wordle (overview)
 
-Casa 24 Records' daily word game, on branch `casa24`. Hosted on Vercel only. The owner is a beginner developer: explain changes in plain language, keep them small, commit after each step.
+Casa 24 Records' daily word game. Published from `main`; feature work happens on its own branch (see `casa24-git-and-github`). Hosted on Vercel only. The owner is a beginner developer: explain changes in plain language, keep them small, commit after each step.
 
 ## What it is
 - Flask app `webapp/app.py` + Vue 3.5 (jsdelivr) and Tailwind (Play CDN) from CDNs, no build step of our own, in `webapp/templates/` and `webapp/static/`.
 - 10 languages in `webapp/data/languages/`: en, es, ar, fr, pt, ru, de, tr, vi, ko. Casa 24 words only in **es** and **en**.
 - **One word per language per day, the same for every player.** It changes at midnight Panama time (UTC-5). About 1 day in 5 the es/en word is a Casa 24 word. Details: `casa24-daily-word`.
-- No database, no accounts, no analytics. Player stats live in the browser's localStorage.
-- Start screen (`/`): Español/English first (last played, else browser language) with "played today" and streak, then the other 8 languages. No links to other sites.
+- **Two ways to play** (chosen on the start screen, remembered as `casa24_mode` in localStorage):
+  - **Guest** (default, all 10 languages): no account, nothing sent to the server. Stats live in the browser's localStorage.
+  - **Leaderboard** (es and en only): log in with Discord (scope `identify`, only the Discord ID and username are stored). The server checks and colors every guess, keeps the score in a Postgres database, and ranks players. The browser never gets the answer until the game is over. Off (all its routes 404) unless the Discord env vars, `SECRET_KEY` and a store are there. Details, scoring, privacy and storage: `casa24-leaderboard`.
+- No analytics.
+- Start screen (`/`): when the leaderboard is on, a guest/leaderboard switch (with a privacy note), a "🏆 View leaderboard" link and the Discord account (log out) sit around the Español/English cards. Español/English first (last played, else browser language) with "played today" and streak, then the other 8 languages. No links to other sites.
 - **Developer view** (internally "demo"; team only, on when the `DEMO_PASSWORD` env var is set): a "🔒 Developer view" card on `/` → `/demo` (password page, `demo_login.html`, es+en side by side) → signed session cookie (30 days) → `/demo/es` or `/demo/en` (other codes redirect to es). It acts like the real game and opens with the real word of the day; the only extras are two buttons in `.c24-demo-bar`: ↻ Restart goes to `?skip=<word>`, and `demo_game()` in `app.py` then picks a random answer from the daily-word pool, never the same word. ✓ Fill in word (`demoFillAnswer()`) types the answer and presses Enter, so the normal win flow runs. The `DEMO` constant in `game.html` makes `game.js` skip every localStorage save/load, results, stats and `casa24_lang`; the end window is the normal one. Responses are `no-store`, not in the sitemap. No `DEMO_PASSWORD` → no card, `/demo` is 404. Why: `casa24-decisions`; env setup: `casa24-deploy`.
+
+## Routes
+- Guest: `/`, `/<lang>`, `/sitemap.xml`. Developer view: `/demo`, `/demo/<lang>`.
+- Leaderboard (all 404 when it's off):
+  - `/lb/<lang>` (es/en; other codes go to `/lb/es`): the game in leaderboard mode, same `game.html` with `lb=True` and a 🏆 badge. Not logged in → Discord login first.
+  - `/leaderboard?tab=es|en|all`: public ranking page (`leaderboard.html`).
+  - `/auth/discord/login?next=…`, `/auth/discord/callback`, `/auth/logout` (POST): Discord login; the signed `c24_lb` cookie holds only the Discord ID.
+  - `/api/guess` (POST, JSON `{lang, guess}`): checks and colors one guess.
+  - `/api/me/delete` (POST): "Delete my data", removes the player and all results.
+  - `/admin/hide` (POST): admins (`ADMIN_DISCORD_IDS`) hide a name on the ranking.
 
 ## What happens on Enter (`keyDown` in `webapp/static/game.js`)
 1. Row not full: "partial word" notification. Typing is ignored while `game_over` or while tiles flip (`revealing`).
 2. `resolveAccents()`: in es/fr/pt, `cancion` becomes `canción` (see `casa24-text-and-languages`).
 3. `checkWord()`: is it in the word lists? If not: "not valid" notification.
 4. Repeat check: a word already guessed in this game is refused with `notification-repeated`; nothing flips.
-5. `updateColors()` sets final colors right away (saved to localStorage at once); `revealRow()` flips the tiles one by one, then the keyboard colors update. A win also runs `bounceRow()`.
+5. `updateColors()` sets final colors right away (saved to localStorage at once); `commitRow()` moves to the next row and `revealRow()` flips the tiles one by one, then the keyboard colors update. A win also runs `bounceRow()`.
 6. `gameWon(reveal_ms)` / `gameLost(reveal_ms)` (6th wrong guess): end the game and save the result immediately; after the flip, show the word as a notification, then open the stats window (win: +1600 ms for the bounce, loss: +400 ms).
 7. The stats window shows a title (`result_won` / `result_lost`, class `c24-result`), then one random Kolo (`pickKolo()`, saved as `kolo_image`), the emoji grid, the countdown, Share, and the stats numbers. Markup: "stats modal" in `game.html`.
 Animations and Kolo pictures: `casa24-branding`.
+
+**Leaderboard mode** (`LB` is true in `game.html`; the page has no answer, `todays_word` is empty):
+1. Row not full: same "partial word" notification. Typing also waits while a guess is on its way (`lb_busy`).
+2. `submitLb()`: the repeat check runs in the browser first (same notification). Then `POST /api/guess`.
+3. The server resolves accents, checks the word, refuses repeats/finished games, saves the guess and returns the colors (and, once the game is over, the answer, points and rank). Errors become the usual notifications (`invalid_word`, `repeat`); `login` sends the player to Discord again; anything else shows `lb_error`.
+4. `applyLbGuess()` puts the server's spelling and colors in the row, then calls the same `commitRow()` as a guest game, so the flip, keyboard colors, bounce and `gameWon`/`gameLost` are identical.
+5. Nothing goes to localStorage. A reload rebuilds the board from the server (`restoreLb()` with the `c24-lb-state` JSON). The end window shows rank, points and a "View leaderboard" link instead of the local stats. A finished guest es/en game shows a small, dismissible "🏆 Play for the leaderboard" hint.
 
 ## Which skill to use
 | Task | Skill |
@@ -36,22 +56,27 @@ Animations and Kolo pictures: `casa24-branding`.
 | Put it online (Vercel), domain | `casa24-deploy` |
 | Commit, push to GitHub, which account, history rules | `casa24-git-and-github` |
 | Mobile/desktop layout, screen sizes, zoom, landscape, page speed | `casa24-responsive` |
+| Leaderboard: Discord login, scoring, ranking, storage (Neon Postgres), privacy, admin hide | `casa24-leaderboard` |
 | Developer view / demo (`/demo`): env var and password `casa24-deploy`, run locally `casa24-test-and-preview`, why `casa24-decisions` (how it works: above) | `casa24-deploy` |
 | Why things are the way they are (decisions already made) | `casa24-decisions` |
 
 ## Map of the repo
 ```
-webapp/app.py            routes (/, /<lang>, /demo, /demo/<lang>, /sitemap.xml), data loading, Language class (keyboards: _generate_alphabetical_keyboard),
+webapp/app.py            routes (/, /<lang>, /demo, /demo/<lang>, /sitemap.xml, plus the leaderboard routes above), data loading, Language class (keyboards: _generate_alphabetical_keyboard),
                          template helpers asset() (?v= URLs), asset_version(), json_script()
 webapp/daily.py          daily-word schedule (pure functions)
+webapp/discord_auth.py   Discord OAuth (identify only): login URL, code -> ID + username
+webapp/leaderboard.py    leaderboard rules (pure): server-side colors, accent resolving, points, streaks
+webapp/store.py          leaderboard storage: Postgres when DATABASE_URL is set, in-memory store locally/tests
 webapp/data/languages/   word lists, language_config.json, keyboards
 webapp/templates/        index.html (start screen), game.html (game, also Developer view with demo=True),
-                         demo_login.html (Developer view password page)
+                         demo_login.html (Developer view password page), leaderboard.html (/leaderboard)
 webapp/static/           game.js, index.js, theme.js, style.css, images/kolo/ (WebP), fonts/, favicon/
 scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py, casa24/ (seed word CSVs)
 tests/                   pytest + Playwright
 vercel.json              year-long caching for /static/ URLs with ?v= (see casa24-deploy)
 pyproject.toml, .vercelignore, .python-version   Vercel setup
+.env.example             names of the env vars (no values); copy to .env.local (git-ignored) for local runs
 DEPLOY.md, CREDITS.md, README.md, LICENSE (never delete; see casa24-decisions)
 ```
 

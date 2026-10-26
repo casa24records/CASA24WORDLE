@@ -44,6 +44,12 @@ All layout CSS is in the "LAYOUT" section of `webapp/static/style.css`; the clas
 - Modals: `.c24-modal-wrap` (fixed, centered, safe areas) holds `.c24-modal` (`width: min(500px, 100% - 32px)`, `max-height: calc(100dvh - 32px - safe areas)`, scrolls inside). `.c24-modal-sm` is 420px. `.c24-close` is the 44px ×. Esc closes every modal.
 - `.c24-kolo` (end-screen picture): at most `min(160px, 22dvh)` tall. `.c24-hero-kolo` (menu): 150px, 96px on screens under 700px tall.
 - Start screen: `.c24-start`, `.c24-primary` (two big buttons side by side at ≥640px), `.c24-chips` (2 columns, 4 at ≥640px); the dashed "🔒 Developer view" card `.c24-play-demo` spans the full row under them (only when `DEMO_PASSWORD` is set).
+- **Leaderboard** (styles in the "leaderboard" section of `style.css`, not in LAYOUT; details of the feature: `casa24-leaderboard`):
+  - Menu: `.c24-mode` guest/leaderboard switch (2 equal columns, each option at least 44px tall, Spanish line over a smaller English line), `.c24-notice` boxes (44px ×), `.c24-lb-links` (View leaderboard, logged-in name, Log out). When the leaderboard is on, these make the start screen taller, so recheck the phone height after changes (the < 2000px test runs with the leaderboard off).
+  - Game `/lb/<lang>` uses the normal game layout; only the end window differs (`.c24-lb-end`: rank, points, link).
+  - `/leaderboard` (`leaderboard.html`) is a **standalone page**: it loads `style.css` but **not Tailwind or Vue**, so the end of the leaderboard section has its own small reset (`.c24-lb-page` margins, buttons, links, `.uppercase`). Use `c24-*` classes there, not Tailwind classes. One column `.c24-lb`, max 40rem; it scrolls normally (`min-height` full screen, not fixed height).
+  - Table `.c24-lb-table`: rank, player (long names cut with …), points always shown. **Wins** (`.c24-lb-opt1`) appear from **400px** wide, **streak and best streak** (`.c24-lb-opt2`) from **520px**, so a 320px phone never scrolls sideways.
+  - Tabs, buttons, Back link and Log in are at least 44px tap targets (the admin-only Hide button is 32px). Side padding is `max(16px, safe area)`.
 - Hover styles only inside `@media (hover: hover) and (pointer: fine)`.
 - Viewport meta: `width=device-width, initial-scale=1, viewport-fit=cover` (pinch-zoom allowed). theme-color: light `#f4efe6`, dark `#0f1a12`.
 - Physical keys: `keyDown()` / `normalizeKey()` in `game.js` (rules in `casa24-text-and-languages`).

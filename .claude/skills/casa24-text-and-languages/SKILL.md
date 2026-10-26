@@ -15,6 +15,7 @@ description: Change any visible text or translation in Casa 24 Wordle (buttons, 
 - `game.js`: use `this.text("key", "English fallback")`.
 - Missing keys fall back to English, so the 8 other languages still work.
 - The start screen (`index.html`) is bilingual on purpose: Spanish and English side by side in `lang="es"`/`lang="en"` spans. The Play/Jugar and "Jugada hoy"/"Played today" labels are in the template's Vue expressions.
+- `index.html` and `leaderboard.html` get `texts` (the es and en `text` blocks) from `app.py`, like `demo_login.html`. `index.html` uses the macros `tx(lang, key, fallback)` and `bi(key, es, en)` (both languages side by side); `leaderboard.html` uses `L(key, es, en)` and shows **one** language: Spanish on the `es` tab, English on `en`, the browser's choice on `all`. Both keep inline es/en fallbacks, so they still render if `texts` is missing. Change the JSON **and** the inline fallback together.
 
 **Rule:** never hard-code a user-visible string. Add the key to **both** `es` and `en` configs, with an English fallback in the code. If every player sees it (like the end-of-game result), add it to **all 10** languages.
 
@@ -27,8 +28,16 @@ Current `text` keys:
 - Theme: `theme`, `theme_auto`, `theme_light`, `theme_dark`
 - Developer view (internally "demo", team only; **es and en only**): `demo_restart`, `demo_fill`, `demo_title` ("Vista de desarrollador" / "Developer view"), `demo_intro`, `demo_password`, `demo_enter`, `demo_wrong_password`. The password page (`demo_login.html`) reads the es and en keys together and shows them side by side, so both files need every `demo_*` key. Don't add them to the other 8: Developer view only exists in es/en. (The start-screen card "🔒 Developer view" is in `index.html`.)
 
+- Leaderboard (Discord mode; **es and en only**, like `demo_*`; the game reads them with `this.text`/`t()`, the menu and `/leaderboard` through `texts`):
+  - Menu switch and account: `lb_mode_label`, `lb_mode_guest`, `lb_mode_lb`, `lb_login`, `lb_logged_in_as`, `lb_logout`, `lb_view`
+  - Privacy: `lb_privacy` (what Discord and we see/store), `lb_guest_note` (guest games don't count)
+  - Notices: `lb_login_failed`, `lb_deleted`, `lb_dismiss` (× label), `lb_error`
+  - Game end window: `lb_rank` (`{rank}`), `lb_points` (`{points}`), `lb_point_one` (exactly 1), `lb_hint` (pointer shown after a guest game)
+  - `/leaderboard` page: `lb_title`, `lb_tab_es`, `lb_tab_en`, `lb_tab_all`, `lb_col_player`, `lb_col_points`, `lb_col_wins`, `lb_col_streak`, `lb_col_best`, `lb_you`, `lb_my_position`, `lb_empty`, `lb_delete`, `lb_delete_confirm`, `lb_hide`, `lb_back`
+  - Keep the `{rank}`/`{points}` placeholders exactly; the code replaces them.
+
 Which languages have which keys:
-- **es, en:** all keys above (the `demo_*` keys only exist here).
+- **es, en:** all keys above (the `demo_*` and `lb_*` keys only exist here).
 - **The other 8** (ar, de, fr, ko, pt, ru, tr, vi): only `next_word`, `no_attempts`, `share`, `notification-copied`, `notification-partial-word`, plus `result_won`, `result_lost`, `notification-repeated` (translated in all 10; a test checks they exist everywhere). Everything else shows the English fallback.
 - `next_word`, `no_attempts` and `share` are read in `game.html` **without** a fallback, so they must exist in all 10.
 - All 10 have the full `help` block (`title`, `text_1_1_1` … `text_2_3`, `close`).
@@ -39,6 +48,8 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
 - Natural Latin American, Panama-friendly Spanish, in the **tú** form: "Escribe", "Pulsa", "Puedes".
 - Use these words: Compartir (not "Cuota"), intento (not "conjetura"/"supongo"), casillas (not "azulejos"), Ajustes, Partidas, Racha, "% ganadas".
 - Keep labels short. Stats labels sit four in a row on a 390 px wide phone.
+- "Leaderboard" stays in English in Spanish text, as used everywhere so far ("Jugar con leaderboard", "Ver leaderboard"); the list itself is "el ranking" ("entrar al ranking"), a place is "puesto" ("Tu puesto: #3"), a game won is "Ganadas". Discord login is "Entrar con Discord" / "Cerrar sesión".
+- Privacy text is plain and honest: say exactly what is stored (Discord ID, username, results) and what we never see (password, email).
 - Show new Spanish strings to the owner before committing big text changes.
 
 ## Accents

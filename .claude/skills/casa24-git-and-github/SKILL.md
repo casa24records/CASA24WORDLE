@@ -1,16 +1,17 @@
 ---
 name: casa24-git-and-github
-description: Commit and push Casa 24 Wordle to GitHub — the public repo casa24records/CASA24WORDLE, working branch casa24 pushed to main, which GitHub account to use, what must never be published, and history rules (no force-push without asking). Use whenever the owner says commit, push, subir, GitHub, or a push fails.
+description: Commit and push Casa 24 Wordle to GitHub — the public repo casa24records/CASA24WORDLE, feature branches merged into main, main auto-deploys to Vercel production (other branches get preview URLs), which GitHub account to use, what must never be published, and history rules (no force-push without asking). Use whenever the owner says commit, push, subir, GitHub, or a push fails.
 ---
 
 # Git and GitHub
 
 ## Where things are
 - GitHub repo: https://github.com/casa24records/CASA24WORDLE. It is **PUBLIC**, and its default branch is `main`.
-- Local work happens on branch `casa24`. It is published as `main`:
-  ```
-  git push origin casa24:main
-  ```
+- **Branches** (as of 2026-10-26, check with `git branch -a`):
+  - `casa24`: the local main line. There is no local `main`; `casa24` is published as `main` (`git push origin casa24:main`). Right now `casa24` and `origin/main` are the same commit.
+  - Feature branches: bigger features get their own branch, for example `leaderboard-discord` (2 commits ahead of `main`, not pushed yet). When the owner OKs it, merge the branch into `casa24` and push that to `main`.
+  - `backup-before-author-fix`: see History rules.
+- A feature branch can be pushed under its own name for a preview (`git push origin leaderboard-discord`) without touching production, but only when the owner asks.
 - There is only one remote, `origin`. The `upstream` remote (the original project) was removed on purpose.
 
 ## Before every commit
@@ -27,8 +28,8 @@ description: Commit and push Casa 24 Wordle to GitHub — the public repo casa24
   - If you get `Permission ... denied to <other user>` (403), the wrong account is active.
   - Ask the owner to run `! gh auth switch --user casa24records`.
   - Don't switch accounts or use their tokens yourself.
-- To see what is not on GitHub yet: `git fetch origin && git log origin/main..casa24 --oneline`.
-- To check that a push worked, `git ls-remote --heads origin` should show the same hash as `git rev-parse casa24`.
+- To see what is not on GitHub yet: `git fetch origin && git log origin/main..<branch> --oneline`.
+- To check that a push worked, `git ls-remote --heads origin` should show the same hash as `git rev-parse <branch>`.
 
 ## History rules
 - **Never force-push or rewrite published history without the owner's explicit OK.** It was done once, on 2026-10-26, to make the first commit authored by Casa 24 instead of Hugo (see `casa24-decisions`).
@@ -36,5 +37,7 @@ description: Commit and push Casa 24 Wordle to GitHub — the public repo casa24
 - If a push fails with `did not receive expected object` / `index-pack failed`, the history points at a commit that isn't present locally (a shallow clone). Check with `git rev-parse --is-shallow-repository`. Ask before fixing it, because the fix rewrites history.
 - A local branch `backup-before-author-fix` may exist from that rewrite. Delete it only if the owner agrees.
 
-## Vercel
-Vercel can be connected to this repo for automatic deploys from `main`. Do that only with the owner's go-ahead. See `casa24-deploy`.
+## Vercel (connected to GitHub)
+- **Pushing to `main` publishes to production immediately.** Vercel builds every push to `main` and makes it the live site. So only push `main` with the owner's explicit OK, after tests pass, and after any needed env vars are set in Vercel (the leaderboard needs its Discord vars, `SECRET_KEY` and the database; see `casa24-leaderboard`).
+- **Any other branch** pushed to GitHub gets its own preview URL: `casa24-wordle-git-<branch>-casa-24.vercel.app` (for example `casa24-wordle-git-leaderboard-discord-casa-24.vercel.app`). Previews don't change the live site; use them to show the owner a feature first. Preview env vars are set separately in Vercel.
+- Deploy setup, env vars and troubleshooting: `casa24-deploy`.

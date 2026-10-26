@@ -152,3 +152,9 @@ screenshots/
 .vercel
 .env*
 !.env.example
+
+# Neon agent skills installed by the Vercel CLI (generic vendor docs, kept local)
+.agents/
+skills-lock.json
+.claude/skills/neon
+.claude/skills/neon-postgres

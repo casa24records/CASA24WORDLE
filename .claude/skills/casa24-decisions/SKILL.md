@@ -1,6 +1,6 @@
 ---
 name: casa24-decisions
-description: Decisions the Casa 24 owner already made about the Wordle project (scope, languages, words, privacy, branding, hosting) and why. Check this before proposing changes so settled questions are not re-asked or undone.
+description: Decisions the Casa 24 owner already made about the Wordle project (scope, languages, words, privacy, guest/leaderboard modes, Discord login, database, branding, hosting) and why. Check this before proposing changes so settled questions are not re-asked or undone.
 ---
 
 # Decisions already made (October 2026)
@@ -40,6 +40,19 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 - **Developer view never touches player data:** no localStorage saves, no results, stats or streaks, no "last language" (`casa24_lang`). The end window is the normal one (countdown, Share, your real stats), but the developer game is not added to them.
 - Not in the sitemap, pages are `noindex`/`no-store`. How it works: `casa24-wordle`; setting the password: `casa24-deploy`.
 
+## Guest mode + Discord leaderboard (decided 2026-10-26)
+How it works: `casa24-leaderboard`.
+- **Two modes in the es/en menu:** "Jugar como invitado" (the old game, nothing leaves the browser) and "Jugar con leaderboard (Discord)" (all-time ranking with Discord username and points). Other languages stay guest only.
+- **Discord login, scope `identify` only, no bot.** Discord app "Casa 24 Wordle". We never see passwords or email.
+- **Minimal data:** Discord ID, username, a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), a per-minute counter. **Never** tokens, avatar, email or IPs. Privacy note on the menu and `/leaderboard`, plus "Borrar mis datos".
+- **Database: Neon Postgres** through the Vercel Marketplace, a new separate database `casa24-wordle-db`. Not Upstash (the first plan, dropped by the owner), and not GitHub-as-a-database. The kanban project has its own Neon and Upstash: **never share or reuse them**.
+- **Points:** win in 1 = 6 … win in 6 = 1, loss = 0. Ranking: points, then wins, then who reached the total first. The server computes everything; the answer never reaches the browser in leaderboard mode.
+- **Guest games never count** and are never imported when someone logs in later.
+- **Open to anyone with a Discord account.** Members-only (for example a Casa 24 server role) is **phase 2**, not built.
+- **Moderation:** admins (`ADMIN_DISCORD_IDS`) can hide offensive names.
+- **Testing in production was approved by the owner** (2026-10-26).
+- Secrets are entered only by the owner in the Vercel dashboard, never by Claude.
+
 ## Privacy
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.
 
@@ -52,7 +65,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 - Dark mode exists: it follows the device by default and can be picked in Settings or on the menu.
 
 ## Hosting
-- Plan for **Vercel**, but **don't deploy yet** and there is **no domain yet**. The subdomain will be decided later, for example `wordle.casa24records.com`. DNS is at GoDaddy, and `shop.` is Shopify.
+- **Vercel** only, team Casa 24. Live at https://casa-24-wordle.vercel.app; GitHub `main` auto-deploys to production (details: `casa24-deploy`). Still **no custom domain**; the subdomain will be decided later, for example `wordle.casa24records.com`. DNS is at GoDaddy, and `shop.` is Shopify.
 
 ## Repository
 - Work happens on branch `casa24`, published to the **public** GitHub repo `casa24records/CASA24WORDLE` as `main` (`git push origin casa24:main`). Details: `casa24-git-and-github`.
@@ -62,7 +75,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
   - The `upstream` git remote: we no longer pull changes from the original project.
   - Unused data and settings: old word files, empty keyboard files (the alphabetical keyboard is built automatically when the file is missing), unused `language_config.json` keys, the 16/32 px favicon pngs, dead code.
   - The console log that printed today's word (it spoiled the answer) and the http→https redirects (Vercel already forces https).
-  - `requirements.txt` now lists only `flask`. `.python-version` is tracked.
+  - `requirements.txt` lists only `flask` (plus `psycopg[binary]` since the leaderboard). `.python-version` is tracked.
 - **Credit is the legal minimum, and only in files:**
   - `LICENSE` (MIT) keeps the original copyright line by Hugo Montenegro and adds a Casa 24 line. **Never delete `LICENSE` or remove that line:** the MIT license requires it.
   - `CREDITS.md` lists the word-list sources and licenses (including the CC BY-SA 4.0 Spanish supplement), VT323 (SIL OFL), and Kolo (© Casa 24 Records).

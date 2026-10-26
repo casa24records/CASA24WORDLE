@@ -24,12 +24,17 @@ cd webapp && ../.venv/bin/flask --app app run --port 5050   # http://127.0.0.1:5
   cd webapp && DEMO_PASSWORD='…' ../.venv/bin/flask --app app run --port 5050
   ```
   Then `/` shows the "🔒 Developer view" card → `/demo` → `/demo/es` or `/demo/en`. Without the variable, `/demo` is a 404 (expected).
+- **Leaderboard** (`/lb/es`, `/leaderboard`, the menu's guest/leaderboard switch) is off unless `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` and `SECRET_KEY` are set. Two ways to turn it on locally:
+  - The owner runs `vercel env pull .env.local` (see `.env.example`). `app.py` reads `.env.local` on its own when not on Vercel and not under pytest, and never overrides variables already set. With `DATABASE_URL` in it, local play writes to the **real** database, so tell the owner first.
+  - Or set the three variables just for that run (values from the owner, never in a file or commit) and leave `DATABASE_URL` out: the app then uses the in-memory store (lost on restart). Real Discord login only works if `http://127.0.0.1:5050/auth/discord/callback` is a redirect URL in the Discord app.
+  Details: `casa24-leaderboard`.
 - The pages load Vue 3.5.13 (jsdelivr) and Tailwind (Play CDN) from the internet, so they need a connection.
 
 ## Tests (from the repo root; all must pass before committing)
 ```
 .venv/bin/python -m pytest -q tests
 ```
+About 150 tests (152 on 2026-10-26).
 | File | Covers |
 |---|---|
 | `test_words.py` | validator passes, tiers don't overlap, Casa 24 words are valid guesses, aliases off, Spanish plurals accepted, no proper names |
@@ -39,7 +44,12 @@ cd webapp && ../.venv/bin/flask --app app run --port 5050   # http://127.0.0.1:5
 | `test_kolo.py` | `KOLO_WIN`/`KOLO_LOSE` in `game.js` match the `win/`/`lose/` folders and `brand_assets.py`, pools don't overlap, no Pikachu, Kolo images are WebP only (only `kolo-hero.png` stays) |
 | text-key tests | the result titles and `notification-repeated` exist in all 10 `language_config.json` files |
 | `test_demo.py` | Developer view (`/demo`): off without `DEMO_PASSWORD` (no card, 404), login needed, wrong password refused, first open = the real daily word, Restart (`?skip=`) gives a random word that never repeats, other languages redirect to es, a new password logs old sessions out, normal `/es` isn't demo, the password never appears in pages; in the browser, Fill in word wins and nothing is saved to localStorage. Uses a **fake** password via `monkeypatch.setenv`, never the real one |
+| `test_leaderboard.py` | leaderboard rules (points, ranking order, streaks, accent folding keeps ñ, server colors), the in-memory store, store choice (Postgres with `DATABASE_URL`, memory locally, none on Vercel without it), SQL is parameterized, Postgres store against a fake connection, `.env.local` loader; routes: off without env, login needed, answer never in the page, guess validation, other-site POST refused, accentless typing, a win counts once, 6 misses, client date ignored, new day, rate limit, guest routes never write, ranking rows and "my position", delete my data, admin hide. `test_color_and_fold_match_game_js` runs the real `updateColors`/`foldAccents` from `game.js` in **node** and compares with the server's colors; it **skips** when `node` isn't installed |
+| `test_discord_auth.py` | Discord login asks only for `identify`, keeps only ID and username (no token, email, avatar), bad/missing state fails, cancel fails, `next` must be a relative path, logout, other-site logout refused, tampered cookie ignored |
+| `test_leaderboard_ui.py` | menu with/without the leaderboard (switch, privacy note, logged-in name, login-failed/deleted notices), guest pages aren't leaderboard, `/lb` page renders the server's state, guest end-window hint, `/leaderboard` table, "me" row, admin and empty states; in the browser: no JS errors, mode switch, a full leaderboard game against a faked `/api/guess` |
 | `test_vercel_ready.py` | `webapp.app:app` loads from the repo root behind a proxy, sitemap uses the site's own address (no wordle.global), build step copies static files, `vercel.json` makes only `?v=` URLs immutable, every `/static/` URL on `/`, `/es`, `/en`, `/ar`, `/ko` has `?v=` |
+
+`tests/lb_testlib.py` holds the leaderboard fixtures: a **fake Discord** (`FakeDiscord`, never calls Discord), the **in-memory store**, fake env values (`FAKE_SECRET_KEY`, never real ones) and a fixed date. Leaderboard tests never touch the real database; `app.py` skips `.env.local` under pytest.
 
 `tests/conftest.py` puts `webapp/` and `scripts/` on the import path and changes into `webapp/`.
 

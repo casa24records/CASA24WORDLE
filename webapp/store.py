@@ -1,296 +1,512 @@
-"""Tiny key-value store for the Discord leaderboard.
+"""Storage for the Discord leaderboard.
 
-Two backends with the same methods:
-- UpstashStore: Upstash Redis over its REST API (stdlib urllib, no package).
-  Env: KV_REST_API_URL + KV_REST_API_TOKEN (Vercel Marketplace names) or
-  UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN.
-- MemoryStore: an in-process imitation of the same Redis commands, for tests
-  and local development without KV. Data is lost on restart.
+Two backends with the same methods (the Store interface below):
+- PostgresStore: Neon Postgres on Vercel, via psycopg 3. Env: DATABASE_URL
+  (the pooled URL; it carries sslmode=require). Tables are created on first
+  use (CREATE TABLE IF NOT EXISTS), all prefixed wordle_.
+- MemoryStore: plain Python dicts with the same behavior, for tests and local
+  development without a database. Data is lost on restart.
 
-get_store() picks Upstash when its env vars are set, else MemoryStore when not
+get_store() picks Postgres when DATABASE_URL is set, else MemoryStore when not
 on Vercel, else None (the leaderboard is then off in production).
 
-Both backends speak Redis commands through execute(*args); the helper methods
-just build commands, so pipelines work the same on both.
+Kept per player: Discord ID, username, a hidden flag, and per finished game
+the language, day, won, attempts and points; today's guesses for 2 days; a
+per-minute guess counter. Never stored: tokens, avatar, email, IP addresses.
+
+Days are datetime.date values (the Panama date from daily.py).
 """
 
-import fnmatch
-import json
+import contextlib
+import datetime
 import os
 import threading
-import time
-import urllib.error
-import urllib.request
 
-TIMEOUT = 5  # seconds per Upstash request
+GAME_KEEP_DAYS = 2   # wordle_games rows older than this are deleted
+RATE_KEEP_MINUTES = 2
 
 
 class StoreError(Exception):
     pass
 
 
-class _Commands:
-    """Helper methods shared by both backends (all go through execute)."""
+class Store:
+    """Interface. `tab` is "es", "en" or "all" (every language)."""
 
-    def execute(self, *args):  # pragma: no cover - implemented by subclasses
+    def upsert_player(self, discord_id, username):
         raise NotImplementedError
 
-    def pipeline(self, commands):
-        """Run several commands; returns their results in order."""
-        return [self.execute(*cmd) for cmd in commands]
+    def get_player(self, discord_id):
+        """{"username", "hidden"} or None."""
+        raise NotImplementedError
 
-    # strings
-    def get(self, key):
-        return self.execute("GET", key)
+    def rate_hit(self, discord_id, minute):
+        """Count one request in this minute; returns the count so far."""
+        raise NotImplementedError
 
-    def set(self, key, value, nx=False, ex=None):
-        """True when written, False when NX found the key already there."""
-        cmd = ["SET", key, value]
-        if nx:
-            cmd.append("NX")
-        if ex:
-            cmd += ["EX", int(ex)]
-        return self.execute(*cmd) is not None
+    def get_game(self, discord_id, lang, day):
+        """(guesses list, result dict {won, attempts, points} or None), read-only."""
+        raise NotImplementedError
 
-    def incr(self, key):
-        return int(self.execute("INCR", key))
+    def game(self, discord_id, lang, day):
+        """Context manager: a locked game handle (.guesses, .result, .save(guesses),
+        .record(won, attempts, points) -> bool). Commits when the block ends."""
+        raise NotImplementedError
 
-    def expire(self, key, seconds):
-        return self.execute("EXPIRE", key, int(seconds))
+    def record_result(self, discord_id, lang, day, won, attempts, points):
+        """Insert a finished game once; False if that day was already recorded."""
+        raise NotImplementedError
 
-    def delete(self, *keys):
-        if not keys:
-            return 0
-        return int(self.execute("DEL", *keys))
+    def leaderboard(self, tab, limit):
+        """Ranked rows [{rank, id, username, points, wins, played}], hidden excluded."""
+        raise NotImplementedError
 
-    # hashes
-    def hget(self, key, field):
-        return self.execute("HGET", key, field)
+    def standing(self, discord_id, tab):
+        """The same row for one player, or None (hidden or no games)."""
+        raise NotImplementedError
 
-    def hset(self, key, mapping):
-        if not mapping:
-            return 0
-        args = []
-        for k, v in mapping.items():
-            args += [k, v]
-        return self.execute("HSET", key, *args)
+    def histories(self, discord_ids, tab):
+        """{id: [(day, won), ...] sorted by day} for streaks."""
+        raise NotImplementedError
 
-    def hgetall(self, key):
-        result = self.execute("HGETALL", key)
-        if isinstance(result, dict):
-            return dict(result)
-        result = result or []
-        return {result[i]: result[i + 1] for i in range(0, len(result), 2)}
+    def delete_player(self, discord_id):
+        raise NotImplementedError
 
-    def hdel(self, key, *fields):
-        if not fields:
-            return 0
-        return self.execute("HDEL", key, *fields)
+    def set_hidden(self, discord_id, hidden):
+        """True if the player exists."""
+        raise NotImplementedError
 
-    # sorted sets
-    def zadd(self, key, score, member):
-        return self.execute("ZADD", key, score, member)
-
-    def zrem(self, key, member):
-        return self.execute("ZREM", key, member)
-
-    def zcard(self, key):
-        return int(self.execute("ZCARD", key) or 0)
-
-    def zrevrank(self, key, member):
-        r = self.execute("ZREVRANK", key, member)
-        return None if r is None else int(r)
-
-    def zrevrange(self, key, start, stop):
-        """[(member, score)] from the highest score down."""
-        flat = self.execute("ZREVRANGE", key, start, stop, "WITHSCORES") or []
-        return [(flat[i], float(flat[i + 1])) for i in range(0, len(flat), 2)]
+    def close(self):
+        pass
 
 
-class UpstashStore(_Commands):
-    def __init__(self, url, token):
-        self.url = url.rstrip("/")
-        self._token = token
-
-    def _post(self, path, payload):
-        data = json.dumps(payload).encode()
-        req = urllib.request.Request(
-            self.url + path,
-            data=data,
-            method="POST",
-            headers={"Authorization": "Bearer " + self._token, "Content-Type": "application/json"},
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-                return json.loads(resp.read().decode())
-        except (urllib.error.URLError, OSError, ValueError) as e:
-            # never include the token or URL in the message
-            raise StoreError("store request failed: " + type(e).__name__) from None
-
-    @staticmethod
-    def _unwrap(item):
-        if isinstance(item, dict) and item.get("error"):
-            raise StoreError("store command failed")
-        return item.get("result") if isinstance(item, dict) else None
-
-    def execute(self, *args):
-        return self._unwrap(self._post("", [str(a) for a in args]))
-
-    def pipeline(self, commands):
-        if not commands:
-            return []
-        body = [[str(a) for a in cmd] for cmd in commands]
-        return [self._unwrap(item) for item in self._post("/pipeline", body)]
+def rank_key(row):
+    """Order: points, then wins, then who reached the total on an earlier day."""
+    return (-row["points"], -row["wins"], row["reached"], row["id"])
 
 
-class MemoryStore(_Commands):
-    """Enough of Redis for this app: strings, hashes, sorted sets, expiry."""
+###############################################################################
+# In-memory backend
+###############################################################################
 
+
+class _MemoryGame:
+    def __init__(self, st, key):
+        self._st, self._key = st, key
+        game = st.games.get(key)
+        self.guesses = list(game["guesses"]) if game else []
+        result = st.results.get(key)
+        self.result = dict(result) if result else None
+
+    def save(self, guesses):
+        self._st.games[self._key] = {"guesses": list(guesses)}
+        oldest = self._key[2] - datetime.timedelta(days=GAME_KEEP_DAYS)
+        for k in [k for k in self._st.games if k[2] < oldest]:
+            del self._st.games[k]
+
+    def record(self, won, attempts, points):
+        return self._st.record_result(*self._key, won, attempts, points)
+
+
+class MemoryStore(Store):
     def __init__(self):
-        self.data = {}
-        self.expires = {}
+        self.players = {}   # id -> {"username", "hidden"}
+        self.results = {}   # (id, lang, day) -> {"won", "attempts", "points"}
+        self.games = {}     # (id, lang, day) -> {"guesses": [...]}
+        self.rate = {}      # (id, minute) -> count
         self._lock = threading.RLock()
 
-    def _alive(self, key):
-        exp = self.expires.get(key)
-        if exp is not None and exp <= time.time():
-            self.data.pop(key, None)
-            self.expires.pop(key, None)
-        return key in self.data
+    def dump(self):
+        """Every table, for tests that check what is stored."""
+        return {"players": self.players, "results": self.results,
+                "games": self.games, "rate": self.rate}
 
-    def keys(self, pattern="*"):
+    def is_empty(self):
+        return not any(self.dump().values())
+
+    def upsert_player(self, discord_id, username):
         with self._lock:
-            return sorted(k for k in list(self.data) if self._alive(k) and fnmatch.fnmatchcase(k, pattern))
+            self.players.setdefault(discord_id, {"username": username, "hidden": False})
+            self.players[discord_id]["username"] = username
 
-    def execute(self, *args):
+    def get_player(self, discord_id):
         with self._lock:
-            cmd = str(args[0]).upper()
-            a = [str(x) for x in args[1:]]
-            return getattr(self, "_c_" + cmd.lower())(*a)
+            p = self.players.get(discord_id)
+            return dict(p) if p else None
 
-    # strings
-    def _c_get(self, key):
-        return self.data[key] if self._alive(key) else None
+    def rate_hit(self, discord_id, minute):
+        with self._lock:
+            key = (discord_id, minute)
+            self.rate[key] = self.rate.get(key, 0) + 1
+            for k in [k for k in self.rate if k[1] < minute - RATE_KEEP_MINUTES]:
+                del self.rate[k]
+            return self.rate[key]
 
-    def _c_set(self, key, value, *opts):
-        opts = [o.upper() for o in opts]
-        if "NX" in opts and self._alive(key):
-            return None
-        self.data[key] = value
-        self.expires.pop(key, None)
-        if "EX" in opts:
-            self.expires[key] = time.time() + int(opts[opts.index("EX") + 1])
-        return "OK"
+    def get_game(self, discord_id, lang, day):
+        with self._lock:
+            g = _MemoryGame(self, (discord_id, lang, day))
+            return g.guesses, g.result
 
-    def _c_incr(self, key):
-        value = int(self.data[key]) + 1 if self._alive(key) else 1
-        self.data[key] = str(value)
-        return value
+    @contextlib.contextmanager
+    def game(self, discord_id, lang, day):
+        with self._lock:
+            if discord_id not in self.players:
+                raise StoreError("unknown player")
+            yield _MemoryGame(self, (discord_id, lang, day))
 
-    def _c_expire(self, key, seconds):
-        if not self._alive(key):
-            return 0
-        self.expires[key] = time.time() + int(seconds)
-        return 1
+    def record_result(self, discord_id, lang, day, won, attempts, points):
+        with self._lock:
+            if discord_id not in self.players:
+                raise StoreError("unknown player")
+            key = (discord_id, lang, day)
+            if key in self.results:
+                return False
+            self.results[key] = {"won": bool(won), "attempts": int(attempts), "points": int(points)}
+            return True
 
-    def _c_del(self, *keys):
-        n = 0
-        for k in keys:
-            if self._alive(k):
-                n += 1
-            self.data.pop(k, None)
-            self.expires.pop(k, None)
-        return n
+    def _ranked(self, tab):
+        agg = {}
+        for (pid, lang, day), r in self.results.items():
+            player = self.players.get(pid)
+            if not player or player["hidden"] or (tab != "all" and lang != tab):
+                continue
+            a = agg.setdefault(pid, {"id": pid, "username": player["username"], "points": 0,
+                                     "wins": 0, "played": 0, "_point_days": [], "_days": []})
+            a["points"] += r["points"]
+            a["wins"] += 1 if r["won"] else 0
+            a["played"] += 1
+            a["_days"].append(day)
+            if r["points"] > 0:
+                a["_point_days"].append(day)
+        rows = []
+        for a in agg.values():
+            a["reached"] = max(a.pop("_point_days")) if a["_point_days"] else min(a["_days"])
+            a.pop("_days")
+            rows.append(a)
+        rows.sort(key=rank_key)
+        return [{"rank": i + 1, **{k: v for k, v in r.items() if k != "reached"}}
+                for i, r in enumerate(rows)]
 
-    # hashes
-    def _hash(self, key, create=False):
-        if self._alive(key):
-            return self.data[key]
-        if create:
-            self.data[key] = {}
-            return self.data[key]
-        return {}
+    def leaderboard(self, tab, limit):
+        with self._lock:
+            return self._ranked(tab)[:limit]
 
-    def _c_hget(self, key, field):
-        return self._hash(key).get(field)
+    def standing(self, discord_id, tab):
+        with self._lock:
+            return next((r for r in self._ranked(tab) if r["id"] == discord_id), None)
 
-    def _c_hset(self, key, *pairs):
-        h = self._hash(key, create=True)
-        added = 0
-        for i in range(0, len(pairs), 2):
-            added += pairs[i] not in h
-            h[pairs[i]] = pairs[i + 1]
-        return added
+    def histories(self, discord_ids, tab):
+        with self._lock:
+            out = {pid: [] for pid in discord_ids}
+            for (pid, lang, day), r in sorted(self.results.items(), key=lambda kv: kv[0][2]):
+                if pid in out and (tab == "all" or lang == tab):
+                    out[pid].append((day, r["won"]))
+            return out
 
-    def _c_hgetall(self, key):
-        flat = []
-        for k, v in self._hash(key).items():
-            flat += [k, v]
-        return flat
+    def delete_player(self, discord_id):
+        with self._lock:
+            self.players.pop(discord_id, None)
+            for table in (self.results, self.games, self.rate):
+                for k in [k for k in table if k[0] == discord_id]:
+                    del table[k]
 
-    def _c_hdel(self, key, *fields):
-        h = self._hash(key)
-        n = sum(1 for f in fields if h.pop(f, None) is not None)
-        if self._alive(key) and not h:
-            self._c_del(key)
-        return n
+    def set_hidden(self, discord_id, hidden):
+        with self._lock:
+            if discord_id not in self.players:
+                return False
+            self.players[discord_id]["hidden"] = bool(hidden)
+            return True
 
-    # sorted sets
-    def _c_zadd(self, key, score, member):
-        z = self._hash(key, create=True)
-        added = member not in z
-        z[member] = float(score)
-        return int(added)
 
-    def _c_zrem(self, key, member):
-        z = self._hash(key)
-        n = 1 if z.pop(member, None) is not None else 0
-        if self._alive(key) and not z:
-            self._c_del(key)
-        return n
+###############################################################################
+# Postgres backend (Neon). Every query is a constant with %s / %(name)s
+# placeholders; values are always passed as parameters.
+###############################################################################
 
-    def _c_zcard(self, key):
-        return len(self._hash(key))
+SCHEMA_LOCK_ID = 2424_2026  # pg_advisory_xact_lock id, so two cold starts don't race
 
-    def _ordered(self, key):
-        # Redis order for ZREVRANGE: score desc, then member desc
-        return sorted(self._hash(key).items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
+SQL_SCHEMA = (
+    """CREATE TABLE IF NOT EXISTS wordle_players (
+        discord_id text PRIMARY KEY,
+        username text NOT NULL,
+        hidden boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now())""",
+    """CREATE TABLE IF NOT EXISTS wordle_results (
+        discord_id text NOT NULL REFERENCES wordle_players ON DELETE CASCADE,
+        lang text NOT NULL,
+        day date NOT NULL,
+        won boolean NOT NULL,
+        attempts integer NOT NULL,
+        points integer NOT NULL,
+        finished_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (discord_id, lang, day))""",
+    """CREATE TABLE IF NOT EXISTS wordle_games (
+        discord_id text NOT NULL REFERENCES wordle_players ON DELETE CASCADE,
+        lang text NOT NULL,
+        day date NOT NULL,
+        guesses jsonb NOT NULL DEFAULT '[]'::jsonb,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (discord_id, lang, day))""",
+    """CREATE TABLE IF NOT EXISTS wordle_rate (
+        discord_id text NOT NULL,
+        minute bigint NOT NULL,
+        count integer NOT NULL,
+        PRIMARY KEY (discord_id, minute))""",
+)
 
-    def _c_zrevrank(self, key, member):
-        for i, (m, _) in enumerate(self._ordered(key)):
-            if m == member:
-                return i
-        return None
+SQL_SCHEMA_LOCK = "SELECT pg_advisory_xact_lock(%s)"
 
-    def _c_zrevrange(self, key, start, stop, *opts):
-        items = self._ordered(key)
-        start, stop = int(start), int(stop)
-        stop = len(items) - 1 if stop < 0 else stop
-        flat = []
-        for m, s in items[start:stop + 1]:
-            flat += [m, repr(s)]
-        return flat
+SQL_UPSERT_PLAYER = """
+    INSERT INTO wordle_players (discord_id, username) VALUES (%s, %s)
+    ON CONFLICT (discord_id) DO UPDATE SET username = EXCLUDED.username"""
 
+SQL_GET_PLAYER = "SELECT username, hidden FROM wordle_players WHERE discord_id = %s"
+
+SQL_RATE_HIT = """
+    INSERT INTO wordle_rate (discord_id, minute, count) VALUES (%s, %s, 1)
+    ON CONFLICT (discord_id, minute) DO UPDATE SET count = wordle_rate.count + 1
+    RETURNING count"""
+
+SQL_RATE_CLEANUP = "DELETE FROM wordle_rate WHERE minute < %s"
+
+SQL_GAME_ENSURE = """
+    INSERT INTO wordle_games (discord_id, lang, day) VALUES (%s, %s, %s)
+    ON CONFLICT (discord_id, lang, day) DO NOTHING"""
+
+SQL_GAME_LOCK = """
+    SELECT guesses FROM wordle_games
+    WHERE discord_id = %s AND lang = %s AND day = %s FOR UPDATE"""
+
+SQL_GAME_GET = "SELECT guesses FROM wordle_games WHERE discord_id = %s AND lang = %s AND day = %s"
+
+SQL_GAME_SAVE = """
+    UPDATE wordle_games SET guesses = %s, updated_at = now()
+    WHERE discord_id = %s AND lang = %s AND day = %s"""
+
+SQL_GAME_CLEANUP = "DELETE FROM wordle_games WHERE day < %s"
+
+SQL_RESULT_GET = """
+    SELECT won, attempts, points FROM wordle_results
+    WHERE discord_id = %s AND lang = %s AND day = %s"""
+
+SQL_RESULT_INSERT = """
+    INSERT INTO wordle_results (discord_id, lang, day, won, attempts, points)
+    VALUES (%s, %s, %s, %s, %s, %s)
+    ON CONFLICT (discord_id, lang, day) DO NOTHING
+    RETURNING 1"""
+
+# "reached": the last day the player scored points (when the current total was
+# reached); for players with no points yet, their first day.
+SQL_RANKED = """
+    WITH agg AS (
+        SELECT r.discord_id, p.username,
+               SUM(r.points)::int AS points,
+               (COUNT(*) FILTER (WHERE r.won))::int AS wins,
+               COUNT(*)::int AS played,
+               COALESCE(MAX(r.day) FILTER (WHERE r.points > 0), MIN(r.day)) AS reached
+        FROM wordle_results r JOIN wordle_players p ON p.discord_id = r.discord_id
+        WHERE NOT p.hidden AND (%(tab)s::text = 'all' OR r.lang = %(tab)s::text)
+        GROUP BY r.discord_id, p.username
+    ), ranked AS (
+        SELECT agg.*, ROW_NUMBER() OVER (
+            ORDER BY points DESC, wins DESC, reached ASC, discord_id ASC) AS rank
+        FROM agg
+    )"""
+
+SQL_LEADERBOARD = SQL_RANKED + """
+    SELECT rank, discord_id, username, points, wins, played FROM ranked
+    ORDER BY rank LIMIT %(limit)s"""
+
+SQL_STANDING = SQL_RANKED + """
+    SELECT rank, discord_id, username, points, wins, played FROM ranked
+    WHERE discord_id = %(id)s"""
+
+SQL_HISTORIES = """
+    SELECT discord_id, day, won FROM wordle_results
+    WHERE discord_id = ANY(%(ids)s) AND (%(tab)s::text = 'all' OR lang = %(tab)s::text)
+    ORDER BY day"""
+
+SQL_DELETE_PLAYER = "DELETE FROM wordle_players WHERE discord_id = %s"  # cascades
+SQL_DELETE_RATE = "DELETE FROM wordle_rate WHERE discord_id = %s"
+SQL_SET_HIDDEN = "UPDATE wordle_players SET hidden = %s WHERE discord_id = %s RETURNING 1"
+
+
+def _row(r):
+    return {"rank": int(r[0]), "id": r[1], "username": r[2],
+            "points": int(r[3]), "wins": int(r[4]), "played": int(r[5])}
+
+
+class _PostgresGame:
+    def __init__(self, cur, key):
+        self._cur, self._key = cur, key
+        cur.execute(SQL_GAME_ENSURE, key)
+        cur.execute(SQL_GAME_LOCK, key)  # row lock: concurrent guesses wait here
+        row = cur.fetchone()
+        self.guesses = list(row[0]) if row and isinstance(row[0], list) else []
+        cur.execute(SQL_RESULT_GET, key)
+        r = cur.fetchone()
+        self.result = {"won": r[0], "attempts": r[1], "points": r[2]} if r else None
+
+    def save(self, guesses):
+        from psycopg.types.json import Jsonb
+        self._cur.execute(SQL_GAME_SAVE, (Jsonb(list(guesses)), *self._key))
+        self._cur.execute(SQL_GAME_CLEANUP, (self._key[2] - datetime.timedelta(days=GAME_KEEP_DAYS),))
+
+    def record(self, won, attempts, points):
+        self._cur.execute(SQL_RESULT_INSERT, (*self._key, bool(won), int(attempts), int(points)))
+        return self._cur.fetchone() is not None
+
+
+class PostgresStore(Store):
+    """One connection per thread, opened lazily and closed after each request
+    (app.py calls close_connections() at teardown), so serverless instances
+    don't hold idle connections. Autocommit is off; every method runs in an
+    explicit transaction."""
+
+    _schema_ready = False
+    _schema_lock = threading.Lock()
+
+    def __init__(self, url):
+        self._url = url
+        self._local = threading.local()
+
+    def _connect(self):
+        conn = getattr(self._local, "conn", None)
+        if conn is not None and not conn.closed and not conn.broken:
+            return conn
+        import psycopg
+        # prepare_threshold=None: no server-side prepared statements (pooled URL)
+        conn = psycopg.connect(self._url, connect_timeout=5, autocommit=False, prepare_threshold=None)
+        self._local.conn = conn
+        self._ensure_schema(conn)
+        return conn
+
+    def _ensure_schema(self, conn):
+        cls = type(self)
+        with cls._schema_lock:
+            if cls._schema_ready:
+                return
+            with conn.transaction(), conn.cursor() as cur:
+                cur.execute(SQL_SCHEMA_LOCK, (SCHEMA_LOCK_ID,))
+                for statement in SQL_SCHEMA:
+                    cur.execute(statement)
+            cls._schema_ready = True
+
+    @contextlib.contextmanager
+    def _tx(self):
+        import psycopg
+        try:
+            conn = self._connect()
+            with conn.transaction(), conn.cursor() as cur:
+                yield cur
+        except psycopg.Error as e:
+            self.close()
+            # no query text or values in the message
+            raise StoreError("database error: " + type(e).__name__) from None
+
+    def close(self):
+        conn = getattr(self._local, "conn", None)
+        self._local.conn = None
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def upsert_player(self, discord_id, username):
+        with self._tx() as cur:
+            cur.execute(SQL_UPSERT_PLAYER, (discord_id, username))
+
+    def get_player(self, discord_id):
+        with self._tx() as cur:
+            cur.execute(SQL_GET_PLAYER, (discord_id,))
+            r = cur.fetchone()
+        return {"username": r[0], "hidden": bool(r[1])} if r else None
+
+    def rate_hit(self, discord_id, minute):
+        with self._tx() as cur:
+            cur.execute(SQL_RATE_HIT, (discord_id, minute))
+            count = int(cur.fetchone()[0])
+            if count == 1:
+                cur.execute(SQL_RATE_CLEANUP, (minute - RATE_KEEP_MINUTES,))
+        return count
+
+    def get_game(self, discord_id, lang, day):
+        key = (discord_id, lang, day)
+        with self._tx() as cur:
+            cur.execute(SQL_GAME_GET, key)
+            row = cur.fetchone()
+            cur.execute(SQL_RESULT_GET, key)
+            r = cur.fetchone()
+        guesses = list(row[0]) if row and isinstance(row[0], list) else []
+        return guesses, ({"won": r[0], "attempts": r[1], "points": r[2]} if r else None)
+
+    @contextlib.contextmanager
+    def game(self, discord_id, lang, day):
+        with self._tx() as cur:
+            yield _PostgresGame(cur, (discord_id, lang, day))
+
+    def record_result(self, discord_id, lang, day, won, attempts, points):
+        with self._tx() as cur:
+            cur.execute(SQL_RESULT_INSERT, (discord_id, lang, day, bool(won), int(attempts), int(points)))
+            return cur.fetchone() is not None
+
+    def leaderboard(self, tab, limit):
+        with self._tx() as cur:
+            cur.execute(SQL_LEADERBOARD, {"tab": tab, "limit": int(limit)})
+            return [_row(r) for r in cur.fetchall()]
+
+    def standing(self, discord_id, tab):
+        with self._tx() as cur:
+            cur.execute(SQL_STANDING, {"tab": tab, "id": discord_id})
+            r = cur.fetchone()
+        return _row(r) if r else None
+
+    def histories(self, discord_ids, tab):
+        out = {pid: [] for pid in discord_ids}
+        if not out:
+            return out
+        with self._tx() as cur:
+            cur.execute(SQL_HISTORIES, {"ids": list(out), "tab": tab})
+            for pid, day, won in cur.fetchall():
+                out[pid].append((day, bool(won)))
+        return out
+
+    def delete_player(self, discord_id):
+        with self._tx() as cur:
+            cur.execute(SQL_DELETE_PLAYER, (discord_id,))
+            cur.execute(SQL_DELETE_RATE, (discord_id,))
+
+    def set_hidden(self, discord_id, hidden):
+        with self._tx() as cur:
+            cur.execute(SQL_SET_HIDDEN, (bool(hidden), discord_id))
+            return cur.fetchone() is not None
+
+
+###############################################################################
 
 _memory = None
-_memory_lock = threading.Lock()
-
-
-def _upstash_env():
-    url = os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
-    token = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-    return url, token
+_postgres = {}
+_choose_lock = threading.Lock()
 
 
 def get_store():
-    """Upstash when configured; an in-memory store locally; None on Vercel without KV."""
+    """Postgres when DATABASE_URL is set; in-memory locally; None on Vercel without it."""
     global _memory
-    url, token = _upstash_env()
-    if url and token:
-        return UpstashStore(url, token)
-    if os.environ.get("VERCEL"):
-        return None
-    with _memory_lock:
+    url = os.environ.get("DATABASE_URL")
+    with _choose_lock:
+        if url:
+            if url not in _postgres:
+                _postgres[url] = PostgresStore(url)  # connects lazily, on first query
+            return _postgres[url]
+        if os.environ.get("VERCEL"):
+            return None
         if _memory is None:
             _memory = MemoryStore()
         return _memory
+
+
+def close_connections():
+    """Close this thread's database connections (called after every request)."""
+    for st in list(_postgres.values()):
+        st.close()

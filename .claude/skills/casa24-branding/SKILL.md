@@ -32,8 +32,14 @@ Both pages use `.c24-header` (3 columns: icons, title, icons), `.c24-header-titl
 ## Start screen styles
 `.c24-hero-kolo`, `.c24-today`, `.c24-play` / `.c24-play-main` (filled green, the player's language) / `.c24-play-alt` (outlined), `.c24-section-title`, `.c24-chip` (other languages) in `style.css`. `.c24-play-demo` is the dashed, transparent "🔒 Developer view" card (team only, shown when `DEMO_PASSWORD` is set). They only use `--c24-*` tokens, so dark mode works automatically. Developer view's own styles (`.c24-demo-bar`, `.c24-demo-lang`, `.c24-demo-btn`, the password page `.c24-demo-login*`) are in the "demo mode" section at the end of `style.css`, also token-only (the one fixed color is the wrong-password red `#d9534f`). The start screen must fit one phone screen (a test checks the height is under 2,000 px).
 
+## Leaderboard styles
+- All in the "leaderboard (es/en only; Discord login)" section of `style.css`, after the start-screen styles: the menu switch (`.c24-mode`, `.c24-mode-opt.is-active` filled green like the main Play button), notices (`.c24-notice`, `.c24-notice-warn` with an orange border), `.c24-lb-links`, the game's end-window block (`.c24-lb-end`, rank in VT323), the guest hint (`.c24-lb-hint`), and the `/leaderboard` page (`.c24-lb-*`: tabs, table, your own row with the `--c24-hover` background, an orange left mark and an orange "You/Tú" tag, buttons).
+- In leaderboard games the header shows a **🏆 badge** (`.c24-badge.c24-badge-lb`, transparent, no padding) right after the language badge, so players can see they are playing for the ranking.
+- **Tokens only** (`--c24-*`), so dark mode works with no extra rules. The only fixed colors are white text on the green active tab/option and the "Delete my data" red `#d9534f` (same red as the Developer view's wrong-password message).
+- `/leaderboard` loads `style.css` and `theme.js` but not Tailwind, so it uses no Tailwind classes; it has the same header, logo slot and moon/sun theme button as the menu.
+
 ## Dark mode: `webapp/static/theme.js`
-- Loaded in `<head>` of both pages, before anything renders, so there is no flash.
+- Loaded in `<head>` of every page (menu, game, `/leaderboard`), before anything renders, so there is no flash.
 - Stores `casa24_theme` in localStorage as `auto`, `light` or `dark`. `auto` follows the device.
 - Settings in the game has a "Tema/Theme" picker (`#theme-select`). The menu has a moon/sun button that calls `casa24ToggleTheme()`.
 

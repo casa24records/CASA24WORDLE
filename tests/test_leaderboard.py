@@ -1,6 +1,6 @@
 """Leaderboard: pure rules (points, ranking key, streaks, accent and color
 port of game.js) and the server routes, with a fake Discord and an in-memory
-store. Nothing here talks to Discord or a real Redis."""
+store. Nothing here talks to Discord or a real database."""
 
 import datetime
 import json
@@ -14,7 +14,7 @@ import app
 import leaderboard as lb
 import store
 from lb_testlib import (  # noqa: F401 (fixtures)
-    ADMIN_ID, all_store_text, answer, client, discord, guess, lb_env, login, mem, rendered,
+    ADMIN_ID, all_store_text, answer, day_of, row_of, client, discord, guess, lb_env, login, mem, rendered,
     today, wrong_words,
 )
 
@@ -30,15 +30,6 @@ def test_points():
     assert [lb.points(True, n) for n in range(1, 7)] == [6, 5, 4, 3, 2, 1]
     assert lb.points(False, 6) == 0
     assert lb.points(True, 0) == 0 and lb.points(True, 7) == 0
-
-
-def test_score_order_points_then_wins_then_earliest():
-    a = lb.score(10, 2, 30)   # 10 points, 2 wins, reached day 30
-    b = lb.score(10, 3, 40)   # more wins beats earlier day
-    c = lb.score(10, 2, 20)   # same points/wins, reached earlier
-    d = lb.score(11, 1, 99)   # more points beats everything
-    assert sorted([a, b, c, d], reverse=True) == [d, b, c, a]
-    assert lb.score(10**6, 9999, 0) < 2**53  # exact in a float
 
 
 def test_streaks():
@@ -144,43 +135,104 @@ console.log(JSON.stringify(out));
 
 def test_memory_store_basics():
     s = store.MemoryStore()
-    assert s.set("a", "1", nx=True, ex=60) is True
-    assert s.set("a", "2", nx=True) is False and s.get("a") == "1"
-    assert s.incr("n") == 1 and s.incr("n") == 2
-    s.hset("h", {"x": "1", "y": "2"})
-    s.hdel("h", "x")
-    assert s.hgetall("h") == {"y": "2"}
-    s.zadd("z", 5, "p"), s.zadd("z", 7, "q"), s.zadd("z", 1, "r")
-    assert s.zrevrange("z", 0, 1) == [("q", 7.0), ("p", 5.0)]
-    assert s.zrevrank("z", "r") == 2 and s.zcard("z") == 3
-    s.zrem("z", "q")
-    assert s.zrevrank("z", "q") is None
-    assert s.delete("a", "h", "missing") == 2
-    assert s.pipeline([["INCR", "n"], ["GET", "n"]]) == [3, "3"]
+    d1, d2 = datetime.date(2026, 11, 1), datetime.date(2026, 11, 2)
+    s.upsert_player("1", "a")
+    s.upsert_player("1", "a2")
+    assert s.get_player("1") == {"username": "a2", "hidden": False}
+    assert s.get_player("2") is None
+    assert [s.rate_hit("1", 100) for _ in range(3)] == [1, 2, 3]
+    assert s.rate_hit("1", 200) == 1 and ("1", 100) not in s.rate  # old minutes cleaned up
+    with s.game("1", "es", d1) as g:
+        assert g.guesses == [] and g.result is None
+        g.save(["perro"])
+        assert g.record(False, 6, 0) is True
+    assert s.get_game("1", "es", d1) == (["perro"], {"won": False, "attempts": 6, "points": 0})
+    assert s.record_result("1", "es", d1, True, 1, 6) is False  # once per day
+    with pytest.raises(store.StoreError):
+        s.record_result("nobody", "es", d1, True, 1, 6)
+    s.record_result("1", "en", d2, True, 2, 5)
+    assert s.leaderboard("all", 10) == [{"rank": 1, "id": "1", "username": "a2",
+                                         "points": 5, "wins": 1, "played": 2}]
+    assert s.standing("1", "es")["points"] == 0
+    assert s.histories(["1", "9"], "all") == {"1": [(d1, False), (d2, True)], "9": []}
+    assert s.set_hidden("1", True) and s.leaderboard("all", 10) == [] and s.standing("1", "en") is None
+    assert s.set_hidden("2", True) is False
+    s.delete_player("1")
+    assert s.is_empty()
 
 
 def test_get_store_choice(monkeypatch):
-    for k in ("KV_REST_API_URL", "KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"):
-        monkeypatch.delenv(k, raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("VERCEL", raising=False)
     assert isinstance(store.get_store(), store.MemoryStore)
     monkeypatch.setenv("VERCEL", "1")
     assert store.get_store() is None
-    monkeypatch.setenv("UPSTASH_REDIS_REST_URL", "https://example.invalid")
-    monkeypatch.setenv("UPSTASH_REDIS_REST_TOKEN", "fake")
-    assert isinstance(store.get_store(), store.UpstashStore)  # built, never called
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pw@db.example.invalid/x?sslmode=require")
+    st = store.get_store()
+    assert isinstance(st, store.PostgresStore)  # built, never connected
+    assert getattr(st._local, "conn", None) is None
 
 
-def test_upstash_request_shape(monkeypatch):
-    """The REST client posts a JSON command array with a Bearer token (fake urlopen)."""
+def _sql_constants():
+    return {k: v for k, v in vars(store).items() if k.startswith("SQL_")}
+
+
+def test_postgres_sql_is_parameterized():
+    """Every query is a module constant; values only ever go in as parameters."""
+    import ast
+    import inspect
+    tree = ast.parse(inspect.getsource(store))
+    pg_classes = [n for n in tree.body if isinstance(n, ast.ClassDef)
+                  and n.name in ("PostgresStore", "_PostgresGame")]
+    assert len(pg_classes) == 2
+    constants = set(_sql_constants())
+    executes = 0
+    for cls in pg_classes:
+        for node in ast.walk(cls):
+            # no f-strings, % formatting, .format() or string concatenation at all
+            assert not isinstance(node, ast.JoinedStr), ast.unparse(node)
+            if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
+                text = ast.unparse(node)
+                has_str = any(isinstance(x, ast.Constant) and isinstance(x.value, str)
+                              for x in (node.left, node.right))
+                assert not has_str or text.startswith("'database error: '"), text
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                assert node.func.attr != "format", ast.unparse(node)
+                if node.func.attr == "execute":
+                    executes += 1
+                    query = node.args[0]
+                    assert isinstance(query, ast.Name) and (query.id in constants or query.id == "statement"), \
+                        ast.unparse(node)
+    assert executes >= 15
+    for name, sql in _sql_constants().items():
+        texts = sql if isinstance(sql, tuple) else (sql,)
+        for text in texts:
+            assert "{" not in text, name
+    # only wordle_ tables
+    import re
+    tables = set(re.findall(r"(?:FROM|INTO|UPDATE|TABLE IF NOT EXISTS|JOIN|REFERENCES)\s+(\w+)",
+                            " ".join(v if isinstance(v, str) else " ".join(v) for v in _sql_constants().values())))
+    tables = {t for t in tables if t.islower()} - {"agg", "ranked"}  # CTE names
+    assert tables == {"wordle_players", "wordle_results", "wordle_games", "wordle_rate"}
+
+
+def test_postgres_store_against_fake_connection(monkeypatch):
+    """PostgresStore sends constant SQL with parameters (fake psycopg connection)."""
     sent = []
 
-    class Resp:
-        def __init__(self, body):
-            self.body = body
+    class Cur:
+        def __init__(self):
+            self.rows = []
 
-        def read(self):
-            return json.dumps(self.body).encode()
+        def execute(self, sql, params=None):
+            sent.append((sql, params))
+            self.rows = [("kolo_fan", False)] if sql == store.SQL_GET_PLAYER else [(1,)]
+
+        def fetchone(self):
+            return self.rows[0] if self.rows else None
+
+        def fetchall(self):
+            return self.rows
 
         def __enter__(self):
             return self
@@ -188,17 +240,32 @@ def test_upstash_request_shape(monkeypatch):
         def __exit__(self, *a):
             return False
 
-    def fake_urlopen(req, timeout):
-        sent.append((req.full_url, req.get_header("Authorization"), json.loads(req.data), timeout))
-        if req.full_url.endswith("/pipeline"):
-            return Resp([{"result": 1}, {"result": "OK"}])
-        return Resp({"result": "OK"})
-    monkeypatch.setattr(store.urllib.request, "urlopen", fake_urlopen)
-    s = store.UpstashStore("https://kv.example.invalid/", "tok")
-    assert s.set("k", "v", nx=True, ex=10) is True
-    assert s.pipeline([["INCR", "n"], ["SET", "a", "b"]]) == [1, "OK"]
-    assert sent[0] == ("https://kv.example.invalid", "Bearer tok", ["SET", "k", "v", "NX", "EX", "10"], 5)
-    assert sent[1][0] == "https://kv.example.invalid/pipeline"
+    class Conn:
+        closed = broken = False
+
+        def transaction(self):
+            return Cur()  # any context manager
+
+        def cursor(self):
+            return Cur()
+
+        def close(self):
+            self.closed = True
+
+    import psycopg
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: Conn())
+    monkeypatch.setattr(store.PostgresStore, "_schema_ready", False)
+    st = store.PostgresStore("postgresql://fake")
+    st.upsert_player("42", "Robert'); DROP TABLE wordle_players;--")
+    assert st.get_player("42") == {"username": "kolo_fan", "hidden": False}
+    assert st.rate_hit("42", 7) == 1
+    st.delete_player("42")
+    st.close()
+    queries = [q for q, _ in sent]
+    assert queries[:1] == [store.SQL_SCHEMA_LOCK] and store.SQL_SCHEMA[0] in queries
+    assert (store.SQL_UPSERT_PLAYER, ("42", "Robert'); DROP TABLE wordle_players;--")) in sent
+    assert (store.SQL_DELETE_PLAYER, ("42",)) in sent and (store.SQL_DELETE_RATE, ("42",)) in sent
+    assert all("DROP" not in q for q in queries)
 
 
 def test_env_local_loader(tmp_path, monkeypatch):
@@ -229,13 +296,12 @@ def test_disabled_without_env(monkeypatch, mem, client):
     assert client.get("/auth/discord/login").status_code == 404
     r = guess(client, "perro")
     assert r.status_code == 404 and r.get_json() == {"error": "disabled"}
-    assert mem.keys() == []
+    assert mem.is_empty()
 
 
-def test_disabled_on_vercel_without_kv(monkeypatch, client):
+def test_disabled_on_vercel_without_database(monkeypatch, client):
     monkeypatch.setenv("VERCEL", "1")
-    for k in ("KV_REST_API_URL", "KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"):
-        monkeypatch.delenv(k, raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("DISCORD_CLIENT_ID", "1")
     monkeypatch.setenv("DISCORD_CLIENT_SECRET", "2")
     monkeypatch.setenv("SECRET_KEY", "3")
@@ -314,15 +380,15 @@ def test_win_records_once(lb_env, client, discord, mem):
     assert body["done"] and body["won"] and body["answer"] == answer("es")
     assert body["points"] == 5 and body["rank"] == 1
     assert guess(client, wrong_words("es", 2)[1]).get_json() == {"error": "finished"}
-    date, idx = app.lb_today()
+    day, idx = app.lb_today()
     # a second finish can't count twice
-    app._record_result(mem, P1, "es", date, idx, True, 1)
-    p = mem.hgetall(f"player:{P1}")
-    assert (p["es_points"], p["es_wins"], p["es_played"]) == ("5", "1", "1")
-    assert (p["all_points"], p["all_cur_streak"], p["all_best_streak"]) == ("5", "1", "1")
-    assert mem.zrevrange("lb:es", 0, -1) == [(P1, float(lb.score(5, 1, idx)))]
-    assert mem.zrevrange("lb:all", 0, -1) == [(P1, float(lb.score(5, 1, idx)))]
-    assert mem.zcard("lb:en") == 0
+    assert app._record_result(mem, P1, "es", day, True, 1) is False
+    assert len(mem.results) == 1
+    es = row_of(mem, P1, "es")
+    assert (es["points"], es["wins"], es["played"], es["rank"]) == (5, 1, 1, 1)
+    combined = row_of(mem, P1, "all")
+    assert (combined["points"], combined["current_streak"], combined["best_streak"]) == (5, 1, 1)
+    assert row_of(mem, P1, "en") is None
     # resume state after reload
     state = app.lb_game_state(mem, P1, "es")
     assert state["done"] and state["won"] and state["points"] == 5 and state["rank"] == 1
@@ -339,8 +405,8 @@ def test_six_misses_then_finished(lb_env, client, discord, mem):
     assert body["rank"] == 1  # a loss still puts you on the board
     r = guess(client, words[6])
     assert r.status_code == 400 and r.get_json()["error"] in ("finished", "too_many")
-    p = mem.hgetall(f"player:{P1}")
-    assert (p["es_points"], p["es_played"], p["es_wins"]) == ("0", "1", "0")
+    es = row_of(mem, P1, "es")
+    assert (es["points"], es["played"], es["wins"]) == (0, 1, 0)
 
 
 def test_client_date_is_ignored(lb_env, client, discord, mem):
@@ -348,10 +414,10 @@ def test_client_date_is_ignored(lb_env, client, discord, mem):
     w = wrong_words("es", 1)[0]
     r = guess(client, w, date="2001-01-01", day=1, answer="perro", points=6)
     assert r.status_code == 200
-    date, _ = app.lb_today()
-    assert date == "2026-11-03"
-    assert json.loads(mem.get(f"game:{P1}:es:{date}")) == [w]
-    assert not any("2001" in k for k in mem.keys())
+    day, _ = app.lb_today()
+    assert day == datetime.date(2026, 11, 3)
+    assert mem.games == {(P1, "es", day): {"guesses": [w]}}
+    assert "2001" not in all_store_text(mem)
 
 
 def test_new_day_new_game_and_streak(lb_env, client, discord, mem, today):
@@ -361,10 +427,15 @@ def test_new_day_new_game_and_streak(lb_env, client, discord, mem, today):
     assert guess(client, answer("es")).get_json()["points"] == 6
     body = guess(client, answer("en"), lang="en").get_json()
     assert body["won"] and body["rank"] == 1
-    p = mem.hgetall(f"player:{P1}")
-    assert (p["es_cur_streak"], p["es_best_streak"], p["es_points"]) == ("2", "2", "12")
-    assert (p["all_cur_streak"], p["all_points"], p["all_played"]) == ("2", "18", "3")
-    assert p["en_cur_streak"] == "1"
+    es, combined, en = row_of(mem, P1, "es"), row_of(mem, P1, "all"), row_of(mem, P1, "en")
+    assert (es["current_streak"], es["best_streak"], es["points"]) == (2, 2, 12)
+    assert (combined["current_streak"], combined["points"], combined["played"]) == (2, 18, 3)
+    assert en["current_streak"] == 1
+    # yesterday's guesses are still there; older games get cleaned up
+    today(datetime.date(2026, 11, 7))
+    guess(client, wrong_words("es", 1)[0])
+    assert {k[2] for k in mem.games} == {datetime.date(2026, 11, 7)}
+    assert row_of(mem, P1, "es")["current_streak"] == 0  # days without a win
 
 
 def test_rate_limit(lb_env, client, discord):
@@ -377,16 +448,16 @@ def test_rate_limit(lb_env, client, discord):
 def test_guest_routes_never_write(lb_env, client, discord, mem):
     for path in ["/", "/es", "/en", "/fr", "/sitemap.xml", "/leaderboard"]:
         assert client.get(path).status_code == 200, path
-    assert mem.keys() == []
+    assert mem.is_empty()
 
 
 # ---------- leaderboard page, delete, admin ----------
 
 def _seed(mem, pid, name, games):
     """games: (day_idx, won, attempts) in es."""
-    mem.hset(f"player:{pid}", {"username": name})
+    mem.upsert_player(pid, name)
     for idx, won, attempts in games:
-        app._record_result(mem, pid, "es", f"d{idx}", idx, won, attempts)
+        app._record_result(mem, pid, "es", day_of(idx), won, attempts)
 
 
 def test_leaderboard_order_and_rows(lb_env, client, discord, mem, rendered):
@@ -430,7 +501,7 @@ def test_delete_my_data(lb_env, client, discord, mem):
     guess(client, wrong_words("es", 1)[0])
     guess(client, answer("es"))
     guess(client, answer("en"), lang="en")
-    assert any(P1 in k for k in mem.keys())
+    assert P1 in all_store_text(mem)
     assert client.post("/api/me/delete", headers={"Origin": "https://evil.example"}).status_code == 403
     r = client.post("/api/me/delete")
     assert r.status_code == 302 and r.headers["Location"] == "/?deleted=1"
@@ -442,7 +513,7 @@ def test_delete_my_data(lb_env, client, discord, mem):
 
 def test_deleted_player_is_logged_out(lb_env, client, discord, mem):
     login(client, discord)
-    mem.delete(f"player:{P1}")
+    mem.delete_player(P1)
     assert guess(client, "perro").status_code == 401
     assert client.get("/lb/es").status_code == 302
 
@@ -453,24 +524,24 @@ def test_admin_hide_and_unhide(lb_env, client, discord, mem, rendered):
     login(client, discord)  # P1, not an admin
     r = client.post("/admin/hide", data={"discord_id": P2, "hidden": "1"})
     assert r.status_code == 403
-    assert mem.zrevrank("lb:all", P2) is not None
+    assert mem.standing(P2, "all") is not None
 
     login(client, discord, user_id=ADMIN_ID, username="owner")
     client.get("/leaderboard")
     assert rendered[-1][1]["is_admin"] is True
     r = client.post("/admin/hide", data={"discord_id": P2, "hidden": "1", "tab": "es"})
     assert r.status_code == 302 and r.headers["Location"] == "/leaderboard?tab=es"
-    assert mem.hget(f"player:{P2}", "hidden") == "1"
+    assert mem.get_player(P2)["hidden"] is True
     for scope in ("es", "all"):
-        assert mem.zrevrank(f"lb:{scope}", P2) is None
+        assert mem.standing(P2, scope) is None
     client.get("/leaderboard")
     assert [row["username"] for row in rendered[-1][1]["rows"]] == ["nice"]
     # a hidden player's new games don't put them back
-    app._record_result(mem, P2, "es", "d4", 4, True, 1)
-    assert mem.zrevrank("lb:es", P2) is None
+    app._record_result(mem, P2, "es", day_of(4), True, 1)
+    assert mem.standing(P2, "es") is None
 
     client.post("/admin/hide", data={"discord_id": P2, "hidden": "0"})
-    assert mem.hget(f"player:{P2}", "hidden") is None
-    assert mem.zrevrank("lb:es", P2) == 0  # 12 points now
+    assert mem.get_player(P2)["hidden"] is False
+    assert mem.standing(P2, "es")["rank"] == 1  # 12 points now
     assert client.post("/admin/hide", data={"discord_id": P2, "hidden": "1"},
                        headers={"Origin": "https://evil.example"}).status_code == 403

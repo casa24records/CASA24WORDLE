@@ -4,9 +4,10 @@
 - fold_accents / resolve_accents / color_guess: 1:1 ports of foldAccents,
   resolveAccents and updateColors in static/game.js. The server colors
   leaderboard guesses itself, so the browser never needs the answer.
-- update_streak / effective_streak: streak = consecutive Panama days with a win.
-- score(): one number for the sorted set; higher is better. Order is
-  points, then wins, then whoever reached that total on an earlier day.
+- update_streak / effective_streak / streaks: streak = consecutive Panama days
+  with a win, recomputed from the player's results whenever it is shown.
+- Ranking order (computed in SQL by store.py): points, then wins, then whoever
+  reached that total on an earlier day.
 """
 
 import unicodedata
@@ -20,11 +21,6 @@ def points(won, attempts):
     if not won or not 1 <= attempts <= MAX_GUESSES:
         return 0
     return MAX_GUESSES + 1 - attempts
-
-
-def score(total_points, wins, reached_day):
-    """Sorted-set score: points first, then wins, then the earlier day."""
-    return int(total_points) * 10**9 + int(wins) * 10**5 + (99999 - int(reached_day))
 
 
 def fold_accents(text):
@@ -116,3 +112,11 @@ def effective_streak(cur, last_win_day, today):
     if last_win_day in (None, ""):
         return 0
     return int(cur or 0) if int(last_win_day) >= today - 1 else 0
+
+
+def streaks(history, today, combined=False):
+    """(current, best) from [(day_number, won), ...] in any order."""
+    cur, best, last = 0, 0, None
+    for day, won in sorted(history):
+        cur, best, last = update_streak(cur, best, last, day, won, combined)
+    return effective_streak(cur, last, today), best

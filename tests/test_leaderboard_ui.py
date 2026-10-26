@@ -18,7 +18,7 @@ from werkzeug.serving import make_server
 import app
 
 LB_ENV = ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SECRET_KEY",
-          "KV_REST_API_URL", "KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN")
+          "DATABASE_URL")
 
 ME = {"id": "100000000000000001", "username": "kolo_fan"}
 

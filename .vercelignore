@@ -19,3 +19,5 @@ webapp/static/fonts/Gilroy-*
 # local Vercel link and env files (never upload)
 .vercel
 .env*
+.agents/
+skills-lock.json

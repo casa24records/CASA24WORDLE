@@ -41,7 +41,8 @@ def test_login_flow_keeps_only_id_and_username(lb_env, client, discord, mem):
     assert decode_lb_cookie(value) == USER_ID  # the cookie holds only the ID
 
     # the store has just the username for this player
-    assert mem.hgetall(f"player:{USER_ID}") == {"username": "kolo_fan"}
+    assert mem.players == {USER_ID: {"username": "kolo_fan", "hidden": False}}
+    assert not mem.results and not mem.games and not mem.rate
     everything = all_store_text(mem) + "\n" + "\n".join(set_cookies)
     for bit in SECRET_BITS.values():
         assert bit not in everything, bit
@@ -62,7 +63,7 @@ def test_bad_state_fails(lb_env, client, discord, mem):
     r = client.get("/auth/discord/callback?code=x&state=wrong")
     assert r.status_code == 302 and r.headers["Location"] == "/?login=failed"
     assert client.get_cookie("c24_lb") is None
-    assert mem.keys() == []
+    assert mem.is_empty()
     assert discord.calls == []
 
 
@@ -76,7 +77,7 @@ def test_cancel_on_discord_fails(lb_env, client, discord, mem):
     state = parse_qs(urlparse(r.headers["Location"]).query)["state"][0]
     r = client.get(f"/auth/discord/callback?error=access_denied&state={state}")
     assert r.headers["Location"] == "/?login=failed"
-    assert mem.keys() == []
+    assert mem.is_empty()
 
 
 def test_discord_error_fails(lb_env, client, discord, monkeypatch):
