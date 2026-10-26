@@ -31,6 +31,15 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 - **The end screen has a title**, "¡Ganaste!" / "Perdiste", above the Kolo. This text and the repeated-word message are translated in all 10 languages.
 - The Spanish help says: "Puedes escribir con o sin tildes, pero los colores sí las cuentan: una «a» no vale por una «á»."
 
+## Developer view for the team (decided 2026-10-26)
+- Players see it as **"Developer view" / "Vista de desarrollador"**. Internally it is still "demo": routes `/demo` and `/demo/<lang>`, env `DEMO_PASSWORD`, `demo_*` text keys, `.c24-demo*` classes, `data-demo` attributes. Don't rename those.
+- **Why:** the Casa 24 team wants to test and show the game without waiting a day for a new word.
+- A "🔒 Developer view" card on the start screen opens `/demo`, a password page. After the right password the browser keeps a signed session cookie for 30 days and plays `/demo/es` or `/demo/en` (chosen inside the start-screen card). **It acts exactly like the real game** (owner, 2026-10-26): it opens with the real word of the day and the same end window. The only differences are two buttons: **↻ Reiniciar** (a random answer from the daily-word pool, never the same word again) and **✓ Poner la palabra** (types the current word and presses Enter, so the real win flow runs).
+- **The password lives only in the `DEMO_PASSWORD` environment variable** (Vercel settings, or the shell when running locally), because the repo is public. Never write it in code, tests, docs, skills or commit messages; call it "the password the owner chose". Without `DEMO_PASSWORD` there is no Developer view card and `/demo` is a 404.
+- **es and en only.** Other language codes redirect to `/demo/es`.
+- **Developer view never touches player data:** no localStorage saves, no results, stats or streaks, no "last language" (`casa24_lang`). The end window is the normal one (countdown, Share, your real stats), but the developer game is not added to them.
+- Not in the sitemap, pages are `noindex`/`no-store`. How it works: `casa24-wordle`; setting the password: `casa24-deploy`.
+
 ## Privacy
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.
 

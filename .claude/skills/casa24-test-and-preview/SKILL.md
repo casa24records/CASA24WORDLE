@@ -15,9 +15,15 @@ Never install packages globally. Use `.venv/bin/pip`.
 
 ## Run the game
 ```
-cd webapp && ../.venv/bin/flask --app app run      # http://127.0.0.1:5000
+cd webapp && ../.venv/bin/flask --app app run --port 5050   # http://127.0.0.1:5050
 ```
+- **Port 5000 is taken by macOS AirPlay on this Mac** (it answers 403). Use `--port 5050` → http://127.0.0.1:5050.
 - Pages: `/` (menu), `/es`, `/en`, plus the other 8 language codes.
+- **Developer view** (internally "demo") is off unless `DEMO_PASSWORD` is set. To try it locally, set it just for that run, with the password the owner chose (never write it in a file, test or commit):
+  ```
+  cd webapp && DEMO_PASSWORD='…' ../.venv/bin/flask --app app run --port 5050
+  ```
+  Then `/` shows the "🔒 Developer view" card → `/demo` → `/demo/es` or `/demo/en`. Without the variable, `/demo` is a 404 (expected).
 - The pages load Vue 3.5.13 (jsdelivr) and Tailwind (Play CDN) from the internet, so they need a connection.
 
 ## Tests (from the repo root; all must pass before committing)
@@ -32,6 +38,7 @@ cd webapp && ../.venv/bin/flask --app app run      # http://127.0.0.1:5000
 | `test_input_bugs.py` | generated keyboards are alphabetical with ⇨ first and ⌫ last (es/en keep their layouts); Shift letters type lowercase; Ctrl/Cmd shortcuts don't type; typing in a Settings field isn't a guess; Turkish I/İ; physical Enter after tapping a key submits; Share fires once per tap |
 | `test_kolo.py` | `KOLO_WIN`/`KOLO_LOSE` in `game.js` match the `win/`/`lose/` folders and `brand_assets.py`, pools don't overlap, no Pikachu, Kolo images are WebP only (only `kolo-hero.png` stays) |
 | text-key tests | the result titles and `notification-repeated` exist in all 10 `language_config.json` files |
+| `test_demo.py` | Developer view (`/demo`): off without `DEMO_PASSWORD` (no card, 404), login needed, wrong password refused, first open = the real daily word, Restart (`?skip=`) gives a random word that never repeats, other languages redirect to es, a new password logs old sessions out, normal `/es` isn't demo, the password never appears in pages; in the browser, Fill in word wins and nothing is saved to localStorage. Uses a **fake** password via `monkeypatch.setenv`, never the real one |
 | `test_vercel_ready.py` | `webapp.app:app` loads from the repo root behind a proxy, sitemap uses the site's own address (no wordle.global), build step copies static files, `vercel.json` makes only `?v=` URLs immutable, every `/static/` URL on `/`, `/es`, `/en`, `/ar`, `/ko` has `?v=` |
 
 `tests/conftest.py` puts `webapp/` and `scripts/` on the import path and changes into `webapp/`.

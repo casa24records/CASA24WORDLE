@@ -30,7 +30,7 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 Both pages use `.c24-header` (3 columns: icons, title, icons), `.c24-header-title`, the logo `.c24-logo`, the language badge `.c24-badge`, and `.c24-icon-btn` (44 px round icon buttons). Layout details: `casa24-responsive`.
 
 ## Start screen styles
-`.c24-hero-kolo`, `.c24-today`, `.c24-play` / `.c24-play-main` (filled green, the player's language) / `.c24-play-alt` (outlined), `.c24-section-title`, `.c24-chip` (other languages) in `style.css`. They only use `--c24-*` tokens, so dark mode works automatically. The start screen must fit one phone screen (a test checks the height is under 2,000 px).
+`.c24-hero-kolo`, `.c24-today`, `.c24-play` / `.c24-play-main` (filled green, the player's language) / `.c24-play-alt` (outlined), `.c24-section-title`, `.c24-chip` (other languages) in `style.css`. `.c24-play-demo` is the dashed, transparent "🔒 Developer view" card (team only, shown when `DEMO_PASSWORD` is set). They only use `--c24-*` tokens, so dark mode works automatically. Developer view's own styles (`.c24-demo-bar`, `.c24-demo-lang`, `.c24-demo-btn`, the password page `.c24-demo-login*`) are in the "demo mode" section at the end of `style.css`, also token-only (the one fixed color is the wrong-password red `#d9534f`). The start screen must fit one phone screen (a test checks the height is under 2,000 px).
 
 ## Dark mode: `webapp/static/theme.js`
 - Loaded in `<head>` of both pages, before anything renders, so there is no flash.

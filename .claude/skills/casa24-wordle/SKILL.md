@@ -13,6 +13,7 @@ Casa 24 Records' daily word game, on branch `casa24`. Hosted on Vercel only. The
 - **One word per language per day, the same for every player.** It changes at midnight Panama time (UTC-5). About 1 day in 5 the es/en word is a Casa 24 word. Details: `casa24-daily-word`.
 - No database, no accounts, no analytics. Player stats live in the browser's localStorage.
 - Start screen (`/`): Español/English first (last played, else browser language) with "played today" and streak, then the other 8 languages. No links to other sites.
+- **Developer view** (internally "demo"; team only, on when the `DEMO_PASSWORD` env var is set): a "🔒 Developer view" card on `/` → `/demo` (password page, `demo_login.html`, es+en side by side) → signed session cookie (30 days) → `/demo/es` or `/demo/en` (other codes redirect to es). It acts like the real game and opens with the real word of the day; the only extras are two buttons in `.c24-demo-bar`: ↻ Restart goes to `?skip=<word>`, and `demo_game()` in `app.py` then picks a random answer from the daily-word pool, never the same word. ✓ Fill in word (`demoFillAnswer()`) types the answer and presses Enter, so the normal win flow runs. The `DEMO` constant in `game.html` makes `game.js` skip every localStorage save/load, results, stats and `casa24_lang`; the end window is the normal one. Responses are `no-store`, not in the sitemap. No `DEMO_PASSWORD` → no card, `/demo` is 404. Why: `casa24-decisions`; env setup: `casa24-deploy`.
 
 ## What happens on Enter (`keyDown` in `webapp/static/game.js`)
 1. Row not full: "partial word" notification. Typing is ignored while `game_over` or while tiles flip (`revealing`).
@@ -35,15 +36,17 @@ Animations and Kolo pictures: `casa24-branding`.
 | Put it online (Vercel), domain | `casa24-deploy` |
 | Commit, push to GitHub, which account, history rules | `casa24-git-and-github` |
 | Mobile/desktop layout, screen sizes, zoom, landscape, page speed | `casa24-responsive` |
+| Developer view / demo (`/demo`): env var and password `casa24-deploy`, run locally `casa24-test-and-preview`, why `casa24-decisions` (how it works: above) | `casa24-deploy` |
 | Why things are the way they are (decisions already made) | `casa24-decisions` |
 
 ## Map of the repo
 ```
-webapp/app.py            routes, data loading, Language class (keyboards: _generate_alphabetical_keyboard),
+webapp/app.py            routes (/, /<lang>, /demo, /demo/<lang>, /sitemap.xml), data loading, Language class (keyboards: _generate_alphabetical_keyboard),
                          template helpers asset() (?v= URLs), asset_version(), json_script()
 webapp/daily.py          daily-word schedule (pure functions)
 webapp/data/languages/   word lists, language_config.json, keyboards
-webapp/templates/        index.html (start screen), game.html (game)
+webapp/templates/        index.html (start screen), game.html (game, also Developer view with demo=True),
+                         demo_login.html (Developer view password page)
 webapp/static/           game.js, index.js, theme.js, style.css, images/kolo/ (WebP), fonts/, favicon/
 scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py, casa24/ (seed word CSVs)
 tests/                   pytest + Playwright
@@ -55,5 +58,5 @@ DEPLOY.md, CREDITS.md, README.md, LICENSE (never delete; see casa24-decisions)
 Quick commands (from the repo root):
 ```
 .venv/bin/python -m pytest -q tests
-cd webapp && ../.venv/bin/flask --app app run
+cd webapp && ../.venv/bin/flask --app app run --port 5050   (port 5000 is macOS AirPlay)
 ```

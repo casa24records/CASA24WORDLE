@@ -25,9 +25,10 @@ Current `text` keys:
 - Settings: `settings`, `right_to_left`, `keyboard_layout`, `easy_mode`
 - Stats: `stats_games`, `stats_win_percentage`, `stats_current_streak`, `stats_best_streak`
 - Theme: `theme`, `theme_auto`, `theme_light`, `theme_dark`
+- Developer view (internally "demo", team only; **es and en only**): `demo_restart`, `demo_fill`, `demo_title` ("Vista de desarrollador" / "Developer view"), `demo_intro`, `demo_password`, `demo_enter`, `demo_wrong_password`. The password page (`demo_login.html`) reads the es and en keys together and shows them side by side, so both files need every `demo_*` key. Don't add them to the other 8: Developer view only exists in es/en. (The start-screen card "🔒 Developer view" is in `index.html`.)
 
 Which languages have which keys:
-- **es, en:** all keys above.
+- **es, en:** all keys above (the `demo_*` keys only exist here).
 - **The other 8** (ar, de, fr, ko, pt, ru, tr, vi): only `next_word`, `no_attempts`, `share`, `notification-copied`, `notification-partial-word`, plus `result_won`, `result_lost`, `notification-repeated` (translated in all 10; a test checks they exist everywhere). Everything else shows the English fallback.
 - `next_word`, `no_attempts` and `share` are read in `game.html` **without** a fallback, so they must exist in all 10.
 - All 10 have the full `help` block (`title`, `text_1_1_1` … `text_2_3`, `close`).

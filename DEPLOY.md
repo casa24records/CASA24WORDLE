@@ -14,15 +14,31 @@ The repo is already set up for Vercel's zero-config Flask support:
 | `.vercelignore` | Keeps tests, the virtualenv, helper scripts and private word/alias files out of the upload |
 | `webapp/app.py` | Uses absolute paths and trusts Vercel's proxy headers, so https works without redirect loops |
 
-No environment variables are needed. Do **not** set `CASA24_ENABLE_ALIASES` until members confirm their aliases.
+### Environment variables
+
+The game itself needs none. Two are optional, for the team's **Developer view** (internally "demo": the `/demo` page: the same game plus Restart (new random word) and Fill in word buttons):
+
+| Variable | What it does |
+|---|---|
+| `DEMO_PASSWORD` | Turns Developer view on. The value is the password the owner chose. **Never write it in the repo, this file, or any message:** the repo is public. Not set → no Developer view card on the start screen and `/demo` shows "Not Found". Everything else works the same. |
+| `SECRET_KEY` (optional) | A long random string that signs the Developer view login cookie (valid 30 days). If not set, the key is made from `DEMO_PASSWORD`. |
+
+How to set them: Vercel → Project → Settings → Environment Variables → add each one and tick **Production** and **Preview** → redeploy (new values only reach new deployments).
+
+Changing the Developer view password: change `DEMO_PASSWORD` in Vercel, then redeploy.
+- Without `SECRET_KEY`: everyone who was logged in to Developer view is logged out and must type the new password.
+- With `SECRET_KEY` set: people already logged in stay logged in (up to 30 days). To log everyone out as well, change `SECRET_KEY` too.
+
+Do **not** set `CASA24_ENABLE_ALIASES` until members confirm their aliases.
 
 ### First deploy (about 10 minutes)
 
 1. Update the Vercel CLI (the installed one is outdated): `npm i -g vercel@latest`
 2. `vercel login` (use the Casa 24 account)
 3. From the project folder: `vercel link` (create a new project, e.g. `casa24-wordle`)
-4. Preview deploy: `vercel deploy` → opens a `*.vercel.app` link. Check `/`, `/es`, `/en`, dark mode, a guess.
-5. Production: `vercel deploy --prod`
+4. Optional: add `DEMO_PASSWORD` (and `SECRET_KEY`) as above if you want Developer view on.
+5. Preview deploy: `vercel deploy` → opens a `*.vercel.app` link. Check `/`, `/es`, `/en`, dark mode, a guess, and `/demo` if you set the password.
+6. Production: `vercel deploy --prod`
 
 Or connect the GitHub repository in the Vercel dashboard. Then every push to the production branch deploys automatically and every other branch gets a preview link.
 
@@ -49,3 +65,4 @@ Nothing in the code needs to change for a domain. Share links and meta tags use 
 - [ ] Confirm member aliases before enabling them
 - [ ] `.venv/bin/python -m pytest -q tests` passes
 - [ ] Look at `/es` and `/en` on a phone in light and dark mode
+- [ ] Decide whether Developer view should be on (set `DEMO_PASSWORD` for Production and Preview) or off (leave it unset)

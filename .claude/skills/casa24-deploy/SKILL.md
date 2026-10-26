@@ -25,14 +25,20 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 - `json_script()` in `app.py` puts the word lists into the page as raw UTF-8 JSON (much smaller Arabic/Korean pages). The HTML itself is never cached long, because it holds the daily word.
 - Outside libraries: **Vue 3.5.13** production build from `cdn.jsdelivr.net` (deferred). **Tailwind still comes from the Play CDN** (`cdn.tailwindcss.com`, development-only); compiling it in `scripts/vercel_build.py` with the Tailwind CLI is pending the owner's OK to download the CLI (see `casa24-responsive`).
 - `.vercelignore` excludes tests, `.venv`, `.claude`, helper scripts (all of `scripts/` except `vercel_build.py`), the **private alias files**, and the Gilroy fonts (commercial).
-- Environment variables: none needed. Keep `CASA24_ENABLE_ALIASES` unset.
+- Environment variables (Vercel → Project → Settings → Environment Variables; tick **Production** and **Preview**):
+  - `DEMO_PASSWORD`: turns on the team's Developer view (internally "demo": `/demo`, see `casa24-decisions`). Value = the password the owner chose; **never write it in the repo, docs or chat summaries** (the repo is public). Not set → no Developer view card and `/demo` is a 404; the game works the same.
+  - `SECRET_KEY` (optional): a long random string that signs the demo login cookie. If unset, the key is derived from `DEMO_PASSWORD`.
+  - Keep `CASA24_ENABLE_ALIASES` unset.
+- **Changing the demo password:** edit `DEMO_PASSWORD` in Vercel, then redeploy (env changes only apply to new deployments). Without a separate `SECRET_KEY`, the cookie key comes from the password, so changing it **logs everyone out of Developer view** and they type the new password. With `SECRET_KEY` set, people already logged in stay logged in (up to 30 days); to force everyone out then, change `SECRET_KEY` too.
+  - CLI alternative (only when asked): `vercel env rm DEMO_PASSWORD production`, then `vercel env add DEMO_PASSWORD production` (it prompts for the value, so it never lands in shell history), same for `preview`.
 - Share links, meta tags and `/sitemap.xml` use the visitor's own address (`request.url_root`, `window.location.origin`), so no domain setting is needed.
 
 ## First deploy (only when asked)
 1. `npm i -g vercel@latest`. The installed CLI is outdated.
 2. `vercel login`, then `vercel link` from the repo root.
-3. `vercel deploy` for a preview. Check `/`, `/es`, `/en`, a guess, and dark mode.
-4. `vercel deploy --prod` for production. Alternatively, connect the GitHub repo `casa24records/CASA24WORDLE` (branch `main`) for automatic deploys. This needs the owner's go-ahead too.
+3. Add `DEMO_PASSWORD` (and optionally `SECRET_KEY`) for Production and Preview, as above, if the owner wants Developer view on.
+4. `vercel deploy` for a preview. Check `/`, `/es`, `/en`, a guess, dark mode, and (if set) `/demo`.
+5. `vercel deploy --prod` for production. Alternatively, connect the GitHub repo `casa24records/CASA24WORDLE` (branch `main`) for automatic deploys. This needs the owner's go-ahead too.
 
 ## Cost
 - Hobby is free, but only for **non-commercial** use. Casa 24 is a label, so flag that Pro may be required.
@@ -51,6 +57,8 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 | `FileNotFoundError` for data | a relative path was added. Use `APP_DIR` |
 | App not detected | entrypoint string changed, or `app` was renamed |
 | Visitors keep an old CSS/JS/picture after a deploy | its URL's `?v=` didn't change with the file (for example a hand-written `?v=`). Link it with `asset()` |
+| No Developer view card / `/demo` is 404 on Vercel | `DEMO_PASSWORD` isn't set for that environment (Production vs Preview), or no redeploy since it was added |
+| Developer view keeps asking for the password | password changed (derived cookie key), or cookies blocked |
 | Different daily word than local | language load order changed. The sort in `app.py` must stay |
 
 Before any deploy, run `.venv/bin/python -m pytest -q tests`. `test_vercel_ready.py` simulates the Vercel import.
