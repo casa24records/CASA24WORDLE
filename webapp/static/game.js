@@ -1,6 +1,5 @@
-// Probably should add some js to deal with mobile url bar here, but I've tried a bunch of approaches and have no idea how.
-
-// Vue stuff below
+// Casa 24 Wordle game page (Vue 3). Word lists, characters and config come
+// from Jinja as globals in game.html.
 const app = Vue.createApp({
     delimiters: ['[[', ']]'],  // don't want to clash with Jinja (backend templating coming from flask)
     data() {
@@ -15,9 +14,6 @@ const app = Vue.createApp({
             // these variables come from Jinja
             todays_word: todays_word,
             todays_idx: todays_idx,
-            word_list: word_list,
-            word_list_supplement: word_list_supplement,
-            characters: characters,
             config: config,
             right_to_left: config.right_to_left == "true",
             allow_any_word: false,
@@ -26,7 +22,6 @@ const app = Vue.createApp({
             showHelpModal: false,
             show_stats_modal: false,
             show_options_modal: false,
-            show_not_valid_notif: false,
 
             notification: {
                 show: false,
@@ -94,9 +89,7 @@ const app = Vue.createApp({
                 for (let i = 0; i < characters.length; i++) {
                     keys[characters[i]] = "";
                 }
-                keys["⟹"] = "";
-                keys["ENTER"] = "";
-                keys["DEL"] = "";
+                keys["⇨"] = "";
                 keys["⌫"] = "";
                 return keys;
             },
@@ -112,12 +105,6 @@ const app = Vue.createApp({
         acceptable_characters() {
             return characters.join("");
         },
-    },
-    beforeCreate() {
-        // if http redirect to same url in https
-        if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" && window.location.protocol !== "https:") {
-            window.location.href = "https://" + window.location.hostname + window.location.pathname;
-        }
     },
     created() {
         // remember the last language played, for the start screen
@@ -213,9 +200,6 @@ const app = Vue.createApp({
             }
             return time_until_next_day;
         },
-        handleEvent(event) {
-        },
-
         addChar(char) {
             this.tiles[this.active_row][this.active_cell] = char;
             this.tile_classes[this.active_row][this.active_cell] = "text-2xl tiny:text-4xl uppercase font-bold select-none border-2 border-neutral-500 pop";
@@ -264,13 +248,8 @@ const app = Vue.createApp({
         checkWord(word) {
             if (this.allow_any_word) {
                 return true;
-            } else if (word_list.indexOf(word) == -1 && word_list_supplement.indexOf(word) == -1) {
-                console.log(word + " is not in either word list and thus not valid");
-                return false;
-            } else {
-                console.log(word + " is in the word list and thus valid");
-                return true;
             }
+            return word_list.indexOf(word) != -1 || word_list_supplement.indexOf(word) != -1;
         },
 
         updateColors() {
@@ -330,7 +309,6 @@ const app = Vue.createApp({
                 this.showHelpModal = false;
                 this.show_stats_modal = false;
                 this.show_options_modal = false;
-                this.show_not_valid_notif = false;
             }
 
             if (this.game_over || this.revealing) {
@@ -624,8 +602,6 @@ const app = Vue.createApp({
                     "n_wins": 0,
                     "n_losses": 0,
                     "n_games": 0,
-                    "n_attempts": 0,
-                    "avg_attempts": 0,
                     "win_percentage": 0,
                     "longest_streak": 0,
                     "current_streak": 0,
@@ -635,7 +611,6 @@ const app = Vue.createApp({
             var results = this.game_results[language_code];
             var n_wins = 0;
             var n_losses = 0;
-            var n_attempts = 0;
             var n_games = results.length;
             var current_streak = 0;
             var longest_streak = 0;
@@ -651,17 +626,13 @@ const app = Vue.createApp({
                     n_losses++;
                     current_streak = 0;
                 }
-                n_attempts += result.attempts;
             }
-            var avg_attempts = n_attempts / results.length;
             var win_percentage = Math.round(n_wins / (n_wins + n_losses) * 100) || 0;
 
             return {
                 "n_wins": n_wins,
                 "n_losses": n_losses,
                 "n_games": n_games,
-                "n_attempts": n_attempts,
-                "avg_attempts": avg_attempts,
                 "win_percentage": win_percentage,
                 "longest_streak": longest_streak,
                 "current_streak": current_streak,

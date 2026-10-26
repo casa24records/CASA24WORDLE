@@ -3,21 +3,15 @@
     "name": "Vietnamese",
     "name_native": "Tiếng Việt",
     "meta": {
-        "locale": "vi",
-        "title": "Trò chơi Word hàng ngày ",
-        "description": "Đoán từ ẩn trong 6 lần thử (hoặc ít hơn). Một câu đố mới có sẵn mỗi ngày! ",
-        "keywords": "Tiếng Anh, câu đố, từ, chơi, trò chơi, trực tuyến, đoán, hàng ngày "
+        "description": "Đoán từ ẩn trong 6 lần thử (hoặc ít hơn). Một câu đố mới có sẵn mỗi ngày! "
     },
     "text": {
-        "subheader": "Tiếng Việt",
         "next_word": "Từ tiếp theo ",
         "no_attempts": "Bạn chưa thử bất kỳ từ nào! ",
         "share": "Đăng lại ",
         "notification-copied": "Sao chép vào clipboard ",
         "notification-partial-word": "Vui lòng nhập một từ đầy đủ "
     },
-    "language_code_3": "",
-    "language_code_iso_639_3": "",
     "right_to_left": "false",
     "help": {
         "title": "Cách chơi ",
@@ -29,7 +23,6 @@
         "text_1_3": "Sau khi bạn đoán, các ô sẽ thay đổi màu sắc để cho biết chữ cái nào của từ của bạn là chính xác hoặc gần như đúng. ",
         "text_2_1": "là trong từ và ở vị trí chính xác! ",
         "text_2_2": "là trong từ, nhưng không phải ở vị trí chính xác. ",
-        "text_2_3": "không có mặt trong từ bạn đang cố đoán. ",
-        "text_3": "Một từ mới sẽ có sẵn mỗi ngày! "
+        "text_2_3": "không có mặt trong từ bạn đang cố đoán. "
     }
 }

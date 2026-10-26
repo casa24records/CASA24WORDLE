@@ -224,9 +224,9 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 /* share button and other green buttons from the original */
 .bg-green-500, .bg-green-600 { background-color: var(--c24-green) !important; }
 
-/* the original's blue gradient accents become Kolo orange to green */
-.bg-gradient-to-r.from-cyan-500 {
-    background-image: linear-gradient(to right, var(--c24-orange), var(--c24-green)) !important;
+/* Kolo orange to green gradient (used as text fill with bg-clip-text) */
+.c24-gradient {
+    background-image: linear-gradient(to right, var(--c24-orange), var(--c24-green));
 }
 
 /* hides vue elements initially */

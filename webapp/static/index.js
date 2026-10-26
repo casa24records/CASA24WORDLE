@@ -17,10 +17,8 @@ const app = Vue.createApp({
         var results = {};
         try { results = JSON.parse(readStorage("game_results")) || {}; } catch (e) { results = {}; }
         return {
-            showPopup: false,
             showAboutModal: false,
             showStatsModal: false,
-            clickedLanguage: "",
             languages: languages,
             todays_idx: todays_idx,
             game_results: results,
@@ -87,8 +85,6 @@ const app = Vue.createApp({
                     "n_wins": 0,
                     "n_losses": 0,
                     "n_games": 0,
-                    "n_attempts": 0,
-                    "avg_attempts": 0,
                     "win_percentage": 0,
                     "longest_streak": 0,
                     "current_streak": 0,
@@ -98,7 +94,6 @@ const app = Vue.createApp({
             var results = this.game_results[language_code];
             var n_wins = 0;
             var n_losses = 0;
-            var n_attempts = 0;
             var n_games = results.length;
             var current_streak = 0;
             var longest_streak = 0;
@@ -114,17 +109,13 @@ const app = Vue.createApp({
                     n_losses++;
                     current_streak = 0;
                 }
-                n_attempts += result.attempts;
             }
-            var avg_attempts = n_attempts / results.length;
             var win_percentage = n_wins / (n_wins + n_losses) * 100;
 
             return {
                 "n_wins": n_wins,
                 "n_losses": n_losses,
                 "n_games": n_games,
-                "n_attempts": n_attempts,
-                "avg_attempts": avg_attempts,
                 "win_percentage": win_percentage,
                 "longest_streak": longest_streak,
                 "current_streak": current_streak,
@@ -134,7 +125,6 @@ const app = Vue.createApp({
             // calculates stats for all languages
 
             var total_games = 0; // total number of games played
-            var game_stats = {}; // holds the calculated stats for each language
             var languages_won = [];  // list of languages that have been won
             var total_win_percentage = 0; // percentage of games won by all languages
             var longest_overall_streak = 0; // the longest streak of consecutive wins for all languages
@@ -188,11 +178,8 @@ const app = Vue.createApp({
             // calculate stats for each language
             for (var i = 0; i < language_keys.length; i++) {
                 var language_code = language_keys[i];
-                var language_results = this.game_results[language_code];
                 var language_stats = this.calculateStats(language_code);
-                game_stats[language_code] = language_stats;
                 if (language_stats.n_wins > 0) {
-                    // console.log(language_code + " won " + language_stats.n_wins + " times");
                     languages_won.push(language_code);
                 }
                 if (language_stats.longest_streak > longest_language_streak) {
@@ -204,10 +191,8 @@ const app = Vue.createApp({
                 }
             }
 
-            
             return {
                 "total_games": total_games,
-                "game_stats": game_stats,
                 "languages_won": languages_won,
                 "total_win_percentage": total_win_percentage,
                 "longest_overall_streak": longest_overall_streak,

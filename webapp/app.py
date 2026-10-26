@@ -3,12 +3,9 @@ from flask import (
     render_template,
     make_response,
     redirect,
-    url_for,
     request,
 )
 import json
-
-import datetime
 import os
 import sys
 
@@ -26,8 +23,8 @@ import random
 random.seed(42)
 
 app = Flask(__name__)
-# Behind Vercel (or any proxy) trust X-Forwarded-Proto/Host so the app knows
-# the visitor is on https and the https redirect below cannot loop.
+# Behind Vercel (or any proxy) trust X-Forwarded-Proto/Host so request.url_root
+# (sitemap, share links) shows the visitor's real https address.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu order (Spanish, English first)
 
@@ -36,28 +33,9 @@ app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu 
 ###############################################################################
 
 data_dir = os.path.join(APP_DIR, "data") + "/"
-# if not glob.glob(data_dir):
-#     data_dir = "../data/"
-# if not glob.glob(data_dir):
-#     data_dir = "webapp/data/"
-# print(f"data_dir: {data_dir}")
-
-
 
 
 def load_characters(lang):
-    if not glob.glob(f"{data_dir}languages/{lang}/{lang}_characters.txt"):
-        characters = set()
-        with open(f"{data_dir}languages/{lang}/{lang}_5words.txt", "r") as f:
-            for line in f:
-                characters.update(line.strip())
-        with open(f"{data_dir}languages/{lang}/{lang}_characters.txt", "w") as f:
-            # sort characters
-            characters = sorted(characters)
-            # write char per newline
-            for char in characters:
-                f.write(char + "\n")
-
     with open(f"{data_dir}languages/{lang}/{lang}_characters.txt", "r") as f:
         characters = [line.strip() for line in f]
     return characters
@@ -116,15 +94,8 @@ def load_supplemental_words(lang):
 
 
 def load_language_config(lang):
-    try:
-        with open(f"{data_dir}languages/{lang}/language_config.json", "r") as f:
-            language_config = json.load(f)
-        return language_config
-    except:
-        # english is fallback (not ideal but better than empty...)
-        with open(f"{data_dir}default_language_config.json", "r") as f:
-            language_config = json.load(f)
-        return language_config
+    with open(f"{data_dir}languages/{lang}/language_config.json", "r") as f:
+        return json.load(f)
 
 
 def load_keyboard(lang):
@@ -280,7 +251,6 @@ class Language:
             keyboard_layout, keyboard_config.get("default")
         )
         layout_meta = self.keyboard_layouts[self.keyboard_layout_name]
-        self.keyboard_layout_label = layout_meta["label"]
         self.keyboard = layout_meta["rows"]
 
     def _build_keyboard_layouts(self, keyboard_config):
@@ -346,21 +316,6 @@ class Language:
 ###############################################################################
 
 
-# before request, redirect to https (unless localhost)
-@app.before_request
-def before_request():
-    # Vercel already forces https, so only redirect elsewhere
-    if (
-        not os.environ.get("VERCEL")
-        and request.url.startswith("http://")
-        and not "localhost" in request.url
-        and not "127.0.0" in request.url
-    ):
-        url = request.url.replace("http://", "https://", 1)
-        code = 301
-        return redirect(url, code=code)
-
-
 @app.route("/")
 def index():
     return render_template(
@@ -376,7 +331,7 @@ def index():
 def site_map():
     response = make_response(
         render_template(
-            "sitemap.xml", languages=languages, base_url="https://wordle.global"
+            "sitemap.xml", languages=languages, base_url=request.url_root.rstrip("/")
         )
     )
     response.headers["Content-Type"] = "application/xml"

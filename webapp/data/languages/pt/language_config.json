@@ -3,21 +3,15 @@
     "name": "Portuguese",
     "name_native": "Português",
     "meta": {
-        "locale": "pt",
-        "title": "O jogo diário da palavra ",
-        "description": "Acho que a palavra oculta em 6 tentativas (ou menos). Um novo quebra-cabeça está disponível todos os dias! ",
-        "keywords": "Inglês, Quebra-cabeça, Palavra, Jogue, Jogo, Online, Adivinha, Diário "
+        "description": "Acho que a palavra oculta em 6 tentativas (ou menos). Um novo quebra-cabeça está disponível todos os dias! "
     },
     "text": {
-        "subheader": "Português",
         "next_word": "Próxima palavra ",
         "no_attempts": "Você ainda não experimentou nenhuma palavra! ",
         "share": "Participação ",
         "notification-copied": "Copiado para a área de transferência ",
         "notification-partial-word": "Por favor, insira uma palavra completa "
     },
-    "language_code_3": "",
-    "language_code_iso_639_3": "",
     "right_to_left": "false",
     "help": {
         "title": "Como jogar ",
@@ -29,8 +23,7 @@
         "text_1_3": "Depois de adivinhar, as telhas vão mudar de cor para indicar quais letras da sua palavra estão corretas ou quase corretas. ",
         "text_2_1": "está na palavra e no local correto! ",
         "text_2_2": "está na palavra, mas não no local correto. ",
-        "text_2_3": "não está presente na palavra que você está tentando adivinhar. ",
-        "text_3": "Uma nova palavra estará disponível a cada dia! "
+        "text_2_3": "não está presente na palavra que você está tentando adivinhar. "
     },
     "accent_insensitive": true
 }

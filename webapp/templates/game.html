@@ -26,9 +26,7 @@
     <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue -->
-    <!-- <script type="text/javascript" src="node_modules/vuejs/dist/vue.min.js"></script> -->
     <script src="https://unpkg.com/vue@3.0.2"></script>
-    <!-- Should not load them by CDN, but frontend build process was a bother -->
 
     <!-- CSS -->
     <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
@@ -39,13 +37,10 @@
     <script>
         const word_list = JSON.parse('{{language.word_list | tojson | safe}}');
         const word_list_supplement = JSON.parse('{{language.word_list_supplement | tojson | safe}}');
-        console.log('\nFor the language: ' + '"{{language.config.name_native}}/{{language.config.name}}"' + ' there are:\n' + word_list.length + ' words in the word list\n' + word_list_supplement.length + ' words in the supplemental word list.');
         const characters = JSON.parse('{{language.characters | tojson | safe}}');
         const config = JSON.parse('{{language.config | tojson | safe}}');
-        console.log("Character Set: " + characters);
         const todays_idx = "{{ language.todays_idx }}";
         const todays_word = "{{ language.daily_word }}";
-        console.log("Today's word is: " + todays_word.toUpperCase() + "\nDon't cheat!");
     </script>
 </head>
 
@@ -136,7 +131,6 @@
                 class="opacity-25 fixed top-0 left-0 w-full h-full z-1 bg-black" v-cloak></div>
 
             <!-- help modal -->
-            <!-- <div v-if="showHelpModal" class="opacity-25 fixed top-0 left-0 w-full h-full z-1 bg-black"></div> -->
             <div id="HelpModal" v-show="showHelpModal"
                 class="fixed top-10 left-0 w-full h-full z-50 items-center flex mx-auto " v-cloak>
                 <div class="bg-white rounded-lg shadow-lg p-5 m-4 border-2 border-slate-200 mx-auto w-full max-w-md sm:max-w-lg"
@@ -148,7 +142,7 @@
                                 class="leading-[0.25] h-5 w-5 text-3xl text-neutral-400 block outline-none focus:outline-none">×</span>
                         </button>
                         <h2 class="flex mx-auto uppercase font-bold text-2xl tracking-wider">Wordle <span
-                                class="ml-1 text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-500">{{
+                                class="ml-1 text-transparent bg-clip-text c24-gradient">{{
                                 language.config.name_native }}</span>
                         </h2>
 
@@ -179,7 +173,6 @@
                             <p class="text-sm mb-2"><span
                                     class="font-bold uppercase">{{language.word_list[0][0]}}</span> {{
                                 language.config.help.text_2_1 }}</p>
-                            <!-- w-full h-full inline-flex justify-center items-center incorrect text-2xl tiny:text-4xl uppercase font-bold select-none text-white -->
 
                             <div class="grid grid-cols-5 gap-1 w-full max-w-xs">
                                 {% for c in language.word_list[1] %}
@@ -256,11 +249,6 @@
                                     </label>
                                     <input type="checkbox" id="right_to_left" v-model="right_to_left" />
                                 </div>
-                                <div class="flex-row gap-2">
-                                    <button class="font-bold text-sm tracking-wider"
-                                        v-on:click="right_to_left = !right_to_left">[[ config.right_to_left_on
-                                        ]]</button>
-                                </div>
                             </div>
 
                             {% if language.keyboard_layouts|length > 1 %}
@@ -299,13 +287,6 @@
                                 </select>
                             </div>
 
-                            <div class=border-t-2 border-gray-300></div>
-                            <div class="flex">
-                                <p class="flex-grow">{{ t('source_code', 'Source code') }}</p>
-                                <a href="https://www.github.com/Hugo0/wordle" class="underline text-neutral-500">GitHub</a>
-                            </div>
-
-                            
                         </div>
                     </div>
                 </div>

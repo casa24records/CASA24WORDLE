@@ -3,21 +3,15 @@
     "name": "Turkish",
     "name_native": "Türkçe",
     "meta": {
-        "locale": "tr",
-        "title": "Günlük kelime oyunu ",
-        "description": "6'daki gizli kelimeyi sanırım (veya daha az). Her gün yeni bir bulmaca mevcuttur! ",
-        "keywords": "İngilizce, bulmaca, kelime, oyun, oyun, çevrimiçi, her gün tahmin "
+        "description": "6'daki gizli kelimeyi sanırım (veya daha az). Her gün yeni bir bulmaca mevcuttur! "
     },
     "text": {
-        "subheader": "Türkçe",
         "next_word": "Sonraki kelime ",
         "no_attempts": "Henüz hiçbir söz denemedin! ",
         "share": "Paylaş ",
         "notification-copied": "Panoya kopyalandı ",
         "notification-partial-word": "Lütfen tam bir kelime girin "
     },
-    "language_code_3": "",
-    "language_code_iso_639_3": "",
     "right_to_left": "false",
     "help": {
         "title": "Nasıl oynanır ",
@@ -29,7 +23,6 @@
         "text_1_3": "Tahmin ettikten sonra, karolar kelimenizin hangi harflerin doğru veya neredeyse doğru olduğunu belirtmek için rengini değiştirecektir. ",
         "text_2_1": "kelimede ve doğru konumda! ",
         "text_2_2": "kelimede, ancak doğru yerde değil. ",
-        "text_2_3": "tahmin etmeye çalıştığınız kelimede bulunmuyor. ",
-        "text_3": "Her gün yeni bir kelime hazır olacak! "
+        "text_2_3": "tahmin etmeye çalıştığınız kelimede bulunmuyor. "
     }
 }

@@ -14,6 +14,11 @@ c = app.test_client()
 for path in ["/", "/es", "/en", "/sitemap.xml"]:
     r = c.get(path, base_url="http://x.vercel.app", headers={"X-Forwarded-Proto": "https"})
     assert r.status_code == 200, (path, r.status_code)
+# the sitemap uses the visitor's own address, never an upstream domain
+sitemap = c.get("/sitemap.xml", base_url="http://x.vercel.app", headers={"X-Forwarded-Proto": "https"}).text
+assert "wordle.global" not in sitemap, sitemap
+assert "<loc>https://x.vercel.app</loc>" in sitemap, sitemap
+assert "<loc>https://x.vercel.app/es</loc>" in sitemap, sitemap
 print("ok")
 """
 

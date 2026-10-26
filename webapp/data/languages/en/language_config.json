@@ -3,13 +3,9 @@
     "name": "English",
     "name_native": "English",
     "meta": {
-        "locale": "en",
-        "title": "The daily word game",
-        "description": "Guess the hidden word in 6 tries (or less). A new puzzle is available each day!",
-        "keywords": "english, puzzle, word, play, game, online, guess, daily"
+        "description": "Guess the hidden word in 6 tries (or less). A new puzzle is available each day!"
     },
     "text": {
-        "subheader": "English",
         "next_word": "Next word ",
         "no_attempts": "You haven't tried any words yet! ",
         "share": "Share ",
@@ -21,8 +17,6 @@
         "right_to_left": "Right to left",
         "keyboard_layout": "Keyboard layout",
         "easy_mode": "Allow any word (easy mode)",
-        "source_code": "Source code",
-        "feedback": "Feedback",
         "stats_games": "Games",
         "stats_win_percentage": "Win %",
         "stats_current_streak": "Current streak",
@@ -32,8 +26,6 @@
         "theme_light": "Light",
         "theme_dark": "Dark"
     },
-    "language_code_3": "",
-    "language_code_iso_639_3": "",
     "right_to_left": "false",
     "help": {
         "title": "How to Play",
@@ -45,7 +37,6 @@
         "text_1_3": "After you guess, the tiles will change color to indicate which letters of your word are correct or almost correct.",
         "text_2_1": "is in the word and in the correct location!",
         "text_2_2": "is in the word, but not in the correct location.",
-        "text_2_3": "is not present in the word you are trying to guess.",
-        "text_3": "A new word will be available each day!"
+        "text_2_3": "is not present in the word you are trying to guess."
     }
 }
