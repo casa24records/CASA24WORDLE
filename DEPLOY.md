@@ -2,7 +2,7 @@
 
 **Status:** not deployed. No domain yet. Everything below is ready for when we want it online.
 
-## Recommended: Vercel
+## Vercel
 
 The repo is already set up for Vercel's zero-config Flask support:
 
@@ -11,7 +11,7 @@ The repo is already set up for Vercel's zero-config Flask support:
 | `pyproject.toml` | Tells Vercel the app is `webapp/app.py` (`[tool.vercel] entrypoint`), Python ≥ 3.12, and the build step |
 | `.python-version` | Python 3.12 |
 | `scripts/vercel_build.py` | Build step: copies `webapp/static/` to `public/static/` so the CDN serves images, fonts, CSS, JS |
-| `.vercelignore` | Keeps tests, notebooks, the virtualenv and private alias files out of the upload |
+| `.vercelignore` | Keeps tests, the virtualenv, helper scripts and private word/alias files out of the upload |
 | `webapp/app.py` | Uses absolute paths and trusts Vercel's proxy headers, so https works without redirect loops |
 
 No environment variables are needed. Do **not** set `CASA24_ENABLE_ALIASES` until members confirm their aliases.
@@ -49,11 +49,3 @@ Nothing in the code needs to change for a domain. Share links and meta tags use 
 - [ ] Confirm member aliases before enabling them
 - [ ] `.venv/bin/python -m pytest -q tests` passes
 - [ ] Look at `/es` and `/en` on a phone in light and dark mode
-
-## Backup: Docker
-
-`Dockerfile` runs the app with gunicorn on port 8000 on any Docker host (Render, Fly.io, Railway, a VPS):
-
-```
-docker build -t casa24-wordle . && docker run -p 8000:8000 casa24-wordle
-```

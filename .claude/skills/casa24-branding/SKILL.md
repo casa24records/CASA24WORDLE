@@ -39,6 +39,7 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
   - `kolo-hero.png`: Young Kolo, on the menu
   - `kolo-win.png`: Rap Battle Kolo, on the win screen
   - `kolo-lose.png`: Baby Kolo, on the lose screen
+- Favicons in `webapp/static/favicon/`: `favicon.ico` (holds 16, 32 and 48 px), `apple-touch-icon.png`, `android-chrome-192x192.png`, `android-chrome-512x512.png`, `site.webmanifest`. There are no separate 16/32 px pngs.
 - Rebuild or swap with `.venv/bin/python scripts/brand_assets.py "<brand pack folder>"`. Edit its `IMAGES` table to change which art is used. Output is reproducible.
 - **Don't use:** "Kolo ft. Pikachu" (trademark), art showing alcohol (Chill Kolo, DJ Kolo), or Kolo Toilet in the public game. Never draw or invent new Kolo art.
 - **Member logos:** not used. Using them needs each member's OK, and HEISEN's logo contains a swear word.

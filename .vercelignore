@@ -3,10 +3,12 @@
 tests/
 .claude/
 drive_export/
-scripts/*.ipynb
-scripts/casa24/*PRIVATE*
 **/__pycache__/
-Dockerfile
-Procfile
+# Helper scripts (scripts/vercel_build.py runs during the build, so it is uploaded)
+scripts/casa24/
+scripts/merge_words.py
+scripts/validate_words.py
+scripts/brand_assets.py
+scripts/screenshots.py
 # member aliases never ship
 webapp/data/languages/*/*_casa24_aliases.txt

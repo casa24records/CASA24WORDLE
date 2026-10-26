@@ -42,5 +42,4 @@ Also run `.venv/bin/python scripts/validate_words.py` after any word change.
 This saves 6 phone-size (390×844) images: the menu, es and en, each in light and dark. It types `cosas, jamon` in Spanish and `crane, music` in English, and prints any JavaScript errors. Read the images yourself and describe them to the owner. To save tokens, combine them into one picture with Pillow before viewing.
 
 ## Gotchas
-- The app prints upstream stats on import. That is noise, not an error.
 - `localStorage` is per browser profile. Each Playwright context starts clean.

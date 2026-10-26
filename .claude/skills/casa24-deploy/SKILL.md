@@ -1,11 +1,11 @@
 ---
 name: casa24-deploy
-description: Put Casa 24 Wordle online — Vercel setup that already exists (pyproject entrypoint, build step, vercelignore), first deploy steps, costs, adding a casa24records.com subdomain at GoDaddy, troubleshooting, and the Docker backup. Use for any hosting, domain, or deployment question. Never deploy or touch DNS without the owner's explicit go-ahead.
+description: Put Casa 24 Wordle online — Vercel setup that already exists (pyproject entrypoint, build step, vercelignore), first deploy steps, costs, adding a casa24records.com subdomain at GoDaddy, and troubleshooting. Vercel is the only host. Use for any hosting, domain, or deployment question. Never deploy or touch DNS without the owner's explicit go-ahead.
 ---
 
 # Deploy
 
-**Current state:** not deployed, no domain chosen. The owner plans to use Vercel. **Never run `vercel deploy`, link a project, or change DNS unless the owner explicitly asks in that conversation.** Full guide: `DEPLOY.md`.
+**Current state:** not deployed, no domain chosen. Vercel is the only host (there is no Docker or other backup setup). **Never run `vercel deploy`, link a project, or change DNS unless the owner explicitly asks in that conversation.** Full guide: `DEPLOY.md`.
 
 ## What is already set up
 - `pyproject.toml`:
@@ -17,8 +17,8 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 - `webapp/app.py`:
   - absolute data paths (`APP_DIR`)
   - `ProxyFix(x_proto=1, x_host=1)`
-  - no https redirect when the `VERCEL` environment variable is set, since Vercel already forces https. Without this, the redirect loops.
-- `.vercelignore` excludes tests, notebooks, `.venv`, `.claude`, and the **private alias files**.
+  - no https redirect in the app: Vercel already forces https
+- `.vercelignore` excludes tests, `.venv`, `.claude`, and the **private alias files**.
 - Environment variables: none needed. Keep `CASA24_ENABLE_ALIASES` unset.
 - Share links and meta tags use the visitor's own address, so no domain setting is needed.
 
@@ -41,12 +41,9 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 | Symptom | Likely cause |
 |---|---|
 | Images/CSS 404 on Vercel | build step didn't run. Check `[tool.vercel.scripts]` and that no Build Command override is set in the dashboard |
-| Redirect loop | `ProxyFix` or the `VERCEL` check was removed from `before_request` |
+| Redirect loop | someone added an http→https redirect back to `app.py`. Remove it; Vercel already does this |
 | `FileNotFoundError` for data | a relative path was added. Use `APP_DIR` |
 | App not detected | entrypoint string changed, or `app` was renamed |
 | Different daily word than local | language load order changed. The sort in `app.py` must stay |
 
 Before any deploy, run `.venv/bin/python -m pytest -q tests`. `test_vercel_ready.py` simulates the Vercel import.
-
-## Backup host
-`Dockerfile` runs single-stage Python 3.12 with gunicorn on port 8000. It works on Render, Fly.io, Railway or a VPS. It isn't used by Vercel and hasn't been built locally, because Docker isn't installed here.

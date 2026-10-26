@@ -1,7 +1,7 @@
 [project]
 name = "casa24-wordle"
 version = "1.0.0"
-description = "Casa 24 Records' daily word game (based on Hugo0/wordle)"
+description = "Casa 24 Records' daily word game"
 requires-python = ">=3.12"
 dependencies = [
     "flask>=3.1",

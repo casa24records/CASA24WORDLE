@@ -5,7 +5,7 @@ description: Start here for anything about Casa 24 Wordle — what the game is, 
 
 # Casa 24 Wordle (overview)
 
-Casa 24 Records' daily word game, a fork of Hugo0/wordle on branch `casa24`. The owner is a beginner developer: explain changes in plain language, keep them small, commit after each step.
+Casa 24 Records' daily word game, on branch `casa24`. Hosted on Vercel only. The owner is a beginner developer: explain changes in plain language, keep them small, commit after each step.
 
 ## What it is
 - Flask app `webapp/app.py` + Vue 3 / Tailwind from CDNs (no build step) in `webapp/templates/` and `webapp/static/`.
@@ -32,9 +32,9 @@ webapp/daily.py          daily-word schedule (pure functions)
 webapp/data/languages/   word lists, language_config.json, keyboards
 webapp/templates/        index.html (start screen), game.html (game)
 webapp/static/           game.js, index.js, theme.js, style.css, images/, fonts/, favicon/
-scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py
+scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py, casa24/ (seed word CSVs)
 tests/                   pytest + Playwright
-DEPLOY.md, CREDITS.md, README.md
+DEPLOY.md, CREDITS.md, README.md, LICENSE (never delete; see casa24-decisions)
 ```
 
 Quick commands (from the repo root):

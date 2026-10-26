@@ -8,8 +8,8 @@ description: Add, remove, review or validate Casa 24 Wordle words — the answer
 ## Files per language (`webapp/data/languages/<lang>/`)
 | File | Daily answer? | Valid guess? | Notes |
 |---|---|---|---|
-| `<lang>_5words.txt` | yes | yes | upstream list; es had 115 proper names removed |
-| `<lang>_5words_supplement.txt` | no | yes | en: upstream; es: FrequencyWords filtered by Hunspell (CC BY-SA 4.0) |
+| `<lang>_5words.txt` | yes | yes | original word list; es had 115 proper names removed |
+| `<lang>_5words_supplement.txt` | no | yes | en: original list; es: FrequencyWords filtered by Hunspell (CC BY-SA 4.0) |
 | `<lang>_5words_casa24_answers.txt` | on ~1 in 5 days | yes | Casa 24 vocabulary and everyday words |
 | `<lang>_5words_casa24_guesses.txt` | never | yes | house slang (priti, frene, fokop), brand names (canva) |
 | `<lang>_5words_casa24_aliases.txt` | never | only with `CASA24_ENABLE_ALIASES=1` | member aliases, **git-ignored, excluded from Vercel** |
@@ -44,7 +44,7 @@ The original seed batch is `scripts/casa24/seed_words.csv`, with a `decision` co
 ## Remove a word
 Delete its line from the right file by hand. Also check the other language's Casa 24 files, since shared words appear in both. Then validate and test. If you remove proper names or other words from the main lists, add a few of them to `test_no_proper_names_in_spanish`.
 
-## Upstream lists
+## Bigger or new lists
 - For a bigger, properly licensed list, see how `es_5words_supplement.txt` was made in `CREDITS.md`:
   - take 5-letter words from FrequencyWords seen 20 or more times
   - keep the ones Hunspell `es` accepts, using `spylls`
