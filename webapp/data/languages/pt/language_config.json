@@ -31,5 +31,6 @@
         "text_2_2": "está na palavra, mas não no local correto. ",
         "text_2_3": "não está presente na palavra que você está tentando adivinhar. ",
         "text_3": "Uma nova palavra estará disponível a cada dia! "
-    }
+    },
+    "accent_insensitive": true
 }

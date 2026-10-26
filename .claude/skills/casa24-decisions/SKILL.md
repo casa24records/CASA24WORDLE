@@ -24,7 +24,10 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Text and accents
 - Spanish was rewritten in natural tú-form Latin American Spanish.
-- Accents are **optional when typing** in Spanish, and the board shows the accented word. ñ stays a separate letter.
+- Accents are **optional when typing**, and the board shows the accented word. ñ stays a separate letter.
+- **Colors respect accents** (decided 2026-10-26): a plain "a" never counts for an "á" in the answer, and only the exact letter's key is colored. Typing today's answer without accents still wins.
+- Optional accents are **on for es, fr, pt** and **off on purpose** for the rest, because there the marks make different letters or words: de (alter/älter, ß), tr (akşam/aksam), vi (tones change meaning), ru (й would become и), ar (hamza forms are their own letters). en and ko have nothing to remove. Details in `casa24-text-and-languages`.
+- The Spanish help says: "Puedes escribir con o sin tildes, pero los colores sí las cuentan: una «a» no vale por una «á»."
 
 ## Privacy
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.

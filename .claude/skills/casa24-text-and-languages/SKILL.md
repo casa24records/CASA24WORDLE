@@ -32,14 +32,27 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
 - Keep labels short. Stats labels sit four in a row on a 390 px wide phone.
 - Show new Spanish strings to the owner before committing big text changes.
 
-## Accents (Spanish)
-- Turned on per language with `"accent_insensitive": true` in `language_config.json`. Currently only `es` has it. Don't turn it on for languages where accented letters are separate letters, such as Turkish or Vietnamese.
-- In `game.js`:
-  - `foldAccents()` removes accents but keeps **ñ**.
+## Accents
+- Turned on per language with `"accent_insensitive": true` in `language_config.json`. It is on for `es`, `fr` and `pt`.
+- **Typing accents is optional, but colors respect them.**
+  - `foldAccents()` removes accents but keeps **ñ**. If you ever turn this on for a language with another letter that must stay separate, add it to that keep list.
   - On Enter, `resolveAccents()` maps the typed word to a real word. For example, `cancion` becomes `canción`, and the board shows the accents.
   - If the typed word matches today's answer without accents, it **is** today's answer and counts as a win.
-  - `updateColors()` compares letters without accents. It colors both the base key and the accented key.
-- Tested in `tests/test_smoke_browser.py::test_spanish_accents_optional`.
+  - `updateColors()` compares letters **exactly**. A plain "a" never counts for an "á" in the answer (it is gray unless the answer also has a plain "a"). An "á" is green or yellow only against an "á". Only the key of the exact letter on the tile gets colored.
+  - When several accented words share one plain spelling, a plain spelling that is itself a word wins; otherwise the first match in the list wins. French has 11 of these groups, Portuguese 82.
+- French and Portuguese keyboards are built automatically in alphabetical order (their `<lang>_keyboard.json` is empty), so every accented letter has its own key. œ and æ can't be typed without accents, so those words still need the œ/æ key.
+
+| Language | Accents optional? | Why |
+|---|---|---|
+| es, fr, pt | On | Accents are just marks on the same letter. |
+| de | Off | ä/ö/ü make different real words (alter/älter, apfel/äpfel, boden/böden). ß can't be split into a plain letter. |
+| tr | Off | ç ğ ı ö ü ş are separate letters (akşam/aksam). |
+| vi | Off | Tone marks change the meaning: 116 clashing groups in 738 words. |
+| ru | Off | Removing marks turns й into и (заика/зайка would merge). No ё words in the list anyway. |
+| ar | Off | It would strip the hamza forms آ أ ؤ إ ئ, which are separate letters with their own keys. |
+| en, ko | Off | Nothing to remove. |
+
+- Tested by the accent tests in `tests/test_smoke_browser.py` (for example `test_spanish_accents_optional`).
 
 ## Keyboards
 - `<lang>_keyboard.json` has `{"default": ..., "layouts": {name: {"label", "rows"}}}`.

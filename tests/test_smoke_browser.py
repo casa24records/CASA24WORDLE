@@ -127,3 +127,74 @@ def test_start_screen_remembers_language_and_played_today(server, page):
 def test_stats_page_removed(server, page):
     page.goto(server + "/stats")
     assert page.url.rstrip("/") == server
+
+
+def pick_accent_case(lang="es"):
+    """An answer with an accented vowel, plus a valid guess that has the plain
+    vowel in that same spot (and nowhere else), shares an exact letter with the
+    answer, and does not fold-match it (so resolveAccents leaves it alone)."""
+    answers = app.language_codes_5words[lang]
+    valid = set(answers) | set(app.language_codes_5words_supplements[lang])
+    for answer in answers:
+        for i, ch in enumerate(answer):
+            plain = fold(ch)
+            if plain == ch or not plain.isascii():
+                continue
+            if plain in answer:  # answer must not also have the plain vowel
+                continue
+            for guess in sorted(valid):
+                if (
+                    guess.isascii()
+                    and guess[i] == plain
+                    and guess.count(plain) == 1
+                    and fold(guess) != fold(answer)
+                    and any(g == a for g, a in zip(guess, answer))
+                ):
+                    return answer, guess, i, ch, plain
+    raise AssertionError(f"no accent test case found for {lang}")
+
+
+def test_spanish_colors_respect_accents(server, page):
+    answer, guess, i, accented, plain = pick_accent_case("es")
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    # Vue 3.0.2 has no app._instance; reach the root component through its vnode
+    vm = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
+    page.evaluate(f"w => {{ {vm}.todays_word = w; }}", answer)
+    assert page.evaluate(f"{vm}.todays_word") == answer
+    type_word(page, guess)
+    wait_reveal(page)
+
+    row = page.locator("main .grid-cols-5").first.locator("> div")
+    assert row.nth(i).inner_text().strip().lower() == plain  # resolveAccents kept the guess
+    assert "incorrect" in row.nth(i).get_attribute("class")  # plain "a" never counts for "á"
+    exact = [j for j in range(5) if guess[j] == answer[j]]
+    assert any(" correct" in " " + row.nth(j).get_attribute("class") for j in exact)
+
+    def key_class(c):
+        return page.locator(f'button.key[data-char="{c}"]').get_attribute("class")
+
+    assert "incorrect" in key_class(plain)
+    accented_cls = key_class(accented)
+    assert not any(k in accented_cls.split() for k in ("correct", "semicorrect", "incorrect"))
+    assert key_class(plain) != accented_cls
+
+
+@pytest.mark.parametrize("lang", ["fr", "pt"])
+def test_accents_optional(server, page, lang):
+    words = app.language_codes_5words[lang]
+    valid = set(words) | set(app.language_codes_5words_supplements[lang])
+    today = app.Language(lang, words).daily_word
+    accented = next(
+        w for w in words
+        if not w.isascii() and fold(w).isascii() and fold(w) != fold(today)
+        and fold(w) not in valid
+        and fold(w) not in {fold(x) for x in valid if x != w}
+    )
+    page.goto(f"{server}/{lang}")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    type_word(page, fold(accented))
+    wait_reveal(page)
+    board = page.locator("main .grid-cols-5").first.inner_text()
+    letter = next(c for c in accented if not c.isascii())
+    assert letter.upper() in board, (accented, board)

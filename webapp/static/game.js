@@ -276,15 +276,15 @@ const app = Vue.createApp({
         updateColors() {
             // NOTE: if a character appears only once in the final word, but multiple times in submitted word
             // then we want to only color one. The hierarchy is correct first, then the semi-correct ones by position.
-            var self = this;
-            var same = this.accentInsensitive() ? function (c) { return self.foldAccents(c); } : function (c) { return c; };
-            var todays_word = this.todays_word.split("").map(same).join("");
+            // Letters are compared exactly: typing may skip accents (resolveAccents fixes the
+            // spelling first), but a plain "a" never counts for an "á" in today's word.
+            var todays_word = this.todays_word;
             const base_class = "text-2xl tiny:text-4xl uppercase font-bold select-none text-white";
             var charcounts = {};
 
             // count characters
             for (let i = 0; i < todays_word.length; i++) {
-                var character = todays_word[i];  // already accent-folded if needed
+                var character = todays_word[i];
                 if (charcounts[character] == undefined) {
                     charcounts[character] = 1;
                 } else {
@@ -294,35 +294,26 @@ const app = Vue.createApp({
 
             // color correct characters
             for (let i = 0; i < this.tiles[this.active_row].length; i++) {
-                var shown = this.tiles[this.active_row][i];
-                var character = same(shown);
+                var character = this.tiles[this.active_row][i];
                 if (character == todays_word[i]) {
                     this.tile_classes[this.active_row][i] = "correct" + " " + base_class;
                     this.key_classes[character] = "correct"
-                    this.key_classes[shown] = "correct"
                     charcounts[character] -= 1;
                 }
             }
             for (let i = 0; i < this.tiles[this.active_row].length; i++) {
-                var shown = this.tiles[this.active_row][i];
-                var character = same(shown);
+                var character = this.tiles[this.active_row][i];
                 if (todays_word.indexOf(character) != -1 && charcounts[character] > 0 && this.tile_classes[this.active_row][i].indexOf("correct") == -1) {
                     // if the tile is not already colored
                     this.tile_classes[this.active_row][i] = "semicorrect" + " " + base_class;
                     if (this.key_classes[character] != "correct") {
                         this.key_classes[character] = "semicorrect"
                     }
-                    if (this.key_classes[shown] != "correct") {
-                        this.key_classes[shown] = "semicorrect"
-                    }
                     charcounts[character] -= 1;
                 } else if (this.tile_classes[this.active_row][i].indexOf("correct") == -1) {
                     this.tile_classes[this.active_row][i] = "incorrect" + " " + base_class;
                     if (this.key_classes[character] != "correct" && this.key_classes[character] != "semicorrect") {
                         this.key_classes[character] = "incorrect"
-                    }
-                    if (this.key_classes[shown] != "correct" && this.key_classes[shown] != "semicorrect") {
-                        this.key_classes[shown] = "incorrect"
                     }
                 }
             }

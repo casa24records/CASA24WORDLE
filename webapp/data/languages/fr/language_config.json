@@ -31,5 +31,6 @@
         "text_2_2": "est dans le mot, mais pas dans le bon endroit. ",
         "text_2_3": "n'est pas présent dans le mot que vous essayez de deviner. ",
         "text_3": "Un nouveau mot sera disponible chaque jour! "
-    }
+    },
+    "accent_insensitive": true
 }
