@@ -1,6 +1,6 @@
 ---
 name: casa24-text-and-languages
-description: Change any visible text or translation in Casa 24 Wordle, follow the Spanish style guide, work with accent-insensitive typing and keyboards, or add/remove a language. Use when editing language_config.json, keyboards, hard-coded strings in templates/JS, or the list of languages.
+description: Change any visible text or translation in Casa 24 Wordle (buttons, notifications, end-screen result title, help), follow the Spanish style guide, work with accent-insensitive typing and keyboards, or add/remove a language. Use when editing language_config.json, keyboards, hard-coded strings in templates/JS, or the list of languages.
 ---
 
 # Text, translations, accents, languages
@@ -10,19 +10,27 @@ description: Change any visible text or translation in Casa 24 Wordle, follow th
   - `meta`: page description
   - `text`: buttons, notifications, settings, stats
   - `help`: the how-to-play popup
+  - also `language_code`, `name`, `name_native`, `right_to_left` (`"true"`/`"false"`), and `accent_insensitive` (es, fr, pt only)
 - Templates: use `{{ t('key', 'English fallback') }}` (macro at the top of `game.html`).
 - `game.js`: use `this.text("key", "English fallback")`.
 - Missing keys fall back to English, so the 8 other languages still work.
 - The start screen (`index.html`) is bilingual on purpose: Spanish and English side by side in `lang="es"`/`lang="en"` spans. The Play/Jugar and "Jugada hoy"/"Played today" labels are in the template's Vue expressions.
 
-**Rule:** never hard-code a user-visible string. Add the key to **both** `es` and `en` configs, with an English fallback in the code.
+**Rule:** never hard-code a user-visible string. Add the key to **both** `es` and `en` configs, with an English fallback in the code. If every player sees it (like the end-of-game result), add it to **all 10** languages.
 
 Current `text` keys:
 - Words and game: `next_word`, `no_attempts`, `share`
-- Notifications: `notification-copied`, `notification-partial-word`, `notification-not-valid`, `notification-share-unsupported`
+- End-screen title (class `c24-result`, above the Kolo): `result_won`, `result_lost`
+- Notifications: `notification-copied`, `notification-partial-word`, `notification-not-valid`, `notification-share-unsupported`, `notification-repeated` (same word guessed twice in one game)
 - Settings: `settings`, `right_to_left`, `keyboard_layout`, `easy_mode`
 - Stats: `stats_games`, `stats_win_percentage`, `stats_current_streak`, `stats_best_streak`
 - Theme: `theme`, `theme_auto`, `theme_light`, `theme_dark`
+
+Which languages have which keys:
+- **es, en:** all keys above.
+- **The other 8** (ar, de, fr, ko, pt, ru, tr, vi): only `next_word`, `no_attempts`, `share`, `notification-copied`, `notification-partial-word`, plus `result_won`, `result_lost`, `notification-repeated` (translated in all 10; a test checks they exist everywhere). Everything else shows the English fallback.
+- `next_word`, `no_attempts` and `share` are read in `game.html` **without** a fallback, so they must exist in all 10.
+- All 10 have the full `help` block (`title`, `text_1_1_1` … `text_2_3`, `close`).
 
 Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, indent=4)`) so accents stay readable.
 
@@ -39,6 +47,7 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
   - On Enter, `resolveAccents()` maps the typed word to a real word. For example, `cancion` becomes `canción`, and the board shows the accents.
   - If the typed word matches today's answer without accents, it **is** today's answer and counts as a win.
   - `updateColors()` compares letters **exactly**. A plain "a" never counts for an "á" in the answer (it is gray unless the answer also has a plain "a"). An "á" is green or yellow only against an "á". Only the key of the exact letter on the tile gets colored.
+  - The repeated-guess check runs on the resolved word, so typing `jamon` after `jamón` is also blocked.
   - When several accented words share one plain spelling, a plain spelling that is itself a word wins; otherwise the first match in the list wins. French has 11 of these groups, Portuguese 82.
 - French and Portuguese keyboards are built automatically in alphabetical order (they have no `<lang>_keyboard.json`), so every accented letter has its own key. œ and æ can't be typed without accents, so those words still need the œ/æ key.
 

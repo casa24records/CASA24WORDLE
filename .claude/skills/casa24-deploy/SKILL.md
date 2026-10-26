@@ -13,14 +13,14 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
   - Python `>=3.12` (plus `.python-version`)
   - dependency `flask>=3.1`
   - `[tool.vercel.scripts] build = "python scripts/vercel_build.py"`
-- `scripts/vercel_build.py` copies `webapp/static/` to `public/static/`. Vercel serves `public/` from its CDN, and Flask's `static_folder` should not serve files on Vercel.
+- `scripts/vercel_build.py` copies `webapp/static/` to `public/static/`. Vercel serves `public/` from its CDN, so `/static/...` requests never reach Flask. Locally Flask serves `webapp/static/` itself; never run the build by hand (`public/` is git-ignored).
 - `webapp/app.py`:
   - absolute data paths (`APP_DIR`)
   - `ProxyFix(x_proto=1, x_host=1)`
   - no https redirect in the app: Vercel already forces https
-- `.vercelignore` excludes tests, `.venv`, `.claude`, and the **private alias files**.
+- `.vercelignore` excludes tests, `.venv`, `.claude`, helper scripts (all of `scripts/` except `vercel_build.py`), and the **private alias files**.
 - Environment variables: none needed. Keep `CASA24_ENABLE_ALIASES` unset.
-- Share links and meta tags use the visitor's own address, so no domain setting is needed.
+- Share links, meta tags and `/sitemap.xml` use the visitor's own address (`request.url_root`, `window.location.origin`), so no domain setting is needed.
 
 ## First deploy (only when asked)
 1. `npm i -g vercel@latest`. The installed CLI is outdated.

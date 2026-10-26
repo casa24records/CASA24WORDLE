@@ -1,6 +1,6 @@
 ---
 name: casa24-branding
-description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kolo mascot art, logo slot, fonts and their licenses, favicons, tile animations. Use when editing style.css, theme.js, the tile animations in game.js, images, fonts, or when the owner shares new brand assets.
+description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kolo mascot art (including the random end-screen Kolo), logo slot, fonts and their licenses, favicons, tile animations. Use when editing style.css, theme.js, the tile animations in game.js, images, fonts, or when the owner shares new brand assets.
 ---
 
 # Branding and themes
@@ -41,6 +41,7 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
     - Win (any number of guesses), 12 pictures: `car` (Car Kolo), `chill` (Chill Kolo), `dj` (DJ Kolo), `face` (Kolo Face), `hoodie` (Hoodie Kolo), `montuno` (Montuno), `pizza` (Pizza Kolo), `prod` (Prod by Kolo), `rap-battle` (Rap Battle Kolo), `ross` (Kolo Ross (Stained)), `young` (Young Kolo), `young-cropped` (Cropped - Young Kolo).
     - Loss, 2 pictures: `baby` (Baby Kolo), `toilet` (Kolo Toilet).
     - Win pictures are at most 300 px tall, loss pictures 240 px.
+    - Shown in the stats window under the won/lost title (`.c24-result`, VT323 2rem; text keys in `casa24-text-and-languages`). The picture uses `.c24-kolo` (max 160 px tall on screen).
     - In `game.js`, `pickKolo()` chooses one in `gameWon()` / `gameLost()`. The choice is saved as `kolo_image` in localStorage, so reloading the page that day shows the same Kolo.
 - Favicons in `webapp/static/favicon/`: `favicon.ico` (holds 16, 32 and 48 px), `apple-touch-icon.png`, `android-chrome-192x192.png`, `android-chrome-512x512.png`, `site.webmanifest`. There are no separate 16/32 px pngs.
 - Rebuild or swap with `.venv/bin/python scripts/brand_assets.py "<brand pack folder>"` (the folder that has `KOLO/` inside). Edit its `IMAGES` table to change the logo or menu art. Output is reproducible.

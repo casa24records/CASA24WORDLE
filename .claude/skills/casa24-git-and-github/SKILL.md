@@ -27,11 +27,12 @@ description: Commit and push Casa 24 Wordle to GitHub — the public repo casa24
   - If you get `Permission ... denied to <other user>` (403), the wrong account is active.
   - Ask the owner to run `! gh auth switch --user casa24records`.
   - Don't switch accounts or use their tokens yourself.
+- To see what is not on GitHub yet: `git fetch origin && git log origin/main..casa24 --oneline`.
 - To check that a push worked, `git ls-remote --heads origin` should show the same hash as `git rev-parse casa24`.
 
 ## History rules
 - **Never force-push or rewrite published history without the owner's explicit OK.** It was done once, on 2026-10-26, to make the first commit authored by Casa 24 instead of Hugo (see `casa24-decisions`).
-- Every commit is authored by `Fer <casa24records@gmail.com>`. Hugo's name may appear only in `LICENSE`, which the law requires.
+- Every commit is authored by `Fer <casa24records@gmail.com>` (the email is in `~/.gitconfig`; the name comes from the Mac account). Don't change the git identity. Hugo's name may appear only in `LICENSE`, which the law requires.
 - If a push fails with `did not receive expected object` / `index-pack failed`, the history points at a commit that isn't present locally (a shallow clone). Check with `git rev-parse --is-shallow-repository`. Ask before fixing it, because the fix rewrites history.
 - A local branch `backup-before-author-fix` may exist from that rewrite. Delete it only if the owner agrees.
 

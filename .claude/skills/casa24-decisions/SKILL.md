@@ -27,6 +27,8 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 - Accents are **optional when typing**, and the board shows the accented word. ñ stays a separate letter.
 - **Colors respect accents** (decided 2026-10-26): a plain "a" never counts for an "á" in the answer, and only the exact letter's key is colored. Typing today's answer without accents still wins.
 - Optional accents are **on for es, fr, pt** and **off on purpose** for the rest, because there the marks make different letters or words: de (alter/älter, ß), tr (akşam/aksam), vi (tones change meaning), ru (й would become и), ar (hamza forms are their own letters). en and ko have nothing to remove. Details in `casa24-text-and-languages`.
+- **A word can't be guessed twice in one game** (2026-10-26): it shows "Ya probaste esa palabra" and costs no turn.
+- **The end screen has a title**, "¡Ganaste!" / "Perdiste", above the Kolo. This text and the repeated-word message are translated in all 10 languages.
 - The Spanish help says: "Puedes escribir con o sin tildes, pero los colores sí las cuentan: una «a» no vale por una «á»."
 
 ## Privacy
