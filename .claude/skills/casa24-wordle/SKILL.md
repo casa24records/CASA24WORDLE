@@ -34,6 +34,7 @@ Animations and Kolo pictures: `casa24-branding`.
 | Run locally, tests, screenshots | `casa24-test-and-preview` |
 | Put it online (Vercel), domain | `casa24-deploy` |
 | Commit, push to GitHub, which account, history rules | `casa24-git-and-github` |
+| Mobile/desktop layout, screen sizes, zoom, landscape, page speed | `casa24-responsive` |
 | Why things are the way they are (decisions already made) | `casa24-decisions` |
 
 ## Map of the repo
