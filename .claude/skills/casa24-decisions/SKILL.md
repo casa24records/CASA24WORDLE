@@ -53,6 +53,6 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
   - `LICENSE` (MIT) keeps the original copyright line by Hugo Montenegro and adds a Casa 24 line. **Never delete `LICENSE` or remove that line:** the MIT license requires it.
   - `CREDITS.md` lists the word-list sources and licenses (including the CC BY-SA 4.0 Spanish supplement), VT323 (SIL OFL), and Kolo (© Casa 24 Records).
   - **No credit line or GitHub link in the game itself** (the footer and the Settings "Source code" row were removed on purpose).
-- Git history is kept as it is (not rewritten).
+- Git history keeps every Casa 24 commit, but the first commit (the imported original code) is now authored by Casa 24, so Hugo doesn't show as a GitHub contributor. His name stays only where the law needs it: `LICENSE`. The old link to the original repo's history was cut, because that history was never downloaded and GitHub refused the push. `main` on GitHub was force-pushed once for this (2026-10-26); don't rewrite published history again without asking.
 - The sitemap stays and uses the site's own address, so it works on any domain.
 - `DAY_OFFSET` in `daily.py` stays, so puzzle numbers don't jump.
