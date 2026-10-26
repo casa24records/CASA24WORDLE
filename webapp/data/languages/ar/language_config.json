@@ -10,7 +10,10 @@
         "no_attempts": " لم يتم إجراء أي محاولات ",
         "share": "شارك ",
         "notification-copied": "نسخ إلى الحافظة ",
-        "notification-partial-word": "الرجاء إدخال كلمة كاملة "
+        "notification-partial-word": "الرجاء إدخال كلمة كاملة ",
+        "result_won": "لقد فزت!",
+        "result_lost": "لقد خسرت",
+        "notification-repeated": "لقد جربت هذه الكلمة من قبل"
     },
     "right_to_left": "true",
     "help": {

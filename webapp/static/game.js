@@ -341,7 +341,11 @@ const app = Vue.createApp({
                     }
                 }
                 var word_is_valid = this.checkWord(word);
-                if (word_is_valid) {
+                // the same word can't be guessed twice in one game
+                var already_tried = this.tiles.slice(0, this.active_row).some(r => r.join("") === word);
+                if (word_is_valid && already_tried) {
+                    this.showNotification(this.text("notification-repeated", "You already tried that word"));
+                } else if (word_is_valid) {
                     var row = this.active_row;
                     // color the keyboard only after the tiles finish flipping
                     var keys_before = Object.assign({}, this.key_classes);

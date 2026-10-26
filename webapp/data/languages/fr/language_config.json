@@ -10,7 +10,10 @@
         "no_attempts": "Vous n'avez pas encore essayé de mots! ",
         "share": "Partager ",
         "notification-copied": "Copié dans le presse-papier ",
-        "notification-partial-word": "S'il vous plaît entrer un mot complet "
+        "notification-partial-word": "S'il vous plaît entrer un mot complet ",
+        "result_won": "Gagné !",
+        "result_lost": "Perdu",
+        "notification-repeated": "Vous avez déjà essayé ce mot"
     },
     "right_to_left": "false",
     "help": {

@@ -24,7 +24,10 @@
         "theme": "Theme",
         "theme_auto": "Automatic",
         "theme_light": "Light",
-        "theme_dark": "Dark"
+        "theme_dark": "Dark",
+        "result_won": "You won!",
+        "result_lost": "You lost",
+        "notification-repeated": "You already tried that word"
     },
     "right_to_left": "false",
     "help": {

@@ -10,7 +10,10 @@
         "no_attempts": "Você ainda não experimentou nenhuma palavra! ",
         "share": "Participação ",
         "notification-copied": "Copiado para a área de transferência ",
-        "notification-partial-word": "Por favor, insira uma palavra completa "
+        "notification-partial-word": "Por favor, insira uma palavra completa ",
+        "result_won": "Você ganhou!",
+        "result_lost": "Você perdeu",
+        "notification-repeated": "Você já tentou essa palavra"
     },
     "right_to_left": "false",
     "help": {

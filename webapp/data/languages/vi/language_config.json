@@ -10,7 +10,10 @@
         "no_attempts": "Bạn chưa thử bất kỳ từ nào! ",
         "share": "Đăng lại ",
         "notification-copied": "Sao chép vào clipboard ",
-        "notification-partial-word": "Vui lòng nhập một từ đầy đủ "
+        "notification-partial-word": "Vui lòng nhập một từ đầy đủ ",
+        "result_won": "Bạn đã thắng!",
+        "result_lost": "Bạn đã thua",
+        "notification-repeated": "Bạn đã thử từ này rồi"
     },
     "right_to_left": "false",
     "help": {

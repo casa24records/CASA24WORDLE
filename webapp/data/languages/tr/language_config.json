@@ -10,7 +10,10 @@
         "no_attempts": "Henüz hiçbir söz denemedin! ",
         "share": "Paylaş ",
         "notification-copied": "Panoya kopyalandı ",
-        "notification-partial-word": "Lütfen tam bir kelime girin "
+        "notification-partial-word": "Lütfen tam bir kelime girin ",
+        "result_won": "Kazandın!",
+        "result_lost": "Kaybettin",
+        "notification-repeated": "Bu kelimeyi zaten denedin"
     },
     "right_to_left": "false",
     "help": {

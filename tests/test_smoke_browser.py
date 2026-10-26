@@ -221,6 +221,7 @@ def test_kolo_after_win(server, page):
     type_word(page, today)
     src = kolo_src(page)
     assert "/kolo/win/" in src and src.endswith(".png"), src
+    assert page.locator(".c24-result").inner_text().strip() == "You won!"
     assert page.locator(KOLO_IMG).count() == 1
     saved = page.evaluate("JSON.parse(localStorage.getItem('en') || '{}').kolo_image")
     assert saved and src.endswith("/kolo/" + saved), (saved, src)  # saved, not re-picked
@@ -245,5 +246,48 @@ def test_kolo_after_loss(server, page):
         wait_reveal(page, n)
     src = kolo_src(page)
     assert "/kolo/lose/" in src and src.endswith(".png"), src
+    assert page.locator(".c24-result").inner_text().strip() == "Perdiste"
     assert page.locator(KOLO_IMG).count() == 1
     assert errors == []
+
+
+VM = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
+NOTIFICATION = "#app .fixed.top-0 p.font-bold"
+
+
+def assert_repeat_rejected(page):
+    page.wait_for_function(
+        f"(() => {{ const n = document.querySelector('{NOTIFICATION}');"
+        " return n && n.innerText.includes('Ya probaste esa palabra'); })()",
+        timeout=3000,
+    )
+    page.wait_for_timeout(2000)  # longer than a flip: make sure no reveal starts
+    assert page.evaluate(f"{VM}.active_row") == 1
+    assert page.locator(BOARD_COLORED).count() == 5  # only the first row is colored
+    assert not page.evaluate(f"{VM}.game_over")
+
+
+def test_repeated_word_rejected(server, page):
+    word = a_valid_non_answer("es")
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    type_word(page, word)
+    wait_reveal(page)
+    type_word(page, word)
+    assert_repeat_rejected(page)
+
+
+def test_repeated_word_rejected_without_accents(server, page):
+    words = app.language_codes_5words["es"]
+    today = app.Language("es", words).daily_word
+    accented = next(
+        w for w in words
+        if not w.isascii() and fold(w).isascii() and fold(w) != fold(today)
+        and fold(w) not in {fold(x) for x in words if x != w}
+    )
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    type_word(page, fold(accented))  # e.g. "jamon" -> "jamón"
+    wait_reveal(page)
+    type_word(page, fold(accented))  # resolves to the same word again
+    assert_repeat_rejected(page)

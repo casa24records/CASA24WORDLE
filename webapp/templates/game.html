@@ -312,7 +312,9 @@
                     </div>
 
                     <div class="relative flex-auto mx-6 my-3 mb-8">
-                        <!-- Kolo celebrates a win, naps after a loss -->
+                        <p v-if="game_won" class="c24-result">{{ t('result_won', 'You won!') }}</p>
+                        <p v-if="game_over && !game_won" class="c24-result">{{ t('result_lost', 'You lost') }}</p>
+                        <!-- a random Kolo celebrates a win or mourns a loss -->
                         <img v-if="game_over && kolo_image" :src="kolo_base + kolo_image" alt="Kolo" class="c24-kolo mb-2">
                         <p class="text-md text-center whitespace-pre-line" id="emoji_board" v-html="emoji_board">
                         </p>

@@ -10,7 +10,10 @@
         "no_attempts": "아직 어떤 단어를 시도하지 않았습니다! ",
         "share": "공유하다 ",
         "notification-copied": "클립 보드에 복사 ",
-        "notification-partial-word": "전체 단어를 입력하십시오 "
+        "notification-partial-word": "전체 단어를 입력하십시오 ",
+        "result_won": "이겼어요!",
+        "result_lost": "졌어요",
+        "notification-repeated": "이미 시도한 단어예요"
     },
     "right_to_left": "false",
     "help": {

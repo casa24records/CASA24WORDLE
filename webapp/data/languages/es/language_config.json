@@ -24,7 +24,10 @@
         "theme": "Tema",
         "theme_auto": "Automático",
         "theme_light": "Claro",
-        "theme_dark": "Oscuro"
+        "theme_dark": "Oscuro",
+        "result_won": "¡Ganaste!",
+        "result_lost": "Perdiste",
+        "notification-repeated": "Ya probaste esa palabra"
     },
     "right_to_left": "false",
     "help": {

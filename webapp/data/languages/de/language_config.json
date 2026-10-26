@@ -10,7 +10,10 @@
         "no_attempts": "Sie haben noch keine Wörter versucht! ",
         "share": "Teilen ",
         "notification-copied": "In die Zwischenablage kopiert. ",
-        "notification-partial-word": "Bitte geben Sie ein vollständiges Wort ein! "
+        "notification-partial-word": "Bitte geben Sie ein vollständiges Wort ein! ",
+        "result_won": "Gewonnen!",
+        "result_lost": "Verloren",
+        "notification-repeated": "Dieses Wort hast du schon versucht"
     },
     "right_to_left": "false",
     "help": {

@@ -10,7 +10,10 @@
         "no_attempts": "Вы еще не пробовали ни слова! ",
         "share": "Делиться ",
         "notification-copied": "Скопирован в буфер обмена ",
-        "notification-partial-word": "Пожалуйста, введите полное слово "
+        "notification-partial-word": "Пожалуйста, введите полное слово ",
+        "result_won": "Вы выиграли!",
+        "result_lost": "Вы проиграли",
+        "notification-repeated": "Вы уже пробовали это слово"
     },
     "right_to_left": "false",
     "help": {
