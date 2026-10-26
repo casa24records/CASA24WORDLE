@@ -4,8 +4,12 @@ from flask import (
     make_response,
     redirect,
     request,
+    url_for,
 )
+from markupsafe import Markup
+import hashlib
 import json
+import time
 import os
 import sys
 
@@ -27,6 +31,91 @@ app = Flask(__name__)
 # (sitemap, share links) shows the visitor's real https address.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.jinja_env.policies["json.dumps_kwargs"] = {"sort_keys": False}  # keep menu order (Spanish, English first)
+
+###############################################################################
+# VERSIONED STATIC URLS
+###############################################################################
+# Every static URL in the templates goes through asset(), which adds
+# ?v=<short hash of the file>. vercel.json caches /static/ for a year
+# ("immutable") only when ?v= is present, so a changed file gets a new URL
+# and visitors never keep an old copy.
+
+STATIC_DIR = os.path.join(APP_DIR, "static")
+_asset_versions = {}
+_fallback_version = None
+
+
+def _fallback():
+    """Version used if a file can't be read (never crash over a cache key).
+
+    The deploy's git commit on Vercel, else a hash of all static files,
+    else the start time (always fresh, just less cacheable)."""
+    global _fallback_version
+    if _fallback_version is None:
+        sha = os.environ.get("VERCEL_GIT_COMMIT_SHA", "")
+        if sha:
+            _fallback_version = sha[:10]
+        else:
+            try:
+                _fallback_version = _hash_path(STATIC_DIR)
+            except Exception:
+                _fallback_version = ""
+            if not _fallback_version:
+                _fallback_version = hashlib.sha1(str(time.time()).encode()).hexdigest()[:10]
+    return _fallback_version
+
+
+def _hash_path(path):
+    """Short content hash of a file, or of every file in a folder (names + contents)."""
+    h = hashlib.sha1()
+    if os.path.isdir(path):
+        found = False
+        for folder, dirs, files in os.walk(path):
+            dirs.sort()
+            for name in sorted(files):
+                full = os.path.join(folder, name)
+                h.update(os.path.relpath(full, path).encode())
+                with open(full, "rb") as f:
+                    h.update(f.read())
+                found = True
+        if not found:
+            return ""
+    else:
+        with open(path, "rb") as f:
+            h.update(f.read())
+    return h.hexdigest()[:10]
+
+
+def asset_version(path):
+    """Content version of a static file or folder (cached after first use)."""
+    if path not in _asset_versions:
+        try:
+            version = _hash_path(os.path.join(STATIC_DIR, path))
+        except Exception:
+            version = ""
+        _asset_versions[path] = version or _fallback()
+    return _asset_versions[path]
+
+
+def asset(path):
+    """/static/<path>?v=<hash>: use for every static link in the templates."""
+    return url_for("static", filename=path) + "?v=" + asset_version(path)
+
+
+def json_script(obj):
+    """JSON for a <script type="application/json"> block: raw UTF-8 (not
+    \\uXXXX, which doubled the Arabic/Korean pages) with < > & ' escaped like
+    Flask's tojson, so "</script>" inside a string can't end the block."""
+    text = json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+    text = (text.replace("<", "\\u003c").replace(">", "\\u003e")
+            .replace("&", "\\u0026").replace("'", "\\u0027"))
+    return Markup(text)
+
+
+@app.context_processor
+def inject_asset_helpers():
+    return {"asset": asset, "asset_version": asset_version, "json_script": json_script}
+
 
 ###############################################################################
 # DATA

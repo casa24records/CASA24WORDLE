@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f1a12" media="(prefers-color-scheme: dark)">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon/favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ asset('favicon/favicon.ico') }}">
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
 
     <title>Casa 24 Wordle</title>
@@ -16,26 +16,31 @@
     <meta name="keywords" content="casa 24, casa 24 records, wordle, español, english, juego de palabras, word game, panamá">
     <meta property="og:title" content="Casa 24 Wordle">
     <meta property="og:url" content="{{ request.url_root }}">
-    <meta property="og:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/kolo/kolo-hero.png') }}">
     <meta property="og:type" content="website">
     <meta property="og:description" content="Casa 24 Wordle: el juego diario de palabras de Casa 24 Records. / Casa 24 Records' daily word game.">
     <meta property="twitter:title" content="Casa 24 Wordle">
     <meta property="twitter:description" content="Casa 24 Wordle: el juego diario de palabras de Casa 24 Records. / Casa 24 Records' daily word game.">
-    <meta property="twitter:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon/apple-touch-icon.png') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='favicon/site.webmanifest') }}">
+    <meta property="twitter:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/kolo/kolo-hero.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('favicon/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('favicon/site.webmanifest') }}">
 
-    <!-- Vue -->
-    <script src="https://unpkg.com/vue@3.0.2"></script>
-    <!-- tailwind -->
+    <!-- tailwind (Play CDN; must stay synchronous so the page never shows unstyled) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 production build with the template compiler (templates compile in the browser).
+         defer: runs after parsing, in order, before index.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+    <!-- pixel font: preload and @font-face use the same URL (with ?v), or the preload is wasted -->
+    <link rel="preload" href="{{ asset('fonts/VT323-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
+    <style>@font-face { font-family: "VT323"; src: url("{{ asset('fonts/VT323-Regular.ttf') }}") format("truetype"); font-display: swap; }</style>
     <!-- stylesheet -->
-    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
+    <link rel="stylesheet" href="{{ asset('style.css') }}">
     <!-- light / dark theme (runs first so the page never flashes) -->
-    <script src="{{ url_for('static', filename='theme.js') }}"></script>
-    
+    <script src="{{ asset('theme.js') }}"></script>
+
+    <script type="application/json" id="c24-languages">{{ json_script(languages) }}</script>
     <script>
-        var languages = JSON.parse('{{languages | tojson | safe}}');
+        var languages = JSON.parse(document.getElementById("c24-languages").textContent);
         var todays_idx = "{{todays_idx}}";
     </script>
 </head>
@@ -59,7 +64,7 @@
             </div>
             <h1 class="c24-title c24-header-title uppercase"><a href="/" class="inline-flex items-center gap-2">
                 <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
-                <img src="{{ url_for('static', filename='images/kolo/kolo-face.png') }}" alt="Casa 24" class="c24-logo">
+                <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
                 <span>Casa 24 Wordle</span></a></h1>
             <div class="c24-header-side c24-header-end">
                 <!-- light / dark switch -->
@@ -86,8 +91,8 @@
 
             <!-- Hero: Kolo, tagline, today's puzzle and countdown -->
             <section class="c24-hero flex flex-col items-center text-center gap-1">
-                <img src="{{ url_for('static', filename='images/kolo/kolo-hero.png') }}"
-                    alt="Kolo, la mascota de Casa 24 / Casa 24's mascot" class="c24-hero-kolo">
+                <img src="{{ asset('images/kolo/kolo-hero.webp') }}" width="199" height="360"
+                        alt="Kolo, la mascota de Casa 24 / Casa 24's mascot" class="c24-hero-kolo">
                 <p class="text-lg font-bold leading-tight mt-2" lang="es">Adivina la palabra del día en 6 intentos.</p>
                 <p class="text-sm text-neutral-500" lang="en">Guess the word of the day in 6 tries.</p>
                 <p class="c24-today mt-2" v-cloak>
@@ -221,7 +226,7 @@
 
     </div>
 
-    <script src="{{ url_for('static', filename='index.js') }}"></script>
+    <script defer src="{{ asset('index.js') }}"></script>
 </body>
 
 

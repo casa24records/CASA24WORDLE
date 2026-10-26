@@ -9,7 +9,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0f1a12" media="(prefers-color-scheme: dark)">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon/favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ asset('favicon/favicon.ico') }}">
 
     <title>Casa 24 Wordle · {{ language.config.name_native }}</title>
     <meta name="description" content="{{ language.config.meta.description }}">
@@ -17,34 +17,41 @@
     <meta name="keywords" content="wordle, {{ language.config.name}}, {{ language.config.name_native }}">
     <meta property="og:title" content="Casa 24 Wordle · {{ language.config.name_native }}">
     <meta property="og:url" content="{{ request.url_root }}{{ language.config.language_code }}">
-    <meta property="og:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/kolo/kolo-hero.png') }}">
     <meta property="og:type" content="website">
     <meta property="og:description" content="{{ language.config.meta.description }}">
     <meta property="twitter:title" content="Casa 24 Wordle · {{ language.config.name_native }}">
     <meta property="twitter:description" content="{{ language.config.meta.description }}">
-    <meta property="twitter:image" content="{{ request.url_root }}static/images/kolo/kolo-hero.png">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon/apple-touch-icon.png') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='favicon/site.webmanifest') }}">
+    <meta property="twitter:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/kolo/kolo-hero.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('favicon/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('favicon/site.webmanifest') }}">
 
-    <!-- Tailwind -->
+    <!-- Tailwind (Play CDN; must stay synchronous so the page never shows unstyled) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue -->
-    <script src="https://unpkg.com/vue@3.0.2"></script>
+    <!-- Vue 3 production build with the template compiler (templates compile in the browser).
+         defer: runs after parsing, in order, before game.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
 
+    <!-- pixel font: preload and @font-face use the same URL (with ?v), or the preload is wasted -->
+    <link rel="preload" href="{{ asset('fonts/VT323-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
+    <style>@font-face { font-family: "VT323"; src: url("{{ asset('fonts/VT323-Regular.ttf') }}") format("truetype"); font-display: swap; }</style>
     <!-- CSS -->
-    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
+    <link rel="stylesheet" href="{{ asset('style.css') }}">
     <!-- light / dark theme (runs first so the page never flashes) -->
-    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+    <script src="{{ asset('theme.js') }}"></script>
 
-    <!-- load backend variables -->
+    <!-- backend data: raw UTF-8 JSON (see json_script in app.py) -->
+    <script type="application/json" id="c24-data">{{ json_script({"word_list": language.word_list, "word_list_supplement": language.word_list_supplement, "characters": language.characters, "config": language.config}) }}</script>
     <script>
-        const word_list = JSON.parse('{{language.word_list | tojson | safe}}');
-        const word_list_supplement = JSON.parse('{{language.word_list_supplement | tojson | safe}}');
-        const characters = JSON.parse('{{language.characters | tojson | safe}}');
-        const config = JSON.parse('{{language.config | tojson | safe}}');
+        const c24_data = JSON.parse(document.getElementById("c24-data").textContent);
+        const word_list = c24_data.word_list;
+        const word_list_supplement = c24_data.word_list_supplement;
+        const characters = c24_data.characters;
+        const config = c24_data.config;
         const todays_idx = "{{ language.todays_idx }}";
         const todays_word = "{{ language.daily_word }}";
         const KOLO_BASE = "{{ url_for('static', filename='images/kolo/') }}";
+        const ASSET_V = "{{ asset_version('images/kolo/') }}";  // version of the whole kolo/ folder
     </script>
 </head>
 
@@ -69,7 +76,7 @@
                 </div>
                 <h1 class="c24-title c24-header-title uppercase"><a href="/" class="inline-flex items-center gap-2">
                         <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
-                        <img src="{{ url_for('static', filename='images/kolo/kolo-face.png') }}" alt="Casa 24" class="c24-logo">
+                        <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
                         <span>Casa 24</span>
                         <span class="c24-badge">{{ language.config.language_code }}</span></a></h1>
                 <div class="c24-header-side c24-header-end">
@@ -298,7 +305,8 @@
                     <p v-if="game_won" class="c24-result">{{ t('result_won', 'You won!') }}</p>
                     <p v-if="game_over && !game_won" class="c24-result">{{ t('result_lost', 'You lost') }}</p>
                     <!-- a random Kolo celebrates a win or mourns a loss -->
-                    <img v-if="game_over && kolo_image" :src="kolo_base + kolo_image" alt="Kolo" class="c24-kolo mb-2">
+                    <img v-if="game_over && kolo_image" :src="kolo_url()" alt="Kolo" class="c24-kolo mb-2"
+                        loading="lazy" decoding="async">
                     <p class="text-md text-center whitespace-pre-line" id="emoji_board" v-html="emoji_board">
                     </p>
                     <p v-if="attempts=='0'" class="text-center text-sm text-gray-600">
@@ -356,12 +364,13 @@
     </div>
 
     <!-- JS -->
-    <script src="{{ url_for('static', filename='game.js') }}"></script>
+    <script defer src="{{ asset('game.js') }}"></script>
     <script>
-        (function () {
+        // after the deferred Vue + game.js have mounted the page
+        document.addEventListener("DOMContentLoaded", function () {
             var select = document.getElementById("theme-select");
             if (select) select.value = casa24GetTheme();
-        })();
+        });
     </script>
 </body>
 

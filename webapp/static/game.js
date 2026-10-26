@@ -3,9 +3,9 @@
 
 // Kolo shown on the end screen, one picked at random per game. These must match
 // the files in static/images/kolo/win/ and lose/ (scripts/brand_assets.py makes them).
-const KOLO_WIN = ["car.png", "chill.png", "dj.png", "face.png", "hoodie.png", "montuno.png", "pizza.png",
-    "prod.png", "rap-battle.png", "ross.png", "young.png", "young-cropped.png"];
-const KOLO_LOSE = ["baby.png", "toilet.png"];
+const KOLO_WIN = ["car.webp", "chill.webp", "dj.webp", "face.webp", "hoodie.webp", "montuno.webp", "pizza.webp",
+    "prod.webp", "rap-battle.webp", "ross.webp", "young.webp", "young-cropped.webp"];
+const KOLO_LOSE = ["baby.webp", "toilet.webp"];
 
 const app = Vue.createApp({
     delimiters: ['[[', ']]'],  // don't want to clash with Jinja (backend templating coming from flask)
@@ -80,7 +80,7 @@ const app = Vue.createApp({
             revealing_row: -1,
             pending_key_classes: null,  // keyboard colors waiting for the flip to end
 
-            kolo_image: "",  // e.g. "win/pizza.png", chosen when the game ends
+            kolo_image: "",  // e.g. "win/pizza.webp", chosen when the game ends
             kolo_base: KOLO_BASE,
 
             emoji_board: "⬜⬜⬜⬜⬜\n",
@@ -492,6 +492,12 @@ const app = Vue.createApp({
             }
             setTimeout(() => { this.showTiles(); }, 1500);
         },
+        kolo_url() {
+            // "win/pizza.webp" -> /static/images/kolo/win/pizza.webp?v=...
+            // (games saved before the PNGs were removed stored "win/pizza.png")
+            var name = this.kolo_image.replace(/\.png$/, ".webp");
+            return this.kolo_base + name + "?v=" + ASSET_V;
+        },
         pickKolo() {
             var pool = this.game_won ? KOLO_WIN : KOLO_LOSE;
             var folder = this.game_won ? "win/" : "lose/";
@@ -507,6 +513,7 @@ const app = Vue.createApp({
                 this.showNotification(this.todays_word.toUpperCase(), 12);
             }, delay);
             setTimeout(() => {
+                this.hideNotification();  // the answer toast would cover the window title
                 this.show_stats_modal = true;
             }, delay + (delay > 0 ? 1600 : 400));
 
@@ -529,6 +536,7 @@ const app = Vue.createApp({
             this.pickKolo();
             this.attempts = "X";
             setTimeout(() => {
+                this.hideNotification();  // the answer toast would cover the window title
                 this.show_stats_modal = true;
             }, delay + 400);
             // save a loss to local storage game results
@@ -538,6 +546,10 @@ const app = Vue.createApp({
             // refresh stats
             this.stats = this.calculateStats(this.config.language_code);
 
+        },
+        hideNotification() {
+            clearTimeout(this.notification.timeout);
+            this.notification.show = false;
         },
         showNotification(message, duration = 3) {
             // if there's already a notification, wait for it to finish then show new one

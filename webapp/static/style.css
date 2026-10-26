@@ -75,7 +75,8 @@
     --c24-correct-bg: #2f7a47;
 }
 
-@font-face { font-family: "VT323"; src: url("fonts/VT323-Regular.ttf") format("truetype"); font-display: swap; }
+/* VT323's @font-face is in the <head> of index.html and game.html, so its URL
+   carries ?v=<hash> (asset() in app.py) and matches the <link rel="preload">. */
 @font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-Medium.ttf") format("truetype"); font-weight: 400 500; font-display: swap; }
 @font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-Bold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
 @font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-ExtraBold.ttf") format("truetype"); font-weight: 800 900; font-display: swap; }

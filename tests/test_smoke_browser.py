@@ -220,11 +220,11 @@ def test_kolo_after_win(server, page):
     page.wait_for_function("document.querySelector('#app') && window.Vue")
     type_word(page, today)
     src = kolo_src(page)
-    assert "/kolo/win/" in src and src.endswith(".png"), src
+    assert "/kolo/win/" in src and src.split("?v=")[0].endswith(".webp"), src
     assert page.locator(".c24-result").inner_text().strip() == "You won!"
     assert page.locator(KOLO_IMG).count() == 1
     saved = page.evaluate("JSON.parse(localStorage.getItem('en') || '{}').kolo_image")
-    assert saved and src.endswith("/kolo/" + saved), (saved, src)  # saved, not re-picked
+    assert saved and src.split("?v=")[0].endswith("/kolo/" + saved), (saved, src)  # saved, not re-picked
 
     page.reload()
     page.wait_for_function("document.querySelector('#app') && window.Vue")
@@ -245,7 +245,7 @@ def test_kolo_after_loss(server, page):
         type_word(page, word)
         wait_reveal(page, n)
     src = kolo_src(page)
-    assert "/kolo/lose/" in src and src.endswith(".png"), src
+    assert "/kolo/lose/" in src and src.split("?v=")[0].endswith(".webp"), src
     assert page.locator(".c24-result").inner_text().strip() == "Perdiste"
     assert page.locator(KOLO_IMG).count() == 1
     assert errors == []

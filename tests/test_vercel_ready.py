@@ -3,6 +3,8 @@
 import os
 import subprocess
 import sys
+import json
+import re
 import tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +43,36 @@ def test_build_step_copies_static(tmp_path):
     subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "vercel_build.py")], check=True, cwd=ROOT)
     try:
         assert os.path.exists(os.path.join(ROOT, "public", "static", "style.css"))
-        assert os.path.exists(os.path.join(ROOT, "public", "static", "images", "kolo", "kolo-face.png"))
+        assert os.path.exists(os.path.join(ROOT, "public", "static", "images", "kolo", "kolo-face.webp"))
     finally:
         import shutil
         shutil.rmtree(os.path.join(ROOT, "public"), ignore_errors=True)
+
+
+def test_vercel_json_caches_only_versioned_static():
+    """Year-long immutable caching only for /static/ URLs that carry ?v=<hash>
+    (asset() in app.py); unversioned URLs keep Vercel's default revalidation."""
+    with open(os.path.join(ROOT, "vercel.json")) as f:
+        config = json.load(f)
+    immutable = [h for h in config.get("headers", [])
+                 if any("immutable" in x["value"] for x in h["headers"])]
+    assert immutable, "no immutable rule"
+    for rule in immutable:
+        assert {"type": "query", "key": "v"} in rule.get("has", []), rule
+
+
+def test_every_static_url_is_versioned():
+    """Every /static/ link in the rendered pages has ?v= (else immutable caching
+    is never applied, or worse, an old copy sticks)."""
+    import importlib
+    import sys
+    sys.path.insert(0, ROOT)
+    app = importlib.import_module("webapp.app").app
+    c = app.test_client()
+    for path in ["/", "/es", "/en", "/ar", "/ko"]:
+        html = c.get(path).get_data(as_text=True)
+        urls = re.findall(r"""/static/[^"'\s)]*""", html)
+        assert urls, path
+        # KOLO_BASE is a folder prefix; game.js adds ?v=ASSET_V to each Kolo URL
+        bad = [u for u in urls if "?v=" not in u and not u.endswith("/kolo/")]
+        assert not bad, (path, bad)

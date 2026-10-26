@@ -19,15 +19,21 @@ def js_pool(name):
 
 
 def folder(name):
-    """PNG files in win/ or lose/ (each also has a .webp twin, checked below)."""
-    return {f for f in os.listdir(os.path.join(KOLO_DIR, name)) if f.endswith(".png")}
+    """WebP files in win/ or lose/."""
+    return {f for f in os.listdir(os.path.join(KOLO_DIR, name)) if f.endswith(".webp")}
 
 
-def test_every_kolo_png_has_a_webp():
+def test_kolo_images_are_webp_only():
+    """The Kolo PNGs were removed (WebP everywhere); only kolo-hero.png stays, for og:image."""
     for name in ("win", "lose"):
-        files = set(os.listdir(os.path.join(KOLO_DIR, name)))
-        for png in folder(name):
-            assert png[:-4] + ".webp" in files, f"{name}/{png} has no .webp"
+        pngs = [f for f in os.listdir(os.path.join(KOLO_DIR, name)) if f.endswith(".png")]
+        assert not pngs, f"{name}/ still has PNGs: {pngs}"
+    top = sorted(f for f in os.listdir(KOLO_DIR) if f.endswith(".png"))
+    assert top == ["kolo-hero.png"], top
+    assert os.path.exists(os.path.join(KOLO_DIR, "kolo-face.webp"))
+    assert os.path.exists(os.path.join(KOLO_DIR, "kolo-hero.webp"))
+    assert all(n.endswith(".webp") for n in list(brand_assets.IMAGES) + list(brand_assets.WIN) + list(brand_assets.LOSE))
+    assert brand_assets.ALSO_PNG == {"kolo-hero.webp"}
 
 
 def test_brand_assets_is_the_script():
