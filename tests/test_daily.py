@@ -43,3 +43,9 @@ def test_casa24_days_use_casa24_words():
 def test_no_casa24_words_means_base_list():
     for i in range(100):
         assert daily.pick_daily_word("fr", i, BASE, []) == BASE[i % len(BASE)]
+
+
+def test_numbering_starts_at_1_on_start_date():
+    assert daily.day_index(daily.START_DATE) == 1
+    assert daily.day_index(datetime.date(2026, 10, 26)) == 1
+    assert daily.day_index(datetime.date(2026, 10, 27)) == 2

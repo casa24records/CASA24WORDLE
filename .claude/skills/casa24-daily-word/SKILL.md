@@ -14,7 +14,7 @@ description: How Casa 24 Wordle picks the daily word — same word for everyone,
 
 ## Code: `webapp/daily.py`
 1. `panama_today(now)` → today's date in Panama.
-2. `day_index(date)` → puzzle number = days since 1970-01-01 minus `DAY_OFFSET` (kept from the original game so numbers look like `#1954`; don't change it). Shown in share text.
+2. `day_index(date)` → puzzle number, counted from `START_DATE` in `daily.py` (2026-10-26 = **#1**, the next day #2, …; owner's choice). Shown in the game title, share text and start screen. The schedule uses this number too, so **never change `START_DATE` after launch**: every day's word would change.
 3. `is_casa24_day(lang, idx)` → `sha256("casa24:{lang}:{idx}") % CASA24_EVERY_N_DAYS == 0`.
 4. `pick_daily_word(lang, idx, base_answers, casa24_answers)` → on Casa 24 days, picks from the sorted Casa 24 list with the same hash. Otherwise picks `base_answers[idx % len]`.
 

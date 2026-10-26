@@ -2,8 +2,9 @@
 
 1. "Today" is the calendar date in Panama (UTC-5, no daylight saving),
    so the word changes at midnight Panama time.
-2. The day number counts days since 1970-01-01, minus a fixed offset
-   (kept from the original game, so day numbers look like "#1400").
+2. The day number (shown as "#1", "#2", ...) counts days from START_DATE,
+   Casa 24's puzzle #1. The word schedule also uses this number, so never
+   change START_DATE after launch: every day's word would change.
 3. For languages with Casa 24 answer words, a fixed hash of
    (language, day number) decides whether today is a "Casa 24 day".
    That happens on about 1 day in 5. On those days the word comes from the
@@ -18,7 +19,8 @@ import hashlib
 
 PANAMA = datetime.timezone(datetime.timedelta(hours=-5), "America/Panama")
 EPOCH = datetime.date(1970, 1, 1)
-DAY_OFFSET = 18992 - 195  # from the original game's numbering
+START_DATE = datetime.date(2026, 10, 26)  # puzzle #1 (Panama date), set by the owner
+DAY_OFFSET = (START_DATE - EPOCH).days - 1
 CASA24_EVERY_N_DAYS = 5
 
 
