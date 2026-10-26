@@ -11,6 +11,14 @@ function readStorage(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
 }
 
+function writeStorage(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { }
+}
+
+// leaderboard settings from the server: {"enabled": bool, "user": {"id", "username"} | null}
+var lb_info = { enabled: false, user: null };
+try { lb_info = JSON.parse(document.getElementById("c24-lb").textContent) || lb_info; } catch (e) { }
+
 const app = Vue.createApp({
     delimiters: ['[[', ']]'],
     data() {
@@ -24,6 +32,9 @@ const app = Vue.createApp({
             game_results: results,
             total_stats: {},
             countdown: "",
+            lb: lb_info,
+            // "guest" (default) or "lb": where the Español/English cards go
+            mode: lb_info.enabled && readStorage("casa24_mode") === "lb" ? "lb" : "guest",
         }
     },
     computed: {
@@ -58,11 +69,25 @@ const app = Vue.createApp({
         document.documentElement.lang = this.preferredLanguage;
         this.tick();
         setInterval(this.tick, 1000);
+        // ?login=failed / ?deleted=1 notices show once; a reload shouldn't bring them back
+        if (/[?&](login|deleted)=/.test(window.location.search) && window.history.replaceState) {
+            window.history.replaceState(null, "", window.location.pathname);
+        }
     },
     mounted() {
         window.addEventListener('keydown', this.keyDown);
     },
     methods: {
+        setMode(mode) {
+            this.mode = mode === "lb" ? "lb" : "guest";
+            writeStorage("casa24_mode", this.mode);
+        },
+        playHref(code) {
+            // guest: /es; leaderboard: /lb/es (through the Discord login when needed)
+            if (this.mode !== "lb" || !this.lb.enabled) return "/" + code;
+            var target = "/lb/" + code;
+            return this.lb.user ? target : "/auth/discord/login?next=" + encodeURIComponent(target);
+        },
         tick() {
             // time left until midnight in Panama, as "11h 48m 03s"
             var now = new Date();

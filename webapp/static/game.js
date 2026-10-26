@@ -7,6 +7,19 @@ const KOLO_WIN = ["car.webp", "chill.webp", "dj.webp", "face.webp", "hoodie.webp
     "prod.webp", "rap-battle.webp", "ross.webp", "young.webp", "young-cropped.webp"];
 const KOLO_LOSE = ["baby.webp", "toilet.webp"];
 
+// Leaderboard game (/lb/es|en): today's guesses so far, sent by the server.
+// The answer is not in the page; the server colors each guess (POST /api/guess).
+let LB_STATE = null;
+try { LB_STATE = JSON.parse(document.getElementById("c24-lb-state").textContent); } catch (e) { }
+
+// tile classes for each color (updateColors and the leaderboard game use the same ones)
+const TILE_BASE = "uppercase font-bold select-none text-white";
+const COLOR_RANK = { "incorrect": 1, "semicorrect": 2, "correct": 3 };
+
+function readFlag(key) {
+    try { return localStorage.getItem(key) === "1"; } catch (e) { return false; }
+}
+
 const app = Vue.createApp({
     delimiters: ['[[', ']]'],  // don't want to clash with Jinja (backend templating coming from flask)
     data() {
@@ -87,6 +100,12 @@ const app = Vue.createApp({
             attempts: "0",
 
             stats: {},
+
+            // leaderboard game only
+            lb_busy: false,     // a guess is on its way to the server: typing waits
+            lb_points: null,    // points for today's game, once it's over
+            lb_rank: null,      // place in this language's ranking, once it's over
+            lb_hint_off: readFlag("casa24_lb_hint_off"),
         }
     },
     computed: {
@@ -144,7 +163,11 @@ const app = Vue.createApp({
         setInterval(() => {
             this.time_until_next_day = this.get_time_until_next_day();
         }, 1000);
-        this.loadFromLocalStorage();
+        if (LB) {
+            this.restoreLb(LB_STATE);
+        } else {
+            this.loadFromLocalStorage();
+        }
         this.showTiles();
 
         if (this.game_over) {
@@ -265,7 +288,7 @@ const app = Vue.createApp({
             // Letters are compared exactly: typing may skip accents (resolveAccents fixes the
             // spelling first), but a plain "a" never counts for an "á" in today's word.
             var todays_word = this.todays_word;
-            const base_class = "uppercase font-bold select-none text-white";
+            const base_class = TILE_BASE;
             var charcounts = {};
 
             // count characters
@@ -354,13 +377,18 @@ const app = Vue.createApp({
             }
             key = this.normalizeKey(key);
 
-            if (this.game_over || this.revealing) {
+            if (this.game_over || this.revealing || this.lb_busy) {
                 return;
             }
             // console.log('keyDown', this.active_cell, this.active_row, event.key);
             if (key === "Enter" || key === "⇨") {
                 if (!this.full_word_inputted) {
                     this.showNotification(this.text("notification-partial-word", "Please enter a full word"));
+                    return;
+                }
+                if (LB) {
+                    // the server checks the word and colors it (submitLb)
+                    this.submitLb();
                     return;
                 }
                 // if checkWord returns true, then go to next row
@@ -379,33 +407,13 @@ const app = Vue.createApp({
                 if (word_is_valid && already_tried) {
                     this.showNotification(this.text("notification-repeated", "You already tried that word"));
                 } else if (word_is_valid) {
-                    var row = this.active_row;
                     // color the keyboard only after the tiles finish flipping
                     var keys_before = Object.assign({}, this.key_classes);
                     this.updateColors();
                     var keys_after = Object.assign({}, this.key_classes);
                     Object.assign(this.key_classes, keys_before);
-                    // saved right away, so a reload mid-flip keeps the keyboard colors
-                    this.pending_key_classes = keys_after;
-                    this.active_row++;
-                    this.active_cell = 0;
-                    this.full_word_inputted = false;
-
                     var won = word === this.todays_word;
-                    var reveal_ms = this.revealRow(row, () => {
-                        Object.assign(this.key_classes, keys_after);
-                        this.pending_key_classes = null;
-                        this.showTiles();
-                        if (won) {
-                            this.bounceRow(row);
-                        }
-                        this.saveToLocalStorage();
-                    });
-                    if (won) {
-                        this.gameWon(reveal_ms);
-                    } else if (this.active_row == 6) {
-                        this.gameLost(reveal_ms);
-                    }
+                    this.commitRow(keys_after, won, won || this.active_row == 5);
                 } else {
                     this.showNotification(this.text("notification-not-valid", "Word is not valid"));
                 }
@@ -427,6 +435,158 @@ const app = Vue.createApp({
             }
             this.showTiles();
             this.saveToLocalStorage();
+        },
+        commitRow(keys_after, won, done) {
+            // The current row's tile_classes are final: move to the next row, flip
+            // the tiles, then color the keyboard (and bounce on a win).
+            var row = this.active_row;
+            // saved right away, so a reload mid-flip keeps the keyboard colors
+            this.pending_key_classes = keys_after;
+            this.active_row++;
+            this.active_cell = 0;
+            this.full_word_inputted = false;
+            var reveal_ms = this.revealRow(row, () => {
+                Object.assign(this.key_classes, keys_after);
+                this.pending_key_classes = null;
+                this.showTiles();
+                if (won) {
+                    this.bounceRow(row);
+                }
+                this.saveToLocalStorage();
+            });
+            if (won) {
+                this.gameWon(reveal_ms);
+            } else if (done) {
+                this.gameLost(reveal_ms);
+            }
+        },
+        colorKey(keys, character, color) {
+            // a key keeps its best color: correct > semicorrect > incorrect
+            if ((COLOR_RANK[color] || 0) > (COLOR_RANK[keys[character]] || 0)) {
+                keys[character] = color;
+            }
+        },
+        setRowFromServer(row, word, colors) {
+            // the server's spelling (accents resolved) and colors for one guess
+            var letters = Array.from(word);
+            for (let i = 0; i < 5; i++) {
+                this.tiles[row][i] = letters[i] || "";
+                this.tile_classes[row][i] = colors[i] + " " + TILE_BASE;
+            }
+        },
+        restoreLb(state) {
+            // leaderboard game: rebuild today's board from the server (no localStorage)
+            if (!state || !Array.isArray(state.guesses)) {
+                return;
+            }
+            var keys = Object.assign({}, this.key_classes);
+            var guesses = state.guesses.slice(0, 6);
+            for (let r = 0; r < guesses.length; r++) {
+                this.setRowFromServer(r, guesses[r].word, guesses[r].colors);
+                var letters = Array.from(guesses[r].word);
+                for (let i = 0; i < 5; i++) {
+                    this.colorKey(keys, letters[i], guesses[r].colors[i]);
+                }
+            }
+            Object.assign(this.key_classes, keys);
+            this.active_row = guesses.length;
+            this.active_cell = 0;
+            this.full_word_inputted = false;
+            if (state.done) {
+                this.game_over = true;
+                this.game_won = !!state.won;
+                this.todays_word = state.answer || "";
+                this.lb_points = state.points === undefined ? null : state.points;
+                this.lb_rank = state.rank === undefined ? null : state.rank;
+                this.pickKolo();
+                this.emoji_board = this.getEmojiBoard();
+            }
+        },
+        submitLb() {
+            // leaderboard game: the server checks the guess, colors it and keeps score
+            if (this.lb_busy) {
+                return;
+            }
+            var row = this.active_row;
+            var typed = this.tiles[row].join("").toLowerCase();
+            // the same word can't be guessed twice (also typed without accents)
+            var resolved = this.resolveAccents(typed);
+            var fold = (w) => this.accentInsensitive() ? this.foldAccents(w) : w;
+            var already_tried = this.tiles.slice(0, row).some(r => {
+                var w = r.join("");
+                return w === resolved || fold(w) === fold(typed);
+            });
+            if (already_tried) {
+                this.showNotification(this.text("notification-repeated", "You already tried that word"));
+                return;
+            }
+            this.lb_busy = true;
+            var lang = this.config.language_code;
+            fetch("/api/guess", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lang: lang, guess: typed }),
+            }).then((response) => {
+                return response.json().catch(() => ({})).then((data) => ({ ok: response.ok, status: response.status, data: data }));
+            }).then((result) => {
+                this.lb_busy = false;
+                if (result.ok && result.data && Array.isArray(result.data.colors)) {
+                    this.applyLbGuess(result.data);
+                } else {
+                    this.lbError((result.data && result.data.error) || (result.status === 401 ? "login" : ""));
+                }
+            }).catch(() => {
+                this.lb_busy = false;
+                this.lbError("");
+            });
+        },
+        applyLbGuess(res) {
+            // one guess colored by the server: same flip / bounce / end flow as a guest game
+            var row = this.active_row;
+            this.setRowFromServer(row, res.word, res.colors);
+            var keys_after = Object.assign({}, this.key_classes);
+            var letters = Array.from(res.word);
+            for (let i = 0; i < 5; i++) {
+                this.colorKey(keys_after, letters[i], res.colors[i]);
+            }
+            if (res.done) {
+                // the answer only arrives once the game is over
+                this.todays_word = res.answer || "";
+                this.lb_points = res.points === undefined ? null : res.points;
+                this.lb_rank = res.rank === undefined ? null : res.rank;
+            }
+            this.commitRow(keys_after, !!res.won, !!res.done);
+            this.showTiles();
+        },
+        lbError(code) {
+            if (code === "login") {
+                // session expired: log in again, then come back to this game
+                var next = "/lb/" + this.config.language_code;
+                window.location.href = "/auth/discord/login?next=" + encodeURIComponent(next);
+            } else if (code === "invalid_word") {
+                this.showNotification(this.text("notification-not-valid", "Word is not valid"));
+            } else if (code === "repeat") {
+                this.showNotification(this.text("notification-repeated", "You already tried that word"));
+            } else if (code === "finished") {
+                // finished in another tab: show the saved result
+                window.location.reload();
+            } else {
+                this.showNotification(this.text("lb_error", "Something went wrong. Please try again."));
+            }
+        },
+        lbRankText() {
+            return this.text("lb_rank", "Your rank: #{rank}").replace("{rank}", this.lb_rank);
+        },
+        lbPointsText() {
+            if (this.lb_points === 1) {
+                return this.text("lb_point_one", "+1 point");
+            }
+            return this.text("lb_points", "+{points} points").replace("{points}", this.lb_points);
+        },
+        dismissLbHint() {
+            this.lb_hint_off = true;
+            try { localStorage.setItem("casa24_lb_hint_off", "1"); } catch (e) { }
         },
         showTiles() {
             // if left to right, then reverse the tiles visuals. else copy normally.
@@ -519,7 +679,7 @@ const app = Vue.createApp({
                 this.show_stats_modal = true;
             }, delay + (delay > 0 ? 1600 : 400));
 
-            if (DEMO) { return; }  // demo results don't count
+            if (DEMO || LB) { return; }  // demo results don't count; leaderboard results live on the server
             // save a win to localStorage
             const result = { "won": true, "attempts": this.attempts, "date": new Date() };
             this.game_results[this.config.language_code].push(result);
@@ -542,7 +702,7 @@ const app = Vue.createApp({
                 this.hideNotification();  // the answer toast would cover the window title
                 this.show_stats_modal = true;
             }, delay + 400);
-            if (DEMO) { return; }  // demo results don't count
+            if (DEMO || LB) { return; }  // demo results don't count; leaderboard results live on the server
             // save a loss to local storage game results
             this.game_results[this.config.language_code].push({ "won": false, "attempts": this.attempts, "date": new Date() });
             localStorage.setItem("game_results", JSON.stringify(this.game_results));
@@ -636,7 +796,7 @@ const app = Vue.createApp({
             return value ? value.trim() : fallback;
         },
         saveToLocalStorage() {
-            if (DEMO) { return; }  // demo games are never saved
+            if (DEMO || LB) { return; }  // demo games are never saved; leaderboard games live on the server
             // saves tiles, tile_classes, active_row and active_cell to local storage with key: page_name
             var url = window.location.href;
             var page_name = url.substring(url.lastIndexOf('/') + 1);
@@ -657,7 +817,7 @@ const app = Vue.createApp({
             localStorage.setItem(page_name, JSON.stringify(data));
         },
         loadFromLocalStorage() {
-            if (DEMO) { return; }
+            if (DEMO || LB) { return; }
             // if local storage has data and the daily word is the same as the todays word, then load data
             var url = window.location.href;
             var page_name = url.substring(url.lastIndexOf('/') + 1);
