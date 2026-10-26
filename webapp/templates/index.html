@@ -2,8 +2,11 @@
 <html lang="en">
 
 <head>
-    <meta content="charset=UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1a12" media="(prefers-color-scheme: dark)">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon/favicon.ico') }}">
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
 
@@ -37,38 +40,37 @@
     </script>
 </head>
 
-<body id="body" class="h-full">
-    <div id="app" class="pb-12">
+<body id="body" class="c24-menu-page">
+    <div id="app" class="c24-menu-app">
 
-        <!-- The Header -->
-        <header
-            class="relative flex flex-row justify-between items-center p-1 px-3 lg:px-1 h-[50px] my-auto border-b border-neutral-300 max-w-screen-sm mx-auto">
-            <button class="z-30 text-neutral-500" v-on:click="showAboutModal = !showAboutModal" aria-label="about">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-info-circle" width="24"
-                    height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                    <circle cx="12" cy="12" r="9"></circle>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    <polyline points="11 12 12 12 12 16 13 16"></polyline>
-                </svg>
-            </button>
-            <div class="absolute right-0 left-0 text-center">
-                <h1 class="c24-title uppercase text-3xl sm:text-4xl"><a href="/" class="inline-flex items-center gap-2">
-                    <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
-                    <img src="{{ url_for('static', filename='images/kolo/kolo-face.png') }}" alt="Casa 24" class="c24-logo">
-                    <span>Casa 24 Wordle</span></a></h1>
-            </div>
-            <div class="flex flex-row gap-3 z-30">
-                <!-- light / dark switch -->
-                <button class="m-0 sm:my-1 c24-theme-button" onclick="casa24ToggleTheme()" aria-label="Modo oscuro / Dark mode" title="Modo oscuro / Dark mode">
-                    <svg class="c24-icon-moon h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1 -9 -9z"/></svg>
-                    <svg class="c24-icon-sun h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <!-- The Header: 3 columns (about / title / theme + stats), so nothing overlaps -->
+        <header class="c24-header c24-header-menu border-b border-neutral-300">
+            <div class="c24-header-side">
+                <button type="button" class="c24-icon-btn" v-on:click="showAboutModal = !showAboutModal" aria-label="about">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24"
+                        height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        <polyline points="11 12 12 12 12 16 13 16"></polyline>
+                    </svg>
                 </button>
-                <button class="m-0 sm:my-1" v-on:click="showStatsModal = !showStatsModal">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-neutral-500" width="24" height="24"
+            </div>
+            <h1 class="c24-title c24-header-title uppercase"><a href="/" class="inline-flex items-center gap-2">
+                <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
+                <img src="{{ url_for('static', filename='images/kolo/kolo-face.png') }}" alt="Casa 24" class="c24-logo">
+                <span>Casa 24 Wordle</span></a></h1>
+            <div class="c24-header-side c24-header-end">
+                <!-- light / dark switch -->
+                <button type="button" class="c24-icon-btn c24-theme-button" onclick="casa24ToggleTheme()" aria-label="Modo oscuro / Dark mode" title="Modo oscuro / Dark mode">
+                    <svg class="c24-icon-moon h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1 -9 -9z"/></svg>
+                    <svg class="c24-icon-sun h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                </button>
+                <button type="button" class="c24-icon-btn" v-on:click="showStatsModal = !showStatsModal" aria-label="Estadísticas / Stats">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                         viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                        stroke-linejoin="round">
+                        stroke-linejoin="round" aria-hidden="true">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                         <rect x="3" y="12" width="6" height="8" rx="1"></rect>
                         <rect x="9" y="8" width="6" height="12" rx="1"></rect>
@@ -80,10 +82,10 @@
         </header>
 
         <!-- ===================== CASA 24 START SCREEN ===================== -->
-        <main class="c24-start max-w-sm mx-auto px-4 pt-6 pb-8 flex flex-col gap-5">
+        <main class="c24-start">
 
             <!-- Hero: Kolo, tagline, today's puzzle and countdown -->
-            <section class="flex flex-col items-center text-center gap-1">
+            <section class="c24-hero flex flex-col items-center text-center gap-1">
                 <img src="{{ url_for('static', filename='images/kolo/kolo-hero.png') }}"
                     alt="Kolo, la mascota de Casa 24 / Casa 24's mascot" class="c24-hero-kolo">
                 <p class="text-lg font-bold leading-tight mt-2" lang="es">Adivina la palabra del día en 6 intentos.</p>
@@ -96,7 +98,7 @@
             </section>
 
             <!-- Español / English: the player's language first -->
-            <section class="flex flex-col gap-3" aria-label="Español / English">
+            <section class="c24-primary" aria-label="Español / English">
                 <a v-for="(lang, i) in primaryLanguages" :key="lang.language_code"
                     :href="'/' + lang.language_code" :lang="lang.language_code"
                     :data-lang="lang.language_code"
@@ -115,7 +117,7 @@
                 <h2 id="more-languages" class="c24-section-title">
                     <span lang="es">Más idiomas</span> · <span lang="en">More languages</span>
                 </h2>
-                <div class="grid grid-cols-2 gap-2">
+                <div class="c24-chips">
                     {% for code in language_codes if code not in ("es", "en") %}
                     <a href="/{{ code }}" lang="{{ code }}" data-lang="{{ code }}" class="c24-chip"
                         {% if languages[code].right_to_left == "true" %}dir="rtl"{% endif %}>
@@ -132,90 +134,89 @@
         </main>
 
         <!-- NOTIFICATIONS & MODALS-->
-        <div class="container mx-auto flex w-full max-w-lg justify-center items-center overflow-auto z-1" v-cloak>
-            <div v-show="showAboutModal || showStatsModal"
-                class="opacity-25 fixed top-0 left-0 w-full h-full z-1 bg-black" v-cloak></div>
+        <div v-show="showAboutModal || showStatsModal" class="c24-backdrop" v-cloak></div>
 
-            <!-- About modal -->
-            <div v-show="showAboutModal" class="fixed top-10 left-0 w-full h-full z-50 items-center overflow-auto"
-                v-cloak>
-                <div class="bg-white rounded-lg shadow-lg p-5 m-4 border-2 border-slate-200 mx-auto w-full max-w-xs sm:max-w-lg"
-                    v-cloak>
-                    <div class="flex flex-col gap-2 relative ">
-                        <h3 class="flex mx-auto c24-title uppercase text-3xl mb-2">Casa 24 Wordle</h3>
-                        <p class="text-center text-sm" lang="es">El juego diario de palabras de <span class="font-bold">Casa 24 Records</span>, sello independiente y colectivo artístico de Ciudad de Panamá. Una palabra nueva cada día, igual para todos. Algunos días la palabra es nuestra.</p>
-                        <p class="text-center text-sm" lang="en">The daily word game from <span class="font-bold">Casa 24 Records</span>, an independent label and art collective in Panama City. A new word every day, the same for everyone. Some days the word is one of ours.</p>
-                        <p class="text-center text-xs text-neutral-500">Mascota / Mascot: Kolo.</p>
-                        <button
-                            class="uppercase font-bold text-sm tracking-wider mt-2 border-t-2 border-gray-300 mt-2 pt-2"
-                            v-on:click="showAboutModal = !showAboutModal">close</button>
-                    </div>
+        <!-- About modal -->
+        <div v-show="showAboutModal" class="c24-modal-wrap" v-cloak>
+            <div class="c24-modal bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
+                aria-modal="true" aria-labelledby="about-title">
+                <button type="button" class="c24-close" aria-label="close"
+                    v-on:click="showAboutModal = false">×</button>
+                <div class="flex flex-col gap-2">
+                    <h3 id="about-title" class="flex mx-auto c24-title uppercase text-3xl mb-2">Casa 24 Wordle</h3>
+                    <p class="text-center text-sm" lang="es">El juego diario de palabras de <span class="font-bold">Casa 24 Records</span>, sello independiente y colectivo artístico de Ciudad de Panamá. Una palabra nueva cada día, igual para todos. Algunos días la palabra es nuestra.</p>
+                    <p class="text-center text-sm" lang="en">The daily word game from <span class="font-bold">Casa 24 Records</span>, an independent label and art collective in Panama City. A new word every day, the same for everyone. Some days the word is one of ours.</p>
+                    <p class="text-center text-xs text-neutral-500">Mascota / Mascot: Kolo.</p>
+                    <button type="button"
+                        class="c24-text-btn uppercase font-bold text-sm tracking-wider mt-2 border-t-2 border-gray-300"
+                        v-on:click="showAboutModal = false">close</button>
                 </div>
             </div>
+        </div>
 
-            <div v-show="showStatsModal" class="fixed top-10 left-0 w-full h-full z-50 items-center" v-cloak>
-                <div class="bg-white rounded-lg shadow-lg p-5 m-4 border-2 border-slate-200 mx-auto w-full max-w-md sm:max-w-lg"
-                    v-cloak>
-                    <div class="flex flex-col gap-2 relative">
-                        <h3 class="flex mx-auto uppercase font-bold text-2xl tracking-wider mb-2">Stats</h3>
-                        <div class="flex flex-row">
-                            <div class="flex-grow">Total Games:</div>
-                            <div class="font-bold">[[total_stats.total_games]]</div>
-                        </div>
-                        <div class="flex flex-row">
-                            <div class="flex-grow">Games Won:</div>
-                            <div class="font-bold">[[total_stats.n_victories]]</div>
-                        </div>
-                        <div class="flex flex-row">
-                            <div class="flex-grow">Games Lost:</div>
-                            <div class="font-bold">[[total_stats.n_losses]]</div>
-                        </div>
-                        <div class="flex flex-row">
-                            <div class="flex-grow">Overall Win Percentage:</div>
-                            <div class="font-bold" v-html="total_stats.total_win_percentage.toLocaleString('en') + '%'"></div>
-                        </div>
-                        <div class="flex flex-row">
-                            <div class="flex-grow">Best Overall Streak:</div>
-                            <div class="font-bold">[[total_stats.longest_overall_streak]]</div>
-                        </div>
-                        <div class="flex flex-row">
-                            <div class="flex-grow">Current Overall Streak:</div>
-                            <div class="font-bold"><span class="mr-1"
-                                    v-if="total_stats.current_overall_streak > 0">🔥</span>[[total_stats.current_overall_streak]]
-                            </div>
-                        </div>
-                        <div class="flex flex-row">
-                            <div class="flex-grow">Best single language Streak:</div>
-                            <div class="font-bold">[[total_stats.longest_language_streak]]</div>
-                        </div>
-                        <div class="flex flex-row">
-                            <div class="flex flex-col flex-grow">
-                                <div class="">Best current Streak:</div>
-                                <div v-if="total_stats.current_longest_language_streak_language !=''"
-                                    class="text-transparent text-sm bg-clip-text c24-gradient font-bold">
-                                    [[languages[total_stats.current_longest_language_streak_language].language_name_native]]</div>
-                            </div>
-                            <div class="font-bold"><span v-if="total_stats.current_longest_language_streak > 0">🔥
-                                </span>[[total_stats.current_longest_language_streak]]</div>
-                        </div>
-                        <div class="flex flex-row mt-4">
-                            <div class="flex-grow uppercase tracking-wider font-bold">Languages Conquered:</div>
-                        </div>
-                        <div v-if="total_stats.languages_won.length == 0" class="text-sm">you haven't beaten any languages yet...</div>
-
-                        <div class="grid grid-cols-2 w-full place-items-center">
-                            <div v-for="(language) in total_stats.languages_won"
-                                class="text-center py-2 px-2 text-transparent bg-clip-text c24-gradient font-bold">
-                                [[languages[language].language_name_native]]</div>
-                        </div>
-
-                        <button
-                            class="uppercase font-bold text-sm tracking-wider mt-4 border-t-2 border-gray-300 mt-2 pt-2"
-                            v-on:click="showStatsModal = !showStatsModal">close</button>
+        <div v-show="showStatsModal" class="c24-modal-wrap" v-cloak>
+            <div class="c24-modal bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
+                aria-modal="true" aria-labelledby="menu-stats-title">
+                <button type="button" class="c24-close" aria-label="close"
+                    v-on:click="showStatsModal = false">×</button>
+                <div class="flex flex-col gap-2">
+                    <h3 id="menu-stats-title" class="flex mx-auto uppercase font-bold text-2xl tracking-wider mb-2">Stats</h3>
+                    <div class="flex flex-row">
+                        <div class="flex-grow">Total Games:</div>
+                        <div class="font-bold">[[total_stats.total_games]]</div>
                     </div>
+                    <div class="flex flex-row">
+                        <div class="flex-grow">Games Won:</div>
+                        <div class="font-bold">[[total_stats.n_victories]]</div>
+                    </div>
+                    <div class="flex flex-row">
+                        <div class="flex-grow">Games Lost:</div>
+                        <div class="font-bold">[[total_stats.n_losses]]</div>
+                    </div>
+                    <div class="flex flex-row">
+                        <div class="flex-grow">Overall Win Percentage:</div>
+                        <div class="font-bold" v-html="total_stats.total_win_percentage.toLocaleString('en') + '%'"></div>
+                    </div>
+                    <div class="flex flex-row">
+                        <div class="flex-grow">Best Overall Streak:</div>
+                        <div class="font-bold">[[total_stats.longest_overall_streak]]</div>
+                    </div>
+                    <div class="flex flex-row">
+                        <div class="flex-grow">Current Overall Streak:</div>
+                        <div class="font-bold"><span class="mr-1"
+                                v-if="total_stats.current_overall_streak > 0">🔥</span>[[total_stats.current_overall_streak]]
+                        </div>
+                    </div>
+                    <div class="flex flex-row">
+                        <div class="flex-grow">Best single language Streak:</div>
+                        <div class="font-bold">[[total_stats.longest_language_streak]]</div>
+                    </div>
+                    <div class="flex flex-row">
+                        <div class="flex flex-col flex-grow">
+                            <div class="">Best current Streak:</div>
+                            <div v-if="total_stats.current_longest_language_streak_language !=''"
+                                class="text-transparent text-sm bg-clip-text c24-gradient font-bold">
+                                [[languages[total_stats.current_longest_language_streak_language].language_name_native]]</div>
+                        </div>
+                        <div class="font-bold"><span v-if="total_stats.current_longest_language_streak > 0">🔥
+                            </span>[[total_stats.current_longest_language_streak]]</div>
+                    </div>
+                    <div class="flex flex-row mt-4">
+                        <div class="flex-grow uppercase tracking-wider font-bold">Languages Conquered:</div>
+                    </div>
+                    <div v-if="total_stats.languages_won.length == 0" class="text-sm">you haven't beaten any languages yet...</div>
+
+                    <div class="grid grid-cols-2 w-full place-items-center">
+                        <div v-for="(language) in total_stats.languages_won"
+                            class="text-center py-2 px-2 text-transparent bg-clip-text c24-gradient font-bold">
+                            [[languages[language].language_name_native]]</div>
+                    </div>
+
+                    <button type="button"
+                        class="c24-text-btn uppercase font-bold text-sm tracking-wider mt-4 border-t-2 border-gray-300"
+                        v-on:click="showStatsModal = false">close</button>
                 </div>
             </div>
-
         </div>
 
     </div>

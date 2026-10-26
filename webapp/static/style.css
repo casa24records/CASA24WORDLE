@@ -81,6 +81,13 @@
 @font-face { font-family: "Gilroy"; src: url("fonts/Gilroy-ExtraBold.ttf") format("truetype"); font-weight: 800 900; font-display: swap; }
 
 /* ---------- base ---------- */
+/* 1vh where the browser lacks dvh; 1dvh (the height that is really visible,
+   without the mobile address bar) where it has it. Used for the page height,
+   key heights and modal heights. */
+:root { --vh: 1vh; }
+@supports (height: 100dvh) { :root { --vh: 1dvh; } }
+html { -webkit-text-size-adjust: 100%; }
+html, body { overscroll-behavior: none; }   /* no pull-to-refresh / rubber band */
 body {
     background-color: var(--c24-bg);
     color: var(--c24-text);
@@ -93,7 +100,6 @@ body {
 .border-neutral-500 { border-color: var(--c24-line-strong) !important; }
 .text-neutral-500, .text-neutral-400 { color: var(--c24-subtle) !important; }
 .text-gray-900, .text-gray-700, .text-gray-600 { color: var(--c24-text) !important; }
-.hover\:bg-neutral-200:hover { background-color: var(--c24-hover) !important; }
 input[type="text"] { background-color: var(--c24-input-bg); color: var(--c24-text) !important; }
 select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 
@@ -127,7 +133,7 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     border-radius: 4px;
     padding: 0 0.3em;
 }
-.c24-kolo { margin: 0 auto; max-height: 160px; width: auto; }
+.c24-kolo { margin: 0 auto; max-height: 160px; max-height: min(160px, calc(var(--vh) * 22)); width: auto; }
 .c24-result {
     font-family: var(--c24-font-display);
     font-size: 2rem;
@@ -138,6 +144,7 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 
 /* ---------- start screen ---------- */
 .c24-hero-kolo { height: 150px; width: auto; }
+@media (max-height: 700px) { .c24-hero-kolo { height: 96px; } }
 .c24-today { font-size: 0.8rem; color: var(--c24-subtle); }
 .c24-play {
     display: flex;
@@ -148,7 +155,6 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     border: 2px solid var(--c24-green);
     transition: transform 0.08s ease, box-shadow 0.15s ease;
 }
-.c24-play:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15); }
 .c24-play:active { transform: scale(0.98); }
 .c24-play-main { background: var(--c24-correct-bg); border-color: var(--c24-correct-bg); color: #fff; }
 .c24-play-alt { background: transparent; color: var(--c24-text); }
@@ -174,7 +180,6 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 }
 .c24-chip > span { display: block; }
 .c24-chip > span:first-child::first-letter { text-transform: uppercase; }
-.c24-chip:hover { background: var(--c24-hover); border-color: var(--c24-orange); }
 
 /* ---------- board and keyboard ---------- */
 .key {
@@ -240,3 +245,246 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 [v-cloak] {
     display: none;
 }
+
+/* ==========================================================================
+   LAYOUT: phones, landscape, tablets, desktops (see the casa24-responsive skill)
+   ========================================================================== */
+
+/* ---------- header: 3 columns, so the title never covers the icons ---------- */
+.c24-header {
+    flex: none;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 2px;
+    height: calc(52px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 4px 0;
+}
+.c24-header-menu { max-width: 640px; margin: 0 auto; }
+.c24-header-side { display: flex; align-items: center; }
+.c24-header-end { justify-content: flex-end; }
+.c24-header-title {
+    font-size: clamp(1.25rem, 0.25rem + 5.7vw, 2.25rem);
+    min-width: 0;
+    white-space: nowrap;
+    text-align: center;
+}
+.c24-header-title a { max-width: 100%; }
+.c24-header-title .c24-badge { font-size: 0.8em; }
+.c24-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    border-radius: 9999px;
+    color: var(--c24-subtle);
+    -webkit-tap-highlight-color: transparent;
+}
+.c24-icon-btn svg { width: 24px; height: 24px; }
+@media (max-width: 360px) {
+    .c24-header .c24-logo { width: 28px; height: 28px; }
+    .c24-header-title a { gap: 0.35rem; }
+}
+
+/* ---------- game page: header, board, keyboard in one column ---------- */
+.c24-game {
+    --kgap: clamp(3px, 1vw, 6px);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: calc(var(--vh) * 100);
+    max-width: 500px;
+    margin: 0 auto;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+/* The board area takes the height that is left; the board is sized from it
+   (container query units), so tiles stay square on every screen. */
+.c24-board-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.c24-board {
+    --g: 5px;
+    --w: min(420px, 100cqw - 20px, (100cqh - 20px - 5 * var(--g)) / 1.2 + 4 * var(--g));
+    width: var(--w);
+    height: calc((var(--w) - 4 * var(--g)) * 1.2 + 5 * var(--g));
+    display: grid;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    gap: var(--g);
+}
+.c24-board > .grid-cols-5 { gap: var(--g); }
+/* board tiles: font follows the tile size (beats the text-2xl class set in game.js) */
+main .grid-cols-5 > div {
+    width: 100%;
+    height: 100%;
+    font-size: max(14px, (var(--w) - 4 * var(--g)) / 5 * 0.62);
+    line-height: 1;
+}
+/* example tiles in "How to play" */
+.c24-example { max-width: 16rem; }
+.c24-example > div { aspect-ratio: 1; font-size: 1.75rem; line-height: 1; }
+
+/* ---------- keyboard ---------- */
+/* --rows is set per keyboard in game.html, so big keyboards (vi 9 rows, ko 7)
+   get shorter keys instead of pushing the board off the screen. */
+.c24-keyboard {
+    --rows: 4;
+    --kh: clamp(24px, min(var(--vh) * 7, (var(--vh) * 42 - (var(--rows) - 1) * var(--kgap)) / var(--rows)), 58px);
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--kgap);
+    padding: 0 8px max(8px, env(safe-area-inset-bottom));
+}
+.c24-key-row { display: flex; gap: var(--kgap); }
+.c24-keyboard .key {
+    flex: 1 1 0;
+    min-width: 0;
+    height: var(--kh);
+    padding: 0 1px;
+    font-size: clamp(0.8rem, 0.6rem + 1vw, 1.05rem);
+    line-height: 1;
+    overflow: hidden;
+    touch-action: manipulation;          /* no double-tap zoom on fast typing */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.c24-keyboard .key[data-char="⇨"],
+.c24-keyboard .key[data-char="⌫"] { flex-grow: 1.5; font-size: 1.35rem; }
+.c24-keyboard .key:active { filter: brightness(0.85); }
+.key:focus-visible,
+.c24-icon-btn:focus-visible,
+.c24-close:focus-visible {
+    outline: 2px solid var(--c24-orange);
+    outline-offset: 2px;
+}
+@media (max-width: 360px) {
+    .c24-keyboard { padding-left: 4px; padding-right: 4px; }
+}
+
+/* ---------- landscape phones: board and keyboard side by side ---------- */
+@media (orientation: landscape) and (max-height: 500px) {
+    .c24-game {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        max-width: 900px;
+        column-gap: 8px;
+    }
+    .c24-game .c24-header {
+        grid-column: 1 / -1;
+        height: calc(40px + env(safe-area-inset-top));
+    }
+    .c24-game .c24-header-title { font-size: 1.5rem; }
+    .c24-game .c24-logo { width: 26px; height: 26px; }
+    .c24-game .c24-icon-btn { height: 40px; }
+    .c24-board-area { grid-column: 1; grid-row: 2; }
+    .c24-keyboard {
+        grid-column: 2;
+        grid-row: 2;
+        align-self: center;
+        --kh: clamp(24px, (var(--vh) * 100 - 40px - 16px - (var(--rows) - 1) * var(--kgap)) / var(--rows), 52px);
+        padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+    }
+}
+
+/* ---------- modals: always fit the screen, scroll inside when too tall ---------- */
+.c24-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: #000;
+    opacity: 0.35;
+}
+.c24-modal-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.c24-modal {
+    position: relative;
+    width: min(500px, 100% - 32px);
+    max-height: calc(100vh - 32px);
+    max-height: calc(var(--vh) * 100 - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+.c24-modal-sm { width: min(420px, 100% - 32px); }
+.c24-modal-head { padding: 0 48px; }
+.c24-close {
+    position: absolute;
+    top: 4px;
+    inset-inline-end: 4px;
+    z-index: 1;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 1.9rem;
+    line-height: 1;
+    color: var(--c24-subtle);
+}
+.c24-text-btn { min-height: 44px; padding-top: 0.5rem; }
+
+/* notification: slides down from the top (game.js changes "top") */
+.c24-toast {
+    left: 0;
+    right: 0;
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    padding-top: env(safe-area-inset-top);
+    pointer-events: none;
+}
+.c24-toast-box { position: relative; max-width: 20rem; text-align: center; }
+
+/* ---------- start screen ---------- */
+.c24-menu-app {
+    padding: 0 env(safe-area-inset-right) calc(3rem + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+}
+.c24-start {
+    max-width: 24rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+.c24-primary { display: grid; gap: 0.75rem; }
+.c24-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+@media (max-height: 700px) {
+    .c24-start { padding-top: 1rem; gap: 1rem; }
+    .c24-menu-app { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+}
+@media (min-width: 640px) {
+    .c24-start { max-width: 40rem; }
+    .c24-primary { grid-template-columns: 1fr 1fr; }
+    .c24-chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ---------- hover only with a real mouse (no "stuck" hover after a tap) ---------- */
+@media (hover: hover) and (pointer: fine) {
+    .c24-play:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15); }
+    .c24-chip:hover { background: var(--c24-hover); border-color: var(--c24-orange); }
+    .c24-icon-btn:hover, .c24-close:hover { background: var(--c24-hover); }
+    .hover\:bg-neutral-200:hover { background-color: var(--c24-hover) !important; }
+    .c24-keyboard .key:hover { filter: brightness(0.93); }
+}
+
+/* keep modal titles clear of the × button */
+.c24-close + div > :first-child { padding-inline-end: 40px; }
+.c24-close + div > .mx-auto:first-child { padding-inline: 40px; }
