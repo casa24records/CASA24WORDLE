@@ -151,3 +151,4 @@ public/
 screenshots/
 .vercel
 .env*
+!.env.example

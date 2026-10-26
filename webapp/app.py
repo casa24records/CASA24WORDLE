@@ -1,5 +1,6 @@
 from flask import (
     Flask,
+    jsonify,
     render_template,
     make_response,
     redirect,
@@ -22,7 +23,40 @@ import sys
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, APP_DIR)
 
+
+
+def load_env_local(path):
+    """Read KEY=VALUE lines from .env.local (made by `vercel env pull`) into
+    os.environ. Only off Vercel, never overrides a variable that is already
+    set. Not called on Vercel or under pytest (tests never see real secrets or KV)."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):]
+        key, value = line.split("=", 1)
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+if not os.environ.get("VERCEL") and "pytest" not in sys.modules:
+    load_env_local(os.path.join(os.path.dirname(APP_DIR), ".env.local"))
+
 import daily
+import discord_auth
+import leaderboard as lbrules
+import store as store_mod
+from itsdangerous import URLSafeTimedSerializer, BadSignature
+from urllib.parse import urlparse
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask.sessions import SecureCookieSessionInterface
 import glob
@@ -463,6 +497,7 @@ def index():
         language_codes=language_codes,
         todays_idx=get_todays_idx(),
         demo_enabled=demo_enabled(),
+        texts={lang: language_configs[lang]["text"] for lang in DEMO_LANGS},
     )
 
 
@@ -547,6 +582,518 @@ def language(lang_code):
             samesite="Lax",
         )
     return response
+
+###############################################################################
+# DISCORD LEADERBOARD (es/en only)
+###############################################################################
+# Data kept (see webapp/store.py for the backends):
+#   player:{id}              hash: username, hidden ("1"), and per scope
+#                            (es / en / all): {scope}_points, _wins, _played,
+#                            _cur_streak, _best_streak, _last_win_day, _reached_day
+#   game:{id}:{lang}:{date}  JSON list of today's guesses (expires after 2 days)
+#   result:{id}:{lang}:{date} JSON {won, attempts, points}, written once (SET NX)
+#   keys:{id}                hash whose fields are this player's result/game
+#                            keys, so "delete my data" needs no SCAN
+#   lb:es / lb:en / lb:all   sorted sets, member = Discord ID, score = leaderboard.score()
+#   rl:{id}:{minute}         guess counter for the rate limit (expires in 120 s)
+#   lock:{id}                5-second lock so two guesses can't race
+# Never stored: Discord tokens, avatar, email, IP addresses.
+#
+# POSTs check that Origin (or Referer) matches this host when the browser sends
+# one; the c24_lb cookie is also SameSite=Lax, so other sites can't post with it.
+
+import secrets
+import unicodedata
+
+LB_LANGS = ("es", "en")
+LB_TABS = ("es", "en", "all")
+LB_COOKIE = "c24_lb"
+LB_COOKIE_AGE = 30 * 24 * 3600
+OAUTH_COOKIE = "c24_oauth"
+OAUTH_COOKIE_AGE = 10 * 60
+OAUTH_COOKIE_PATH = "/auth/discord"
+GAME_TTL = 2 * 24 * 3600
+RATE_LIMIT_PER_MINUTE = 30
+TOP_N = 50
+STAT_FIELDS = ("points", "wins", "played", "cur_streak", "best_streak", "last_win_day", "reached_day")
+
+
+def lb_secret():
+    return os.environ.get("SECRET_KEY", "")
+
+
+def lb_store():
+    try:
+        return store_mod.get_store()
+    except Exception:
+        return None
+
+
+def lb_enabled():
+    """Discord app + SECRET_KEY + a store: otherwise every leaderboard route is 404."""
+    return bool(discord_auth.client_id() and discord_auth.client_secret() and lb_secret()) \
+        and lb_store() is not None
+
+
+def lb_admin_ids():
+    return {x.strip() for x in os.environ.get("ADMIN_DISCORD_IDS", "").split(",") if x.strip()}
+
+
+def _serializer(salt):
+    return URLSafeTimedSerializer(lb_secret(), salt=salt)
+
+
+def lb_player_id():
+    """Discord ID from the signed c24_lb cookie (the cookie holds nothing else)."""
+    raw = request.cookies.get(LB_COOKIE)
+    if not raw or not lb_secret():
+        return None
+    try:
+        value = _serializer("c24-lb").loads(raw, max_age=LB_COOKIE_AGE)
+    except BadSignature:
+        return None
+    return value if isinstance(value, str) and value.isdigit() else None
+
+
+def lb_current_user(st=None):
+    """{"id", "username"} for the logged-in player, None if logged out or deleted."""
+    pid = lb_player_id()
+    st = st or lb_store()
+    if not pid or st is None:
+        return None
+    try:
+        username = st.hget(f"player:{pid}", "username")
+    except store_mod.StoreError:
+        return None
+    return {"id": pid, "username": username} if username else None
+
+
+@app.context_processor
+def inject_leaderboard():
+    enabled = lb_enabled()
+    user = lb_current_user() if enabled and request.cookies.get(LB_COOKIE) else None
+    return {"lb_enabled": enabled, "lb_user": user}
+
+
+def _same_origin():
+    """False when the browser says the POST came from another site."""
+    for header in ("Origin", "Referer"):
+        value = request.headers.get(header)
+        if value:
+            return value != "null" and urlparse(value).netloc == request.host
+    return True
+
+
+def _safe_next(value):
+    """Only relative paths on this site ("/lb/es"), never "//evil" or a full URL."""
+    if (isinstance(value, str) and value.startswith("/") and not value.startswith("//")
+            and "\\" not in value and value.isprintable() and len(value) <= 200):
+        return value
+    return "/"
+
+
+def _set_lb_cookie(response, discord_id):
+    response.set_cookie(
+        LB_COOKIE, _serializer("c24-lb").dumps(discord_id), max_age=LB_COOKIE_AGE,
+        httponly=True, secure=request.is_secure, samesite="Lax",
+    )
+
+
+def _clear_lb_cookie(response):
+    response.delete_cookie(LB_COOKIE, httponly=True, secure=request.is_secure, samesite="Lax")
+
+
+def _err(code, status):
+    response = jsonify({"error": code})
+    response.status_code = status
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def lb_today():
+    """(Panama date "YYYY-MM-DD", puzzle number). The client's date is never used."""
+    date = daily.panama_today()
+    return date.isoformat(), daily.day_index(date)
+
+
+def lb_answer(lang, idx):
+    """The real word of the day (same as Language(lang, ...).daily_word)."""
+    return daily.pick_daily_word(lang, idx, language_codes_5words[lang], casa24_words[lang][0])
+
+
+_lb_word_cache = {}
+
+
+def _lb_words(lang):
+    if lang not in _lb_word_cache:
+        main = language_codes_5words[lang]
+        sup = language_codes_5words_supplements[lang]
+        _lb_word_cache[lang] = (set(main), set(sup), lbrules.build_fold_map(main, sup))
+    return _lb_word_cache[lang]
+
+
+def _accent_insensitive(lang):
+    value = language_configs[lang].get("accent_insensitive")
+    return value is True or value == "true"
+
+
+def _game_key(pid, lang, date):
+    return f"game:{pid}:{lang}:{date}"
+
+
+def _result_key(pid, lang, date):
+    return f"result:{pid}:{lang}:{date}"
+
+
+def _load_json(raw, kind):
+    try:
+        value = json.loads(raw) if raw else None
+    except ValueError:
+        return None
+    return value if isinstance(value, kind) else None
+
+
+def _load_guesses(st, pid, lang, date):
+    guesses = _load_json(st.get(_game_key(pid, lang, date)), list) or []
+    return [g for g in guesses if isinstance(g, str)]
+
+
+def _rank(st, pid, scope):
+    r = st.zrevrank(f"lb:{scope}", pid)
+    return None if r is None else r + 1
+
+
+def _int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _scope_score(player, scope):
+    return lbrules.score(_int(player.get(f"{scope}_points")), _int(player.get(f"{scope}_wins")),
+                         _int(player.get(f"{scope}_reached_day")))
+
+
+def _record_result(st, pid, lang, date, idx, won, attempts):
+    """Count a finished game once (SET NX); update stats, streaks and rankings."""
+    pts = lbrules.points(won, attempts)
+    rkey = _result_key(pid, lang, date)
+    if not st.set(rkey, json.dumps({"won": won, "attempts": attempts, "points": pts}), nx=True):
+        return  # already counted
+    st.hset(f"keys:{pid}", {rkey: "1"})
+    pkey = f"player:{pid}"
+    player = st.hgetall(pkey)
+    updates = {}
+    for scope in (lang, "all"):
+        old = {f: player.get(f"{scope}_{f}") for f in STAT_FIELDS}
+        cur, best, last = lbrules.update_streak(
+            old["cur_streak"], old["best_streak"], old["last_win_day"], idx, won, combined=(scope == "all"))
+        reached = old["reached_day"]
+        if reached in (None, "") or pts > 0:
+            reached = idx
+        new = {
+            "points": _int(old["points"]) + pts,
+            "wins": _int(old["wins"]) + (1 if won else 0),
+            "played": _int(old["played"]) + 1,
+            "cur_streak": cur,
+            "best_streak": best,
+            "last_win_day": "" if last is None else last,
+            "reached_day": reached,
+        }
+        updates.update({f"{scope}_{k}": str(v) for k, v in new.items()})
+    st.hset(pkey, updates)
+    player.update(updates)
+    if player.get("hidden") != "1":
+        for scope in (lang, "all"):
+            st.zadd(f"lb:{scope}", _scope_score(player, scope), pid)
+
+
+def lb_game_state(st, pid, lang):
+    """Resume state for /lb/<lang>: today's guesses with colors; the answer only once done."""
+    date, idx = lb_today()
+    answer = lb_answer(lang, idx)
+    guesses = _load_guesses(st, pid, lang, date)
+    result = _load_json(st.get(_result_key(pid, lang, date)), dict)
+    won = answer in guesses
+    done = won or len(guesses) >= lbrules.MAX_GUESSES or result is not None
+    if result is not None:
+        won = bool(result.get("won"))
+    state = {
+        "guesses": [{"word": w, "colors": lbrules.color_guess(w, answer)} for w in guesses],
+        "done": done, "won": bool(done and won), "answer": None, "points": None, "rank": None,
+    }
+    if done:
+        state["answer"] = answer
+        state["points"] = _int(result.get("points")) if result else lbrules.points(won, len(guesses))
+        state["rank"] = _rank(st, pid, lang)
+    return state
+
+
+@app.route("/auth/discord/login")
+def discord_login():
+    if not lb_enabled():
+        abort(404)
+    state = secrets.token_urlsafe(32)
+    redirect_uri = request.url_root + "auth/discord/callback"
+    response = redirect(discord_auth.authorize_url(redirect_uri, state))
+    response.set_cookie(
+        OAUTH_COOKIE, _serializer("c24-oauth").dumps({"state": state, "next": _safe_next(request.args.get("next"))}),
+        max_age=OAUTH_COOKIE_AGE, path=OAUTH_COOKIE_PATH,
+        httponly=True, secure=request.is_secure, samesite="Lax",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/auth/discord/callback")
+def discord_callback():
+    if not lb_enabled():
+        abort(404)
+    failed = redirect("/?login=failed")
+    failed.delete_cookie(OAUTH_COOKIE, path=OAUTH_COOKIE_PATH)
+    raw = request.cookies.get(OAUTH_COOKIE)
+    try:
+        saved = _serializer("c24-oauth").loads(raw, max_age=OAUTH_COOKIE_AGE) if raw else None
+    except BadSignature:
+        saved = None
+    code = request.args.get("code", "")
+    given = request.args.get("state", "")
+    if request.args.get("error") or not code or not isinstance(saved, dict):
+        return failed
+    if not hmac.compare_digest(given.encode(), str(saved.get("state", "")).encode()):
+        return failed
+    try:
+        # the access token lives only inside discord_auth.identify()
+        discord_id, username = discord_auth.identify(code, request.url_root + "auth/discord/callback")
+        lb_store().hset(f"player:{discord_id}", {"username": username})
+    except Exception:
+        return failed  # nothing logged: messages could carry request details
+    response = redirect(_safe_next(saved.get("next")))
+    response.delete_cookie(OAUTH_COOKIE, path=OAUTH_COOKIE_PATH)
+    _set_lb_cookie(response, discord_id)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/auth/logout", methods=["POST"])
+def discord_logout():
+    if not _same_origin():
+        abort(403)
+    response = redirect("/")
+    _clear_lb_cookie(response)
+    return response
+
+
+@app.route("/lb/<lang_code>")
+def lb_game(lang_code):
+    if not lb_enabled():
+        abort(404)
+    if lang_code not in LB_LANGS:
+        return redirect("/lb/es")
+    st = lb_store()
+    user = lb_current_user(st)
+    if not user:
+        return redirect(f"/auth/discord/login?next=/lb/{lang_code}")
+    cookie_key = f"keyboard_layout_{lang_code}"
+    language = Language(lang_code, language_codes_5words[lang_code],
+                        request.args.get("layout") or request.cookies.get(cookie_key))
+    language.daily_word = ""  # the browser never gets the answer; the server colors guesses
+    state = lb_game_state(st, user["id"], lang_code)
+    response = make_response(render_template(
+        "game.html", language=language, demo=False, lb=True, lb_state=state, lb_user=user))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/api/guess", methods=["POST"])
+def api_guess():
+    if not lb_enabled():
+        return _err("disabled", 404)
+    if not _same_origin():
+        return _err("forbidden", 403)
+    st = lb_store()
+    try:
+        user = lb_current_user(st)
+        if not user:
+            return _err("login", 401)
+        pid = user["id"]
+        rkey = f"rl:{pid}:{int(time.time() // 60)}"
+        count = st.pipeline([["INCR", rkey], ["EXPIRE", rkey, 120]])[0]
+        if _int(count) > RATE_LIMIT_PER_MINUTE:
+            return _err("rate", 429)
+
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or not isinstance(body.get("guess"), str):
+            return _err("bad_request", 400)
+        lang = body.get("lang")
+        if lang not in LB_LANGS:
+            return _err("bad_lang", 400)
+
+        lock = f"lock:{pid}"
+        if not st.set(lock, "1", nx=True, ex=5):
+            return _err("rate", 429)
+        try:
+            return _apply_guess(st, pid, lang, body["guess"])
+        finally:
+            st.delete(lock)
+    except store_mod.StoreError:
+        return _err("store", 503)
+
+
+def _apply_guess(st, pid, lang, typed):
+    date, idx = lb_today()
+    answer = lb_answer(lang, idx)
+    word = unicodedata.normalize("NFC", typed).strip().lower()
+    main, sup, fold_map = _lb_words(lang)
+    word = lbrules.resolve_accents(word, answer, main, sup, _accent_insensitive(lang), fold_map)
+    if len(word) != 5 or not (word in main or word in sup or word == answer):
+        return _err("invalid_word", 400)
+
+    guesses = _load_guesses(st, pid, lang, date)
+    if answer in guesses or st.get(_result_key(pid, lang, date)) is not None:
+        return _err("finished", 400)
+    if len(guesses) >= lbrules.MAX_GUESSES:
+        return _err("too_many", 400)
+    if word in guesses:
+        return _err("repeat", 400)
+
+    guesses.append(word)
+    gkey = _game_key(pid, lang, date)
+    st.set(gkey, json.dumps(guesses, ensure_ascii=False), ex=GAME_TTL)
+    st.hset(f"keys:{pid}", {gkey: "1"})
+
+    won = word == answer
+    done = won or len(guesses) >= lbrules.MAX_GUESSES
+    result = {"word": word, "colors": lbrules.color_guess(word, answer), "done": done,
+              "won": won, "answer": None, "points": None, "rank": None}
+    if done:
+        _record_result(st, pid, lang, date, idx, won, len(guesses))
+        stored = _load_json(st.get(_result_key(pid, lang, date)), dict) or {}
+        result["answer"] = answer
+        result["points"] = _int(stored.get("points", lbrules.points(won, len(guesses))))
+        result["rank"] = _rank(st, pid, lang)
+    response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _lb_row(rank, pid, player, tab, today, me_id):
+    def stat(name):
+        return player.get(f"{tab}_{name}")
+    return {
+        "rank": rank,
+        "id": pid,
+        "username": player.get("username", ""),
+        "points": _int(stat("points")),
+        "wins": _int(stat("wins")),
+        "played": _int(stat("played")),
+        "current_streak": lbrules.effective_streak(stat("cur_streak"), stat("last_win_day"), today),
+        "best_streak": _int(stat("best_streak")),
+        "is_me": pid == me_id,
+    }
+
+
+def _flat_hash(value):
+    if isinstance(value, dict):
+        return value
+    value = value or []
+    return {value[i]: value[i + 1] for i in range(0, len(value), 2)}
+
+
+@app.route("/leaderboard")
+def leaderboard_page():
+    if not lb_enabled():
+        abort(404)
+    tab = request.args.get("tab", "all")
+    if tab not in LB_TABS:
+        tab = "all"
+    st = lb_store()
+    user = lb_current_user(st)
+    me_id = user["id"] if user else None
+    _, today = lb_today()
+    top = st.zrevrange(f"lb:{tab}", 0, TOP_N - 1)
+    players = st.pipeline([["HGETALL", f"player:{pid}"] for pid, _ in top])
+    rows = []
+    for i, ((pid, _), raw) in enumerate(zip(top, players)):
+        player = _flat_hash(raw)
+        if player and player.get("hidden") != "1":
+            rows.append(_lb_row(i + 1, pid, player, tab, today, me_id))
+    me_row = None
+    if me_id and not any(r["is_me"] for r in rows):
+        rank = _rank(st, me_id, tab)
+        player = st.hgetall(f"player:{me_id}")
+        if rank is not None and player.get("hidden") != "1" and _int(player.get(f"{tab}_played")):
+            me_row = _lb_row(rank, me_id, player, tab, today, me_id)
+    response = make_response(render_template(
+        "leaderboard.html", tab=tab, rows=rows, me_row=me_row,
+        is_admin=bool(me_id and me_id in lb_admin_ids()), lb_user=user,
+        texts={lang: language_configs[lang]["text"] for lang in DEMO_LANGS}))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _delete_player(st, pid):
+    """Remove every key this app keeps for one player."""
+    keys = set(st.hgetall(f"keys:{pid}").keys())
+    # also today's and recent game keys, in case the index missed one
+    for days_back in range(3):
+        date = (daily.panama_today() - datetime.timedelta(days=days_back)).isoformat()
+        for lang in LB_LANGS:
+            keys.add(_game_key(pid, lang, date))
+            keys.add(_result_key(pid, lang, date))
+    minute = int(time.time() // 60)
+    keys.update(f"rl:{pid}:{m}" for m in range(minute - 2, minute + 1))
+    keys.update({f"player:{pid}", f"keys:{pid}", f"lock:{pid}"})
+    st.delete(*sorted(keys))
+    for scope in LB_TABS:
+        st.zrem(f"lb:{scope}", pid)
+
+
+@app.route("/api/me/delete", methods=["POST"])
+def lb_delete_me():
+    if not _same_origin():
+        abort(403)
+    pid = lb_player_id()
+    st = lb_store()
+    if st is None:
+        abort(404)
+    if not pid:
+        return _err("login", 401)
+    _delete_player(st, pid)
+    response = redirect("/?deleted=1")
+    _clear_lb_cookie(response)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/admin/hide", methods=["POST"])
+def lb_admin_hide():
+    if not lb_enabled():
+        abort(404)
+    if not _same_origin():
+        abort(403)
+    pid = lb_player_id()
+    if not pid or pid not in lb_admin_ids():
+        abort(403)
+    target = request.form.get("discord_id", "").strip()
+    if not target.isdigit():
+        abort(400)
+    st = lb_store()
+    pkey = f"player:{target}"
+    player = st.hgetall(pkey)
+    if player:
+        if request.form.get("hidden", "1") == "1":
+            st.hset(pkey, {"hidden": "1"})
+            for scope in LB_TABS:
+                st.zrem(f"lb:{scope}", target)
+        else:
+            st.hdel(pkey, "hidden")
+            for scope in LB_TABS:
+                if _int(player.get(f"{scope}_played")):
+                    st.zadd(f"lb:{scope}", _scope_score(player, scope), target)
+    tab = request.form.get("tab")
+    return redirect("/leaderboard" + (f"?tab={tab}" if tab in LB_TABS else ""))
 
 
 if __name__ == "__main__":
