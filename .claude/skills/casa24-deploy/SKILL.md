@@ -26,7 +26,7 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 1. `npm i -g vercel@latest`. The installed CLI is outdated.
 2. `vercel login`, then `vercel link` from the repo root.
 3. `vercel deploy` for a preview. Check `/`, `/es`, `/en`, a guess, and dark mode.
-4. `vercel deploy --prod` for production. Alternatively, connect the GitHub repo for automatic deploys.
+4. `vercel deploy --prod` for production. Alternatively, connect the GitHub repo `casa24records/CASA24WORDLE` (branch `main`) for automatic deploys. This needs the owner's go-ahead too.
 
 ## Cost
 - Hobby is free, but only for **non-commercial** use. Casa 24 is a label, so flag that Pro may be required.

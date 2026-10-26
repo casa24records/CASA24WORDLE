@@ -23,6 +23,7 @@ Casa 24 Records' daily word game, on branch `casa24`. Hosted on Vercel only. The
 | Colors, dark mode, Kolo art, fonts, logo, favicons, animations | `casa24-branding` |
 | Run locally, tests, screenshots | `casa24-test-and-preview` |
 | Put it online (Vercel), domain | `casa24-deploy` |
+| Commit, push to GitHub, which account, history rules | `casa24-git-and-github` |
 | Why things are the way they are (decisions already made) | `casa24-decisions` |
 
 ## Map of the repo

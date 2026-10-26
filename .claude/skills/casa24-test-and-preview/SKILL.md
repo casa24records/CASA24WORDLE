@@ -28,8 +28,8 @@ cd webapp && ../.venv/bin/flask --app app run      # http://127.0.0.1:5000
 |---|---|
 | `test_words.py` | validator passes, tiers don't overlap, Casa 24 words are valid guesses, aliases off, Spanish plurals accepted, no proper names |
 | `test_daily.py` | same date same word, Panama midnight, 1 in 5 Casa 24 days |
-| `test_smoke_browser.py` | start screen (10 local links, es/en first, fits a phone, remembers language, "Jugada hoy" after a win), a guess colors tiles in es/en, accents optional in Spanish, `/stats` gone (Playwright) |
-| `test_vercel_ready.py` | `webapp.app:app` loads from the repo root behind a proxy, build step copies static files |
+| `test_smoke_browser.py` | start screen (10 local links, es/en first, fits a phone, remembers language, "Jugada hoy" after a win), a guess colors tiles in es/en, accents optional in es/fr/pt, colors respect accents (plain a ≠ á), `/stats` gone (Playwright) |
+| `test_vercel_ready.py` | `webapp.app:app` loads from the repo root behind a proxy, sitemap uses the site's own address (no wordle.global), build step copies static files |
 
 `tests/conftest.py` puts `webapp/` and `scripts/` on the import path and changes into `webapp/`.
 
@@ -43,3 +43,7 @@ This saves 6 phone-size (390×844) images: the menu, es and en, each in light an
 
 ## Gotchas
 - `localStorage` is per browser profile. Each Playwright context starts clean.
+- **Tile animation:** after Enter, tiles flip one by one for about 1.7 s. Keys typed during the flip are ignored. In browser tests, call `wait_reveal(page, rows)` (in `test_smoke_browser.py`) before asserting colors or typing the next word.
+- **Count only board tiles** with the `BOARD_COLORED` selector (`main .grid-cols-5 > …`). The hidden "How to play" window has 3 example tiles that are always in the page.
+- **Forcing today's word in a test:** the page uses Vue 3.0.2, which has no `app._instance`. Use `document.querySelector('#app').__vue_app__._container._vnode.component.proxy.todays_word = '…'`. See `test_spanish_colors_respect_accents`.
+- **Reduced motion:** a Playwright context with `reduced_motion='reduce'` gets instant colors with no flip.
