@@ -1,11 +1,11 @@
 ---
 name: casa24-leaderboard
-description: Casa 24 Wordle's guest mode and Discord leaderboard — what players see, Discord login (OAuth, sign in, identify only), the data we store and never store, anti-cheat (server-checked guesses), points, tiebreaks and streaks, the Neon Postgres database (tables, cleanup, MemoryStore), routes and error codes, env vars, tests, and how to delete my data, hide user, add an admin or change points. Use for any leaderboard, ranking, Discord, login, sign in, OAuth, points, streaks, database, Neon, Postgres, delete my data, hide user or anti-cheat question.
+description: Casa 24 Wordle's guest mode and Discord leaderboard — what players see (the live view has its own skill, casa24-live-view), Discord login (OAuth, sign in, identify only), the data we store and never store, anti-cheat (server-checked guesses), points, tiebreaks and streaks, the Neon Postgres database (tables, cleanup, MemoryStore), routes and error codes, env vars, tests, and how to delete my data, hide user, add an admin or change points. Use for any leaderboard, ranking, Discord, login, sign in, OAuth, points, streaks, database, Neon, Postgres, delete my data, hide user or anti-cheat question.
 ---
 
 # Guest mode + Discord leaderboard
 
-Built 2026-10-26 on branch `leaderboard-discord` (commits `dfb5dea` backend, `ad8610f` UI, then the storage moved from Redis to Neon Postgres). Why it was built this way: `casa24-decisions`. Hosting and env vars: `casa24-deploy`.
+Built 2026-10-26 on branch `leaderboard-discord` (commits `dfb5dea` backend, `ad8610f` UI, then the storage moved from Redis to Neon Postgres). Why it was built this way: `casa24-decisions`. Hosting and env vars: `casa24-deploy`. The **live view** (who else is playing today, colors only, `GET /api/live`; added 2026-10-27): **`casa24-live-view`**.
 
 Files:
 - `webapp/app.py`, section "DISCORD LEADERBOARD": routes, cookies, checks
@@ -29,17 +29,17 @@ UI rules decided by the owner on 2026-10-26/27 (record: `casa24-decisions`; look
 - **Leaderboard game `/lb/<lang>`:** same `game.html`, with the trophy SVG as a badge after the language badge and the avatar in the header. The answer is **not** in the page. Every Enter sends the word to the server, which answers with the colors; the flip animation and keyboard colors work as usual. Progress is restored from the server (another device works too), and nothing is saved in localStorage. End window shows **rank and points as big numbers** ("#N", "+N", both `.c24-lb-big`, small labels `lb_rank_label` / `lb_points_label` or `lb_point_label` for exactly 1) and a trophy "Ver leaderboard" link. Other language codes redirect to `/lb/es`.
 - **Guest end window (es/en, only when enabled):** a dismissible hint (dismissal saved in localStorage `casa24_lb_hint_off`): logged in → a trophy link to `/lb/<lang>`; logged out → short text + the Discord sign-in button.
 - **`/leaderboard`** (public, `?tab=es|en|all`, default `all` = "Combinado"): top 50 with rank, @username, points, wins, current streak (🔥), best streak. Your own row is highlighted ("Tú") with your avatar; if you are outside the top 50, "Tu posición: #N" shows below. Page language follows the tab (`all` uses the browser language). Below the table: logged out → Discord sign-in button; logged in → avatar + @username. Plus the small "ⓘ Privacidad" link. Cerrar sesión and **Borrar mis datos** (asks for confirmation) are in the avatar popover: delete is secondary, never a big button.
-- **Privacy text** (the dialog): Discord handles the login, we never see password or email; we store Discord ID, username and results to show the ranking; **your Discord picture is only shown in your browser, we don't store it**; guest games don't count. That promise must stay true (see "Avatar" below).
-- **Delete my data:** removes the player row, all results and saved games, and the rate counter, then logs out, clears `c24_dc_avatar`, and shows the "deleted" toast. Logging in again later starts from zero.
+- **Privacy text** (the dialog; `lb_privacy`, `lb_avatar_note`, `lb_guest_note`; changed 2026-10-27): Discord handles the login, we never see password or email; we store Discord ID, username, **profile picture** and results to show the ranking and who is playing today; **other players see only your colors, never your words**; other players see your Discord picture in the live list (the ranking shows only your own); guest games don't count. The old "only shown in your browser, we don't store it" promise is gone (the live view needs the avatar). The inline fallbacks in `index.html` / `leaderboard.html` match the JSON keys; change both together.
+- **Delete my data:** removes the player row (with the avatar hash), all results and saved games, and the rate counters (guess and `:live` buckets), then logs out, clears `c24_dc_avatar`, and shows the "deleted" toast. Logging in again later starts from zero.
 - **Admin hide:** Discord user IDs in `ADMIN_DISCORD_IDS` see an "Ocultar" button on each row. A hidden player disappears from every ranking but can still play (their results keep being recorded).
 
 ## Data
 | Stored (Neon Postgres) | Never stored |
 |---|---|
-| Discord user ID, Discord username (max 32 chars, refreshed on each login), `hidden` flag, created date | Discord access token (lives only inside `discord_auth.identify()`) |
-| Per finished leaderboard game: language, Panama date, won, attempts, points, finish time | avatar hash (only passed to the player's own browser in the login redirect's `#dc=` fragment), email, banner, display name, locale or anything else Discord returns |
+| Discord user ID, Discord username (max 32 chars, refreshed on each login), **Discord avatar hash** (`avatar`, only if it matches `^(a_)?[0-9a-f]{32}$`, else NULL; refreshed on each login; owner decision 2026-10-27, for the live view), `hidden` flag, created date | Discord access token (lives only inside `discord_auth.identify()`) |
+| Per finished leaderboard game: language, Panama date, won, attempts, points, finish time | email, banner, display name, locale or anything else Discord returns |
 | Today's guesses (deleted after 2 days) | IP addresses, user agent |
-| Guesses per minute counter (deleted after ~2 minutes) | guest games (never sent, never imported on login) |
+| Per-minute request counters: guesses (key = ID) and live polling (key = `<id>:live`), deleted after ~2 minutes | guest games (never sent, never imported on login) |
 
 No app logging of tokens or IPs. Vercel's own platform request logs exist outside the app.
 
@@ -53,7 +53,7 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 3. Player approves on Discord; Discord sends them to `/auth/discord/callback?code=…&state=…`.
 4. **Cancel first:** if the callback has `?error=access_denied` (the player pressed Cancel on Discord), the server deletes `c24_oauth` and redirects to **`/?login=cancelled`** (a gentle notice, not an error). This is checked **before** the state check.
 5. Server checks `state` against the cookie (constant-time compare), trades the code for a token (`POST https://discord.com/api/oauth2/token`), calls `GET /api/users/@me`. `discord_auth.identify()` returns only **`(id, username, avatar_hash)`** and drops the rest and the token.
-6. Upserts the player (id + username only), sets `c24_lb`, deletes `c24_oauth`, redirects to `next` (only relative paths like `/lb/es`; anything else → `/`) with any `#…` in `next` replaced by the avatar fragment:
+6. Upserts the player (id, username, and the avatar hash if it has Discord's format, else NULL), sets `c24_lb`, deletes `c24_oauth`, redirects to `next` (only relative paths like `/lb/es`; anything else → `/`) with any `#…` in `next` replaced by the avatar fragment:
    - `#dc=<hash>` when the hash matches `^(a_)?[0-9a-f]{32}$`
    - `#dc=` (empty) when the player has no Discord avatar
    - no fragment at all when the hash doesn't match that format
@@ -62,8 +62,9 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 - **Logout:** `POST /auth/logout` clears `c24_lb` and goes to `/`. The page also clears localStorage `c24_dc_avatar`.
 - The `redirect_uri` is built from the address the visitor used, so **each domain must be listed in the Discord app's Redirects** exactly.
 
-## Avatar (shown only in the player's own browser)
-- **The server never stores, logs or puts the avatar hash in a cookie.** It only passes through the login redirect's URL fragment; browsers never send fragments back to servers. So the privacy promise stays true: "your Discord photo is shown only in your browser; we don't store it".
+## Avatar
+- **Since 2026-10-27 the server stores the avatar hash** (`wordle_players.avatar`) so the live view can show other players' pictures (`casa24-live-view`). It is still never logged or put in a cookie (`c24_lb` holds only the ID). Your **own** avatar in the header still comes from the login redirect's `#dc=` fragment, as below.
+- `/api/live` builds other players' `avatar_url` server-side; that URL contains their Discord ID (accepted by the owner; see `casa24-live-view`).
 - The page reads `#dc=` on load, saves localStorage **`c24_dc_avatar` = `{id, hash}`** (id = the logged-in Discord ID from the page), then removes the fragment with `history.replaceState`.
 - Picture URL, loaded by the browser straight from Discord: `https://cdn.discordapp.com/avatars/<id>/<hash>.png` (animated hashes start with `a_`). No hash (empty `#dc=`) or a load error → default avatar `https://cdn.discordapp.com/embed/avatars/<(id >> 22) % 6>.png` (compute with `BigInt`, the id is too big for a JS number).
 - A stored `c24_dc_avatar` whose `id` differs from the logged-in player is ignored. It is **removed on logout** (and on "Borrar mis datos").
@@ -94,11 +95,12 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
   - not set and not on Vercel → `MemoryStore` (Python dicts; lost on restart; used by tests and local dev)
   - not set on Vercel → `None` → leaderboard off
 - Tables, created automatically on first use (`CREATE TABLE IF NOT EXISTS`, guarded by an advisory lock):
-  - `wordle_players(discord_id PK, username, hidden, created_at)`
+  - `wordle_players(discord_id PK, username, hidden, created_at, avatar)` (`avatar` added 2026-10-27 by `ALTER TABLE … ADD COLUMN IF NOT EXISTS`, run on first use)
   - `wordle_results(discord_id → players ON DELETE CASCADE, lang, day, won, attempts, points, finished_at, PK(discord_id, lang, day))`
   - `wordle_games(discord_id → players ON DELETE CASCADE, lang, day, guesses jsonb, updated_at, PK(discord_id, lang, day))`
-  - `wordle_rate(discord_id, minute, count, PK(discord_id, minute))`
-- Cleanup happens during normal use (no cron): saving a guess deletes `wordle_games` rows older than 2 days; the first hit of each minute deletes `wordle_rate` rows older than 2 minutes. Deleting a player cascades results and games, and the rate rows are deleted separately.
+  - `wordle_rate(discord_id, minute, count, PK(discord_id, minute))` (`discord_id` is `<id>` for guesses, `<id>:live` for live polling)
+  - index `wordle_games_lang_day (lang, day, updated_at DESC)` for the live view
+- Cleanup happens during normal use (no cron): saving a guess deletes `wordle_games` rows older than 2 days; the first hit of each minute deletes `wordle_rate` rows older than 2 minutes. Deleting a player cascades results and games, and the rate rows (both buckets) are deleted separately.
 - One connection per request, closed at teardown (serverless friendly). DB errors become `StoreError` with no query text; `/api/guess` returns 503 `store`.
 - All SQL is constant with parameters (a test checks this).
 
@@ -110,6 +112,7 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 | `POST /auth/logout` | log out | 302 `/`; 403 other site |
 | `GET /lb/<lang>` | leaderboard game (es/en) | page; 302 to login if logged out; 404 if disabled |
 | `POST /api/guess` JSON `{lang, guess}` | one guess | 200 `{word, colors[5], done, won, answer, points, rank}` (answer/points/rank only when done, else null) |
+| `GET /api/live?lang=es\|en` | who else plays today, colors only (`casa24-live-view`) | 200 `{players:[{username, avatar_url, rows, done, won, live}], count}`; 401 `login`, 400 `bad_lang`, 429 `rate` (own 20/min bucket), 503 `store`, 404 `disabled`; `Cache-Control: no-store` |
 | `GET /leaderboard?tab=` | ranking page | page; 404 if disabled |
 | `POST /api/me/delete` | delete my data | 302 `/?deleted=1`; 401 JSON `login` if no cookie; 403 other site |
 | `POST /admin/hide` form `discord_id`, `hidden` (1/0), `tab` | hide/unhide | 302 `/leaderboard`; 403 not admin; 400 bad id |
@@ -127,9 +130,10 @@ Set in Vercel → casa24-wordle → Settings → Environment Variables, for Prod
 
 ## Tests
 - `tests/lb_testlib.py`: shared fixtures. `FakeDiscord` replaces `discord_auth.exchange_code` / `fetch_me` (returns extra fields like email/avatar on purpose; `FakeDiscord.avatar` defaults to a deliberately invalid hash so no `#dc=` is added, `VALID_AVATAR` is a real-format one); `mem` = a fresh `MemoryStore`; `lb_env` = fake env values + frozen Panama date; helpers `login()`, `guess()`, `answer()`, `wrong_words()`.
-- `tests/test_discord_auth.py`: login only asks `identify`, only id + username stored, bad/missing state, cancel → `/?login=cancelled`, other Discord error → `/?login=failed`, avatar hash only in the `Location` fragment (never in store/cookies/body), empty `#dc=` without avatar, no fragment for a malformed hash, `next`'s own fragment replaced, `next` must be relative, logout, tampered cookie.
+- `tests/test_discord_auth.py`: login only asks `identify`, only id + username + valid avatar hash stored, bad/missing state, cancel → `/?login=cancelled`, other Discord error → `/?login=failed`, avatar hash in the store (valid format only) and the `Location` fragment, never in cookies or the body, empty `#dc=` without avatar, no fragment for a malformed hash, `next`'s own fragment replaced, `next` must be relative, logout, tampered cookie.
 - `tests/test_leaderboard.py`: points, order, streaks, accents, coloring vs `game.js` (node), MemoryStore, `get_store()` choice, SQL parameterized, PostgresStore against a fake connection, `.env.local` loader, disabled without env, guess validation, other-site refused, records once, client date ignored, rate limit, guest makes zero writes, ranking rows, delete, admin hide/unhide.
-- `tests/test_leaderboard_ui.py`: rendered menu/game/leaderboard templates, plus Playwright browser tests with a faked `/api/guess`.
+- `tests/test_leaderboard_ui.py`: rendered menu/game/leaderboard templates, plus Playwright browser tests with a faked `/api/guess` (and live view tests with a faked `/api/live`).
+- `tests/test_live.py`: `/api/live` and `store.live()` (see `casa24-live-view`).
 - **No test talks to Discord or a real database.**
 - Run: `.venv/bin/python -m pytest -q tests` (or just `tests/test_leaderboard.py tests/test_discord_auth.py tests/test_leaderboard_ui.py`).
 - **Try it locally without Discord setup:** not possible through the real login (Discord must redirect back). Use the tests, or the real login below.
@@ -143,7 +147,7 @@ Set in Vercel → casa24-wordle → Settings → Environment Variables, for Prod
 - **Hide a user:** as admin, "Ocultar" on `/leaderboard`. **Unhide:** there is no button (hidden users aren't listed). Either POST `/admin/hide` with `discord_id=<id>&hidden=0` while logged in as admin, or in the Neon SQL editor: `UPDATE wordle_players SET hidden = false WHERE discord_id = '<id>';`.
 - **Change points:** edit `points()` in `webapp/leaderboard.py` and `test_points`. Results already stored keep their old points (they are saved per game); to recompute, run an `UPDATE wordle_results SET points = …` only with the owner's OK.
 - **Add another language to the leaderboard** (now es/en only): add it to `LB_LANGS` and `LB_TABS` in `app.py`, add a tab in `leaderboard.html`, add the `lb_*` text keys to that language's `language_config.json`, show the Discord area / guest toggle for its card in `index.html`/`index.js` (they currently assume es/en), add a Discord-free test, and check `casa24-text-and-languages` for its accent rules.
-- **Delete someone's data on request:** they can use "Borrar mis datos"; otherwise `DELETE FROM wordle_players WHERE discord_id = '<id>';` (cascades) plus `DELETE FROM wordle_rate WHERE discord_id = '<id>';`.
+- **Delete someone's data on request:** they can use "Borrar mis datos"; otherwise `DELETE FROM wordle_players WHERE discord_id = '<id>';` (cascades) plus `DELETE FROM wordle_rate WHERE discord_id IN ('<id>', '<id>:live');`.
 
 ## Troubleshooting
 | Symptom | Likely cause |

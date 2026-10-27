@@ -101,7 +101,7 @@ def test_menu_logged_out_shows_discord_button():
     assert "data-mode=" not in html and "data-guest-toggle" not in html
     # privacy only inside the (i) dialog, not in the main view
     assert "data-dc-privacy" in html and '<dialog id="c24-privacy"' in html
-    assert "no vemos tu contraseña" in html and "no se suman al ranking" in html and "no la guardamos" in html
+    assert "no vemos tu contraseña" in html and "no se suman al ranking" in html and "nunca tus palabras" in html
     assert "no vemos tu contraseña" not in main_view(html)
     assert "Discord handles your login" not in main_view(html)
     assert "/auth/logout" not in main_view(html) and "data-dc-toggle" not in main_view(html)  # logged out
@@ -413,4 +413,241 @@ def test_leaderboard_game_flow(server, page):
     # nothing about the leaderboard game is kept in the browser
     saved = page.evaluate("JSON.stringify(Object.assign({}, localStorage))")
     assert "jam" not in saved and '"es":[{' not in saved
+    assert errors == []
+
+
+# ---------- live view: who else plays today (colors only) ----------
+
+from lb_testlib import client, discord, lb_env, login, mem, today  # noqa: E402,F401 (fixtures)
+
+C, S, I = "correct", "semicorrect", "incorrect"
+# Words that must never show up: one player's payload is stuffed with letters
+# (as if the server misbehaved); the page only ever draws colors.
+LEAKY_WORDS = ["perro", "gatos", "jamon", "jamón", "cosas", "pizza"]
+LIVE_PLAYERS = [
+    {"username": "dj_montuno", "avatar_url": "https://cdn.discordapp.com/avatars/123/" + "ab" * 16 + ".png?size=64",
+     "rows": [[I, S, I, I, I], [C, C, C, I, C]], "done": False, "won": False, "live": True},
+    {"username": "heisen", "avatar_url": "https://cdn.discordapp.com/embed/avatars/2.png",
+     "rows": [[I, I, S, I, I], [C] * 5], "done": True, "won": True, "live": False},
+    {"username": "sneaky", "avatar_url": "https://evil.example/track.png",
+     "rows": [list("perro"), ["gatos", C, "jamón", S, I], "cosas"], "word": "pizza", "answer": "jamon",
+     "guesses": ["perro", "gatos"], "done": True, "won": False, "live": False},
+    {"username": "una_persona_con_nombre_larguisimo", "avatar_url": "https://cdn.discordapp.com/embed/avatars/3.png",
+     "rows": [], "done": False, "won": False, "live": True},
+] + [{"username": f"player{i}", "avatar_url": "https://cdn.discordapp.com/embed/avatars/1.png",
+      "rows": [[I, S, I, C, I]], "done": False, "won": False, "live": False} for i in range(6)]
+
+PNG_1PX = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c6360f8cff01f0005010201a0e2d2b80000000049454e44ae426082")
+
+
+def test_lb_game_renders_live_view():
+    html = render_game("es", lb=True, lb_state=None, lb_enabled=True, lb_user=ME)
+    assert 'id="c24-live"' in html and "data-live-open" in html
+    assert "Jugando hoy" in html and "Nadie más está jugando ahora" in html
+    assert 'referrerpolicy="no-referrer"' in html and 'loading="lazy"' in html
+    assert "Ver quién está jugando hoy" in html  # people button label
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_guest_game_has_no_live_view(lb_off, lang):
+    html = app.app.test_client().get(f"/{lang}").get_data(as_text=True)
+    assert 'id="c24-live"' not in html and "data-live-open" not in html
+
+
+def test_guest_game_has_no_live_view_when_enabled(lb_env, client, discord):
+    login(client, discord)
+    html = client.get("/es").get_data(as_text=True)
+    assert "const LB = false;" in html
+    assert 'id="c24-live"' not in html and "data-live-open" not in html
+
+
+def test_lb_route_renders_live_view(lb_env, client, discord):
+    login(client, discord)
+    r = client.get("/lb/en")
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'id="c24-live"' in html and "data-live-open" in html
+    assert "Playing today" in html
+
+
+def test_live_text_keys_in_es_and_en():
+    for lang in ("es", "en"):
+        text = app.Language(lang, app.language_codes_5words[lang]).config["text"]
+        for key in ("lb_live_title", "lb_live_empty", "lb_live_now", "lb_live_open"):
+            assert text.get(key, "").strip(), (lang, key)
+
+
+def open_lb(server, page, players=LIVE_PLAYERS, status=200, calls=None, errors=None):
+    """The leaderboard game page with a faked /api/live; returns the list of /api/live calls."""
+    html = render_game("es", lb=True, lb_state=None, lb_enabled=True, lb_user=ME)
+    calls = [] if calls is None else calls
+    if errors is not None:
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+
+    def live(route):
+        calls.append(route.request.url)
+        current = status() if callable(status) else status
+        body = {"players": players, "count": len(players)} if current == 200 else {"error": "rate" if current == 429 else "login"}
+        route.fulfill(status=current, content_type="application/json", body=json.dumps(body))
+
+    page.route("https://cdn.discordapp.com/**", lambda r: r.fulfill(status=200, content_type="image/png", body=PNG_1PX))
+    page.route(server + "/lb/es", lambda r: r.fulfill(body=html, content_type="text/html"))
+    page.route(server + "/api/live?**", live)
+    page.goto(server + "/lb/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('.key')")
+    return calls
+
+
+def live_text_has_no_words(page):
+    text = page.evaluate("document.body.innerText").lower()
+    live_html = page.inner_html("#c24-live").lower()
+    for w in LEAKY_WORDS:
+        assert w not in text and w not in live_html, w
+    # the mini boards are empty squares: no text inside them at all
+    assert page.evaluate("[...document.querySelectorAll('.c24-live-grid')].map(g => g.textContent.trim()).join('')") == ""
+
+
+def test_live_sidebar_on_desktop(server, page):
+    errors = []
+    page.set_viewport_size({"width": 1366, "height": 768})
+    calls = open_lb(server, page, errors=errors)
+    page.wait_for_selector(".c24-live-card")
+    assert calls and calls[0].endswith("/api/live?lang=es")
+    assert page.is_visible("#c24-live") and not page.is_visible("[data-live-open]")
+    assert page.locator(".c24-live-card").count() == len(LIVE_PLAYERS)
+    assert page.locator(".c24-live-grid").first.locator("span").count() == 30
+    first = page.locator(".c24-live-card").first
+    assert "@dj_montuno" in first.inner_text() and page.is_visible(".c24-live-dot")
+    assert first.locator(".is-correct").count() == 4 and first.locator(".is-semicorrect").count() == 1
+    img = first.locator("img")
+    assert img.get_attribute("referrerpolicy") == "no-referrer" and img.get_attribute("alt") == ""
+    # a URL that isn't Discord's CDN is never loaded
+    srcs = page.eval_on_selector_all(".c24-live-avatar", "els => els.map(e => e.getAttribute('src'))")
+    assert all(s.startswith("https://cdn.discordapp.com/") for s in srcs)
+    # the stuffed player shows only colors (unknown values = empty squares)
+    sneaky = page.locator(".c24-live-card").nth(2)
+    assert sneaky.locator(".is-empty").count() == 27  # only C, S, I of row 2 are colors
+    live_text_has_no_words(page)
+    # the sidebar never covers the game
+    side = page.locator("#c24-live").bounding_box()
+    for sel in (".c24-board", ".c24-keyboard", "header.c24-header"):
+        assert not boxes_overlap(side, page.locator(sel).bounding_box()), sel
+    assert errors == []
+
+
+def test_live_sheet_on_phone(server, page):
+    errors = []
+    page.set_viewport_size({"width": 390, "height": 844})
+    open_lb(server, page, errors=errors)
+    page.wait_for_selector("[data-live-open] .c24-live-badge")
+    assert page.inner_text("[data-live-open] .c24-live-badge") == str(len(LIVE_PLAYERS))
+    assert not page.is_visible("#c24-live")
+    # opens and closes with ×, Esc and a tap outside
+    page.click("[data-live-open]")
+    assert page.is_visible("#c24-live") and page.get_attribute("[data-live-open]", "aria-expanded") == "true"
+    sheet = page.locator("#c24-live").bounding_box()
+    assert sheet["y"] >= 0 and sheet["y"] + sheet["height"] <= 844 + 0.5 and sheet["width"] <= 390
+    live_text_has_no_words(page)
+    page.click("[data-live-close]")
+    assert not page.is_visible("#c24-live")
+    page.click("[data-live-open]")
+    page.keyboard.press("Escape")
+    assert not page.is_visible("#c24-live")
+    page.click("[data-live-open]")
+    page.mouse.click(195, 30)  # the backdrop, above the sheet
+    assert not page.is_visible("#c24-live")
+    # typing still goes to the board after closing
+    page.keyboard.press("c")
+    assert page.locator("main .grid-cols-5 > div").first.inner_text().strip().lower() == "c"
+    assert errors == []
+
+
+def test_live_empty_state(server, page):
+    page.set_viewport_size({"width": 390, "height": 844})
+    open_lb(server, page, players=[])
+    page.click("[data-live-open]")
+    page.wait_for_selector(".c24-live-empty", state="visible")
+    assert "Nadie más está jugando ahora" in page.inner_text("#c24-live")
+    assert page.locator("[data-live-open] .c24-live-badge").count() == 0
+
+
+def test_live_polling_pauses_when_hidden_and_backs_off(server, page):
+    page.clock.install()
+    state = {"status": 200}
+    calls = open_lb(server, page, status=lambda: state["status"])
+    page.wait_for_selector(".c24-live-card", state="attached")
+    assert len(calls) == 1
+
+    def advance(ms):
+        page.clock.run_for(ms)
+        page.wait_for_timeout(150)  # let the faked response arrive
+
+    advance(8100)
+    assert len(calls) == 2
+    # hidden tab: no requests at all
+    page.evaluate("""() => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => true});
+                             document.dispatchEvent(new Event('visibilitychange')); }""")
+    advance(60000)
+    assert len(calls) == 2
+    # visible again: asks right away
+    page.evaluate("""() => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => false});
+                             document.dispatchEvent(new Event('visibilitychange')); }""")
+    page.wait_for_timeout(150)
+    assert len(calls) == 3
+    # 429: the wait doubles (16 s), then success brings it back to 8 s
+    state["status"] = 429
+    advance(8100)
+    assert len(calls) == 4
+    advance(8100)
+    assert len(calls) == 4
+    state["status"] = 200
+    advance(8000)
+    assert len(calls) == 5
+    advance(8100)
+    assert len(calls) == 6
+    # logged out (401): polling stops
+    state["status"] = 401
+    advance(8100)
+    assert len(calls) == 7
+    advance(120000)
+    assert len(calls) == 7
+
+
+LIVE_SIZES = [(320, 568), (390, 844), (844, 390), (768, 1024), (1024, 768), (1366, 768), (1920, 1080)]
+
+
+@pytest.mark.parametrize("width,height", LIVE_SIZES)
+def test_live_layout_fits_without_overlap(server, page, width, height):
+    errors = []
+    page.set_viewport_size({"width": width, "height": height})
+    open_lb(server, page, errors=errors)
+    page.wait_for_selector(".c24-live-card", state="attached")
+    page.wait_for_timeout(100)
+    assert page.evaluate("document.documentElement.scrollHeight") <= height
+    assert page.evaluate("document.documentElement.scrollWidth") <= width
+    boxes = page.evaluate(HEADER_BOXES)
+    for i, a in enumerate(boxes):
+        assert a["x"] >= 0 and a["x"] + a["width"] <= width + 0.5, a
+        for b in boxes[i + 1:]:
+            assert not boxes_overlap(a, b), (a, b)
+    board = page.locator(".c24-board").bounding_box()
+    keys = page.locator(".c24-keyboard").bounding_box()
+    assert board["y"] >= 0 and board["y"] + board["height"] <= height + 0.5
+    assert keys["y"] + keys["height"] <= height + 0.5
+    sidebar = width >= 1024 and height > 500
+    assert page.is_visible("#c24-live") == sidebar
+    assert page.is_visible("[data-live-open]") == (not sidebar)
+    if sidebar:
+        side = page.locator("#c24-live").bounding_box()
+        for other in (board, keys, page.locator("header.c24-header").bounding_box()):
+            assert not boxes_overlap(side, other)
+    else:
+        page.click("[data-live-open]")
+        sheet = page.locator("#c24-live").bounding_box()
+        assert sheet["y"] >= 0 and sheet["y"] + sheet["height"] <= height + 0.5
+        assert sheet["x"] >= 0 and sheet["x"] + sheet["width"] <= width + 0.5
+        page.keyboard.press("Escape")
     assert errors == []

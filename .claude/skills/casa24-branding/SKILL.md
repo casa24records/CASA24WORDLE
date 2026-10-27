@@ -1,6 +1,6 @@
 ---
 name: casa24-branding
-description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kolo mascot art (including the random end-screen Kolo), logo slot, fonts and their licenses, favicons, tile animations. Use when editing style.css, theme.js, the tile animations in game.js, images, fonts, or when the owner shares new brand assets.
+description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kolo mascot art (including the random end-screen Kolo), logo slot, fonts and their licenses, favicons, tile animations, live view look. Use when editing style.css, theme.js, the tile animations in game.js, images, fonts, or when the owner shares new brand assets.
 ---
 
 # Branding and themes
@@ -24,11 +24,13 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 - The original Tailwind classes (`bg-white`, `text-neutral-500`, `border-gray-300`, ...) are remapped to tokens in the "base" section. A newly used Tailwind color class needs a mapping there, or it will look wrong in dark mode.
 - **Browser bar color** (`theme-color` meta in both templates): light `#f4efe6` (cream), dark `#0f1a12`. Change them together with `--c24-bg` if the background changes.
 - **Hover** styles go only inside `@media (hover: hover) and (pointer: fine)` at the end of `style.css`, so they don't stick after a tap on phones.
+- **`--c24-live`** (the green "en vivo" dot and label in the live view): light `#1f8a46`, dark `#4cc477`. It is in **all three theme blocks** (`:root`, the dark media query, `:root[data-theme="dark"]`); keep the two dark values identical.
 - **Dark-mode keys:** unused keys (`#5d6d61`) must be *lighter* than ruled-out letters (`#2b312d`), or players can't tell them apart.
 
 ## Header
 Both pages use `.c24-header` (3 columns: icons, title, icons), `.c24-header-title`, the logo `.c24-logo`, the language badge `.c24-badge`, and `.c24-icon-btn` (44 px round icon buttons). Layout details: `casa24-responsive`.
-- **Top-left, when the leaderboard is on (owner, 2026-10-26/27):** the logged-in player's **round Discord avatar** first; logged out, a small Discord-logo icon button takes its place. On the menu the **trophy icon** (link to `/leaderboard`) follows, then the info button (hidden under 420 px wide). Tapping the avatar opens a small popover (@username, Ver leaderboard, Cerrar sesión, and Borrar mis datos only on `/leaderboard`). The avatar picture comes from Discord's CDN in the player's browser only (how: `casa24-leaderboard`).
+- **Top-left, when the leaderboard is on (owner, 2026-10-26/27):** the logged-in player's **round Discord avatar** first; logged out, a small Discord-logo icon button takes its place. On the menu the **trophy icon** (link to `/leaderboard`) follows, then the info button (hidden under 420 px wide). Tapping the avatar opens a small popover (@username, Ver leaderboard, Cerrar sesión, and Borrar mis datos only on `/leaderboard`). The avatar picture comes from Discord's CDN (how: `casa24-leaderboard`).
+- **Top-right on the leaderboard game (narrower than 1024px):** a **"people" line SVG icon** (`.c24-live-btn`, same stroke style as the other header icons, no emoji) with a small orange count badge opens the live view sheet. Below 420px the game header hides the "Casa 24" text (`.c24-title-text`) to make room; Kolo's face and badges stay (owner may revisit).
 - **Nothing may overlap** at any width (320, 375, 390, 844×390 landscape, 768, 1366).
 
 ## Start screen styles
@@ -41,6 +43,14 @@ Both pages use `.c24-header` (3 columns: icons, title, icons), `.c24-header-titl
 - **Less text:** notices are short auto-dismiss toasts (`.c24-dc-toast`), privacy is a small "ⓘ Privacidad" link opening a dialog (`.c24-privacy`), the end window shows rank/points as big numbers, "Borrar mis datos" is secondary (only in the avatar popover on `/leaderboard`).
 - **Tokens only** (`--c24-*`), so dark mode works with no extra rules. The only fixed colors are Discord Blurple (above), white text on the green active tab and on the Blurple button, the white knob of the guest switch (`.c24-switch`), and the "Delete my data" red `#d9534f` (same red as the Developer view's wrong-password message).
 - `/leaderboard` loads `style.css` and `theme.js` but not Tailwind, so it uses no Tailwind classes; it has the same header, logo slot and moon/sun theme button as the menu.
+
+## Live view styles
+The "live view" section of `style.css` (after the leaderboard styles; feature: `casa24-live-view`, layout: `casa24-responsive`). Token-only:
+- `.c24-live` (sidebar ≥1024px on `--c24-bg` with a `--c24-line` right border; otherwise a bottom sheet on `--c24-surface` with rounded top corners and a shadow), `.c24-live-backdrop` (black, 35%).
+- Title `.c24-live-title` (small uppercase, `--c24-subtle`) with a count pill `.c24-live-count` (`--c24-hover`).
+- Cards `.c24-live-card`: round 34px avatar `.c24-live-avatar`, bold `@name` with ellipsis, status line: `.c24-live-now` + `.c24-live-dot` in `--c24-live`, and `.c24-live-result` (✓ on the correct-tile green, ✗ on the absent gray).
+- Mini board `.c24-live-grid`: 6×5 squares (10px, 11px from 1280px), using the tile tokens `--c24-correct-bg`, `--c24-present-bg`, `--c24-absent-bg`; empty cells are outlined at 55% opacity. In dark mode the absent squares get a `--c24-line-strong` border so they stand out. **Never put letters in them.**
+- Header button badge `.c24-live-badge`: orange (`--c24-orange`) with ink text.
 
 ## Dark mode: `webapp/static/theme.js`
 - Loaded in `<head>` of every page (menu, game, `/leaderboard`), before anything renders, so there is no flash.

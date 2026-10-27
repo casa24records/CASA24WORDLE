@@ -1,6 +1,6 @@
 ---
 name: casa24-decisions
-description: Decisions the Casa 24 owner already made about the Wordle project (scope, languages, words, privacy, guest/leaderboard modes, Discord login, database, branding, hosting) and why. Check this before proposing changes so settled questions are not re-asked or undone.
+description: Decisions the Casa 24 owner already made about the Wordle project (scope, languages, words, privacy, guest/leaderboard modes, Discord login, live view, database, branding, hosting) and why. Check this before proposing changes so settled questions are not re-asked or undone.
 ---
 
 # Decisions already made (October 2026)
@@ -44,7 +44,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 How it works: `casa24-leaderboard`.
 - **Two modes for es/en:** guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest); when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch. Other languages stay guest only.
 - **Discord login, scope `identify` only, no bot.** Discord app "Casa 24 Wordle". We never see passwords or email.
-- **Minimal data:** Discord ID, username, a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), a per-minute counter. **Never** tokens, avatar, email or IPs. Privacy text in a small "ⓘ Privacidad" popover (see below), plus "Borrar mis datos".
+- **Minimal data:** Discord ID, username, Discord avatar hash (since 2026-10-27, see "Live view"), a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), per-minute counters. **Never** tokens, email or IPs. Privacy text in a small "ⓘ Privacidad" popover (see below), plus "Borrar mis datos".
 - **Database: Neon Postgres** through the Vercel Marketplace, a new separate database `casa24-wordle-db`. Not Upstash (the first plan, dropped by the owner), and not GitHub-as-a-database. The kanban project has its own Neon and Upstash: **never share or reuse them**.
 - **Points:** win in 1 = 6 … win in 6 = 1, loss = 0. Ranking: points, then wins, then who reached the total first. The server computes everything; the answer never reaches the browser in leaderboard mode.
 - **Guest games never count** and are never imported when someone logs in later.
@@ -58,11 +58,22 @@ How it works: `casa24-leaderboard` (login flow, avatar, UI); look: `casa24-brand
 - **Official Discord sign-in button:** Discord Blurple `#5865F2`, white official Discord logo (inline SVG), 48 px tall, hover `#4752C4`. A fixed brand color is an allowed exception to the tokens-only rule.
 - **On the menu the Discord button shows right away** on page load (no need to pick a mode first), and it is **server-rendered**, so nothing jumps when the page loads.
 - **Logged in: the player's Discord avatar (round) sits in the top-left of the header, before the trophy icon.** Tapping it opens a small popover: @username, "Ver leaderboard", "Cerrar sesión" (and "Borrar mis datos").
-- **The avatar never touches our server's storage.** The callback passes the hash only in the redirect's URL fragment `#dc=<hash>`; the page keeps it in localStorage `c24_dc_avatar` `{id, hash}`, removes the fragment with `history.replaceState`, and the browser loads the picture from `cdn.discordapp.com`. No hash → Discord's default avatar `embed/avatars/<(id>>22)%6>.png`. Cleared on logout. **The privacy promise stays true:** the photo is shown only in the player's own browser; we never store it. Don't add the avatar to the database, cookies or logs.
+- **Own avatar in the header:** the callback passes the hash in the redirect's URL fragment `#dc=<hash>`; the page keeps it in localStorage `c24_dc_avatar` `{id, hash}`, removes the fragment with `history.replaceState`, and the browser loads the picture from `cdn.discordapp.com`. No hash → Discord's default avatar `embed/avatars/<(id>>22)%6>.png`. Cleared on logout.
+- ~~The avatar never touches our server's storage~~ — **superseded 2026-10-27** by the live view: the owner chose to store the avatar hash (see below). It is still never put in cookies or logs.
 - **Cancel on Discord is not an error:** `?error=access_denied` → `/?login=cancelled` (a gentle notice); other failures → `/?login=failed`. `prompt=none` stays.
 - **Leaderboard access is a trophy line icon (SVG)** in the top-left of the header, not an emoji and not a "Ver leaderboard" text link. The 🏆 emoji is replaced by this SVG everywhere.
 - **Less text, UI that speaks for itself:** no privacy paragraph on the menu; the full privacy text lives only in a small "ⓘ Privacidad" popover. Notices are short toasts that close themselves. The end window shows rank and points as big numbers. "Borrar mis datos" is secondary (avatar popover or a small link), never a big button.
 - **Nothing may overlap anything at any screen size.** Check at 320, 375, 390, 844×390 (landscape), 768 and 1366 px wide (see `casa24-responsive`).
+
+## Live view (decided 2026-10-27)
+How it works: `casa24-live-view`.
+- **While playing the leaderboard game you see who else is playing today's word** (same language), like NYT Wordle's Discord activity: avatar, @username, live dot, ✓/✗ and a mini board.
+- **Colors only, never letters.** The server computes the colors; words and the answer are never sent.
+- **Discord players only:** only logged-in leaderboard players see it, and only they appear in it. Guest games never leave the browser.
+- **Discord avatars are shown, so the avatar hash is now stored** (`wordle_players.avatar`, Discord's format only, refreshed at login, removed by "Borrar mis datos"). This replaces the earlier "we never store your photo" rule.
+- **Privacy text updated** (`lb_privacy`, `lb_avatar_note`): we store ID, username, profile picture and results for the ranking and "who is playing today"; others see only your colors.
+- **The avatar URL exposes the player's Discord ID** (`cdn.discordapp.com/avatars/<id>/<hash>.png`). Accepted: Discord IDs are public inside Discord. If this ever matters, proxy the images through our domain.
+- Live = polling every 8 s (no WebSockets on Vercel serverless). Desktop sidebar from 1024px; a header people button + bottom sheet elsewhere. Below 420px the leaderboard game header hides the "Casa 24" title text to fit the extra button (the owner may revisit).
 
 ## Privacy
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.

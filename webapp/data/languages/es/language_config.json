@@ -38,7 +38,7 @@
         "lb_view": "Ver leaderboard",
         "lb_login": "Entrar con Discord",
         "lb_logout": "Cerrar sesión",
-        "lb_privacy": "Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID y tu nombre de usuario de Discord y tus resultados para mostrar el ranking.",
+        "lb_privacy": "Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID, tu nombre de usuario y tu foto de perfil de Discord y tus resultados para mostrar el ranking y quién está jugando hoy. Los demás jugadores ven solo tus colores, nunca tus palabras.",
         "lb_guest_note": "Las partidas como invitado no se suman al ranking.",
         "lb_login_failed": "No se pudo entrar con Discord. Intenta de nuevo.",
         "lb_deleted": "Listo: borramos tus datos del leaderboard.",
@@ -63,13 +63,17 @@
         "lb_back": "Menú",
         "lb_signin": "Entrar con Discord",
         "lb_login_cancelled": "Cancelaste el inicio de sesión con Discord.",
-        "lb_avatar_note": "Tu foto de Discord solo se muestra en tu navegador; no la guardamos.",
+        "lb_avatar_note": "Tu foto de Discord la ven los demás jugadores en la lista de quién está jugando hoy.",
         "lb_account": "Tu cuenta de Discord",
         "lb_privacy_title": "Privacidad",
         "lb_play_guest": "Jugar como invitado (no cuenta)",
         "lb_rank_label": "Puesto",
         "lb_points_label": "puntos",
-        "lb_point_label": "punto"
+        "lb_point_label": "punto",
+        "lb_live_title": "Jugando hoy",
+        "lb_live_empty": "Nadie más está jugando ahora",
+        "lb_live_now": "en vivo",
+        "lb_live_open": "Ver quién está jugando hoy"
     },
     "right_to_left": "false",
     "help": {

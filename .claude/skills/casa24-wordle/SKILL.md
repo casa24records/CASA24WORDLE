@@ -1,6 +1,6 @@
 ---
 name: casa24-wordle
-description: Start here for anything about Casa 24 Wordle — what the game is, how it is built, guest vs leaderboard (Discord) modes and their routes, what happens when a player presses Enter (game flow, repeated guesses, win/lose end screen), the one-word-per-day rule, and which casa24-* skill covers words, text/accents, branding/dark mode/Kolo/animations, testing, deployment, git/GitHub, or past decisions.
+description: Start here for anything about Casa 24 Wordle — what the game is, how it is built, guest vs leaderboard (Discord) modes and their routes, the live view (who is playing today), what happens when a player presses Enter (game flow, repeated guesses, win/lose end screen), the one-word-per-day rule, and which casa24-* skill covers words, text/accents, branding/dark mode/Kolo/animations, testing, deployment, git/GitHub, or past decisions.
 ---
 
 # Casa 24 Wordle (overview)
@@ -13,7 +13,7 @@ Casa 24 Records' daily word game. Published from `main`; feature work happens on
 - **One word per language per day, the same for every player.** It changes at midnight Panama time (UTC-5). About 1 day in 5 the es/en word is a Casa 24 word. Details: `casa24-daily-word`.
 - **Two ways to play:**
   - **Guest** (default, all 10 languages): no account, nothing sent to the server. Stats live in the browser's localStorage.
-  - **Leaderboard** (es and en only): sign in with Discord (scope `identify`, only the Discord ID and username are stored). The server checks and colors every guess, keeps the score in a Postgres database, and ranks players. The browser never gets the answer until the game is over. Off (all its routes 404) unless the Discord env vars, `SECRET_KEY` and a store are there. Details, scoring, privacy and storage: `casa24-leaderboard`.
+  - **Leaderboard** (es and en only): sign in with Discord (scope `identify`; the Discord ID, username and avatar hash are stored). The server checks and colors every guess, keeps the score in a Postgres database, and ranks players. The browser never gets the answer until the game is over. Off (all its routes 404) unless the Discord env vars, `SECRET_KEY` and a store are there. Details, scoring, privacy and storage: `casa24-leaderboard`. While playing, a **live view** shows the other leaderboard players of today's word (avatar, @username, a mini board of colors only): `casa24-live-view`.
 - No analytics.
 - Start screen (`/`): Español/English cards first (last played, else browser language) with "played today" and streak, then the other 8 languages. No links to other sites. When the leaderboard is on (owner rule: less text, the UI speaks for itself):
   - **Logged out:** the official Discord sign-in button (Blurple, server-rendered so it shows at once) above the cards, plus a small "ⓘ Privacidad" link that opens a `<dialog>` (the full privacy text lives only there). The cards play the guest game.
@@ -25,10 +25,11 @@ Casa 24 Records' daily word game. Published from `main`; feature work happens on
 ## Routes
 - Guest: `/`, `/<lang>`, `/sitemap.xml`. Developer view: `/demo`, `/demo/<lang>`.
 - Leaderboard (all 404 when it's off):
-  - `/lb/<lang>` (es/en; other codes go to `/lb/es`): the game in leaderboard mode, same `game.html` with `lb=True`, a line trophy badge and the avatar menu in the header. Not logged in → Discord login first.
+  - `/lb/<lang>` (es/en; other codes go to `/lb/es`): the game in leaderboard mode, same `game.html` with `lb=True`, a line trophy badge, the avatar menu and the live view's people button in the header (sidebar instead from 1024px). Not logged in → Discord login first.
   - `/leaderboard?tab=es|en|all`: public ranking page (`leaderboard.html`); compact line under the table (avatar + @username, or the sign-in button) and the privacy link; "Borrar mis datos" is in the avatar popover.
-  - `/auth/discord/login?next=…`, `/auth/discord/callback`, `/auth/logout` (POST): Discord login; the signed `c24_lb` cookie holds only the Discord ID. After login the redirect carries `#dc=<avatar hash>`, which the page keeps only in localStorage `c24_dc_avatar` (never on the server). Cancel → `/?login=cancelled`, other errors → `/?login=failed`.
+  - `/auth/discord/login?next=…`, `/auth/discord/callback`, `/auth/logout` (POST): Discord login; the signed `c24_lb` cookie holds only the Discord ID. After login the redirect carries `#dc=<avatar hash>`, which the page keeps in localStorage `c24_dc_avatar` for the header; since 2026-10-27 the server also stores the hash for the live view. Cancel → `/?login=cancelled`, other errors → `/?login=failed`.
   - `/api/guess` (POST, JSON `{lang, guess}`): checks and colors one guess.
+  - `/api/live?lang=es|en` (GET, logged in): other players today, colors only; polled every 8 s by `game.js`. See `casa24-live-view`.
   - `/api/me/delete` (POST): "Delete my data", removes the player and all results.
   - `/admin/hide` (POST): admins (`ADMIN_DISCORD_IDS`) hide a name on the ranking.
 
@@ -61,6 +62,7 @@ Animations and Kolo pictures: `casa24-branding`.
 | Commit, push to GitHub, which account, history rules | `casa24-git-and-github` |
 | Mobile/desktop layout, screen sizes, zoom, landscape, page speed | `casa24-responsive` |
 | Leaderboard: Discord login, scoring, ranking, storage (Neon Postgres), privacy, admin hide | `casa24-leaderboard` |
+| Live view: who is playing today, sidebar/sheet, mini boards, polling, `/api/live` | `casa24-live-view` |
 | Developer view / demo (`/demo`): env var and password `casa24-deploy`, run locally `casa24-test-and-preview`, why `casa24-decisions` (how it works: above) | `casa24-deploy` |
 | Why things are the way they are (decisions already made) | `casa24-decisions` |
 
@@ -69,11 +71,11 @@ Animations and Kolo pictures: `casa24-branding`.
 webapp/app.py            routes (/, /<lang>, /demo, /demo/<lang>, /sitemap.xml, plus the leaderboard routes above), data loading, Language class (keyboards: _generate_alphabetical_keyboard),
                          template helpers asset() (?v= URLs), asset_version(), json_script()
 webapp/daily.py          daily-word schedule (pure functions)
-webapp/discord_auth.py   Discord OAuth (identify only): login URL, code -> ID + username
+webapp/discord_auth.py   Discord OAuth (identify only): login URL, code -> ID + username + avatar hash
 webapp/leaderboard.py    leaderboard rules (pure): server-side colors, accent resolving, points, streaks
-webapp/store.py          leaderboard storage: Postgres when DATABASE_URL is set, in-memory store locally/tests
+webapp/store.py          leaderboard storage: Postgres when DATABASE_URL is set, in-memory store locally/tests; live() for /api/live
 webapp/data/languages/   word lists, language_config.json, keyboards
-webapp/templates/        index.html (start screen), game.html (game, also Developer view with demo=True),
+webapp/templates/        index.html (start screen), game.html (game, also Developer view with demo=True; live view aside in lb mode),
                          demo_login.html (Developer view password page), leaderboard.html (/leaderboard),
                          _discord.html (shared Discord macros: sign-in button, logo, trophy, avatar, header menu,
                          privacy link + dialog, toasts, #dc= avatar script; imported by index/game/leaderboard)

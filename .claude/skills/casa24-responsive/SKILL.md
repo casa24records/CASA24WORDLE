@@ -1,6 +1,6 @@
 ---
 name: casa24-responsive
-description: Make Casa 24 Wordle work well on every screen — small/large phones, landscape, tablets, laptops, big desktops. Layout rules (dvh, board sized from leftover height, square tiles, key sizes, modals that scroll, safe areas), where each layout class lives, what the 2026-10-26 fixes changed and what is still to do (Tailwind compile, WOFF2), NYT Wordle's measured layout, performance (Vue/Tailwind CDN, fonts, WebP, caching) and the sizes to test. Use for any mobile, desktop, responsive, layout, zoom, landscape, or page-speed question.
+description: Make Casa 24 Wordle work well on every screen — small/large phones, landscape, tablets, laptops, big desktops. Layout rules (dvh, board sized from leftover height, square tiles, key sizes, modals that scroll, safe areas), where each layout class lives (including the live view's sidebar/bottom-sheet breakpoints), what the 2026-10-26 fixes changed and what is still to do (Tailwind compile, WOFF2), NYT Wordle's measured layout, performance (Vue/Tailwind CDN, fonts, WebP, caching) and the sizes to test. Use for any mobile, desktop, responsive, layout, zoom, landscape, or page-speed question.
 ---
 
 # Responsive layout (phones → desktop)
@@ -9,7 +9,7 @@ Research done on 2026-10-26 by measuring 9 screen sizes, reading the code, and r
 
 ## Target layout (what "good" looks like)
 Based on NYT Wordle, which was measured directly.
-- **One centered column**, max about 500px wide, on every screen. No side panels on desktop; empty space is fine.
+- **One centered column**, max about 500px wide, on every screen. The only side panel is the leaderboard game's live view sidebar (≥1024px, see below); otherwise empty space is fine.
 - **Page height `100dvh`** (with a `100vh` fallback first), never plain `100vh` / `h-screen`. Otherwise mobile browser bars hide the bottom keyboard row. Use `dvh` only on the outer container, not on tiles.
 - **Header → board → keyboard**, as a flex column. The board area is `flex:1; min-height:0`. The board is **sized from the leftover height**: `width = min(350px…420px, area width, area height × 5/6)`, with `aspect-ratio: 5/6`. Tiles use `aspect-ratio: 1`, so they are always square. Do it with CSS container queries (`container-type:size` + `cqw/cqh`), or a ResizeObserver like NYT.
 - **Keys:**
@@ -53,6 +53,11 @@ All layout CSS is in the "LAYOUT" section of `webapp/static/style.css`; the clas
   - `/leaderboard` (`leaderboard.html`) is a **standalone page**: it loads `style.css` but **not Tailwind or Vue**, so the end of the leaderboard section has its own small reset (`.c24-lb-page` margins, buttons, links, `.uppercase`). Use `c24-*` classes there, not Tailwind classes. One column `.c24-lb`, max 40rem; it scrolls normally (`min-height` full screen, not fixed height).
   - Table `.c24-lb-table`: rank, player (long names cut with …), points always shown. **Wins** (`.c24-lb-opt1`) appear from **400px** wide, **streak and best streak** (`.c24-lb-opt2`) from **520px**, so a 320px phone never scrolls sideways.
   - Under the table: one compact centered line `.c24-dc-signed` (avatar + @username, wraps long names) or the Discord button `.c24-lb-login` (max 20rem), then the privacy link.
+  - **Live view** on `/lb/<lang>` (styles: "live view" section of `style.css`; feature: `casa24-live-view`):
+    - **≥1024px wide and ≥501px tall** (`@media (min-width: 1024px) and (min-height: 501px)`): `<aside class="c24-live">` is a fixed **left sidebar**, 240px wide (280px from 1280px, mini squares 11px instead of 10px). The game column stays centered; at 1024px it starts at 262px, so it never touches the sidebar. The people button, × and backdrop are hidden.
+    - **Everywhere else** (phones, tablets, landscape phones): the header gets a 44px **people button** `.c24-live-btn` (badge `.c24-live-badge`) and the list opens as a **bottom sheet** (`.c24-live.is-open`): `width: min(500px, 100%)`, `max-height: min(70% of height, 100% − 48px − top safe area)`, list scrolls inside, side and bottom safe areas, backdrop `.c24-live-backdrop`. Esc, ×, backdrop or the button close it.
+    - **Header < 420px:** the leaderboard game header (`.c24-header-lb`) has 2 icons left + 3 right, so it uses `grid-template-columns: auto minmax(0, 1fr) auto` and **hides the "Casa 24" text** (`.c24-title-text`); Kolo's face and the badges stay. Guest games keep the text. The owner may revisit this.
+    - Tested at 320, 390, 844×390 and 1366 (`test_live_layout_fits_without_overlap`): no page scroll, no overlap.
   - Tabs, buttons, Back link and the Discord button are at least 44px tap targets (the admin-only Hide button is 32px). Side padding is `max(16px, safe area)`.
 - Hover styles only inside `@media (hover: hover) and (pointer: fine)`.
 - Viewport meta: `width=device-width, initial-scale=1, viewport-fit=cover` (pinch-zoom allowed). theme-color: light `#f4efe6`, dark `#0f1a12`.
@@ -85,7 +90,7 @@ Performance done:
 - Targets (Core Web Vitals, mobile): LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1. Check with Lighthouse in mobile mode.
 
 ## Sizes to test
-**Owner rule: nothing may overlap** (header icons vs title, popover, Discord area, cards, end-window numbers) at **320, 375, 390, 844×390 landscape, 768 and 1366** wide; check these on every leaderboard/Discord UI change, logged in and logged out, on `/`, `/lb/es` and `/leaderboard`. Only the toasts may cover content (see above).
+**Owner rule: nothing may overlap** (header icons vs title, popover, Discord area, cards, end-window numbers) at **320, 375, 390, 844×390 landscape, 768 and 1366** wide; check these on every leaderboard/Discord UI change, logged in and logged out, on `/`, `/lb/es` and `/leaderboard`. On `/lb/es` also check 1024×768 (the live sidebar's first size) and open the live sheet on phones. Only the toasts may cover content (see above).
 
 Full list: 320×568, 375×667, 390×844, 430×932, 844×390 (landscape), 768×1024, 1024×768, 1366×768, 1920×1080. Use `is_mobile`/`has_touch` for phones and tablets.
 - Check in light and dark mode, and with es, vi (9 key rows), ko (7 rows), ar (RTL) and de/fr/tr (11-key rows).

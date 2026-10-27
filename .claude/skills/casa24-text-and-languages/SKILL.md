@@ -30,8 +30,9 @@ Current `text` keys:
 
 - Leaderboard (Discord mode; **es and en only**, like `demo_*`; the game reads them with `this.text`/`t()`, the menu and `/leaderboard` through `texts`):
   - Sign-in and account: `lb_signin` (Discord button and header icon: "Entrar con Discord" / "Sign in with Discord"), `lb_account` (aria label of the avatar button), `lb_view` (popover item and trophy icon label), `lb_logout`, `lb_play_guest` (logged-in switch "Jugar como invitado (no cuenta)")
-  - Privacy dialog: `lb_privacy_title` (the small "ⓘ Privacidad" link and the dialog title), `lb_privacy` (what Discord and we see/store), `lb_avatar_note` (the picture stays in your browser), `lb_guest_note` (guest games don't count)
+  - Privacy dialog: `lb_privacy_title` (the small "ⓘ Privacidad" link and the dialog title), `lb_privacy` (what Discord and we see/store), `lb_avatar_note` (where your Discord picture is shown), `lb_guest_note` (guest games don't count). **Changed 2026-10-27** for the live view: `lb_privacy` now says we store ID, username, profile picture and results "para mostrar el ranking y quién está jugando hoy" and that others see only your colors; `lb_avatar_note` no longer says the photo stays in your browser. The fallback strings in `index.html` / `leaderboard.html` still have the old wording (only used if a key is missing).
   - Toasts and errors: `lb_login_failed`, `lb_login_cancelled`, `lb_deleted`, `lb_dismiss` (× / Close label), `lb_error`
+  - Live view (`casa24-live-view`): `lb_live_title` ("Jugando hoy" / "Playing today"), `lb_live_empty` ("Nadie más está jugando ahora"), `lb_live_now` ("en vivo" / "live", next to the dot), `lb_live_open` (aria-label of the header people button)
   - Game end window: `lb_rank_label` ("Puesto"/"Rank", under the big "#N"), `lb_points_label` / `lb_point_label` ("puntos"/"punto", under "+N"; singular when exactly 1), `lb_hint` (pointer shown after a guest game)
   - `/leaderboard` page: `lb_title`, `lb_tab_es`, `lb_tab_en`, `lb_tab_all`, `lb_col_player`, `lb_col_points`, `lb_col_wins`, `lb_col_streak`, `lb_col_best`, `lb_you`, `lb_my_position`, `lb_empty`, `lb_delete`, `lb_delete_confirm`, `lb_hide`, `lb_back`
   - Removed: `lb_rank`, `lb_points`, `lb_point_one` (the numbers are now plain "#N" / "+N" with a label). Also removed with the mode switch: `lb_mode_label`, `lb_mode_guest`, `lb_mode_lb`, `lb_logged_in_as` (`lb_login` is still used by `index.html`).
@@ -51,7 +52,7 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
 - Keep labels short. Stats labels sit four in a row on a 390 px wide phone.
 - "Leaderboard" stays in English in Spanish text, as used everywhere so far ("Juega con leaderboard", "Ver leaderboard"); the list itself is "el ranking" ("entrar al ranking"), a place is "puesto" (label "Puesto"), a game won is "Ganadas". Discord login is "Entrar con Discord" / "Cerrar sesión" (English: "Sign in with Discord" / "Log out").
 - Owner rule for leaderboard/Discord UI: **less text, the UI speaks for itself.** Prefer an icon or a short label; long explanations go in the privacy dialog, not on the page.
-- Privacy text is plain and honest: say exactly what is stored (Discord ID, username, results) and what we never see (password, email).
+- Privacy text is plain and honest: say exactly what is stored (Discord ID, username, profile picture, results) and what we never see (password, email), and that other players see only colors.
 - Show new Spanish strings to the owner before committing big text changes.
 
 ## Accents

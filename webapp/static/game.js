@@ -16,6 +16,39 @@ try { LB_STATE = JSON.parse(document.getElementById("c24-lb-state").textContent)
 const TILE_BASE = "uppercase font-bold select-none text-white";
 const COLOR_RANK = { "incorrect": 1, "semicorrect": 2, "correct": 3 };
 
+// Live view (leaderboard game only): who else is playing today, colors only.
+// Polls GET /api/live every 8 s while the tab is visible; a 429 doubles the wait (max 60 s).
+const LIVE_EVERY = 8000;
+const LIVE_MAX = 60000;
+const LIVE_COLORS = { "correct": "is-correct", "semicorrect": "is-semicorrect", "incorrect": "is-incorrect" };
+const LIVE_AVATAR_RE = /^https:\/\/cdn\.discordapp\.com\/(avatars\/\d{1,20}\/(a_)?[0-9a-f]{32}\.png|embed\/avatars\/[0-5]\.png)(\?size=\d{2,4})?$/;
+const LIVE = { timer: null, delay: LIVE_EVERY, busy: false, stopped: false };
+
+function liveCells(rows) {
+    // 6 rows x 5 cells of color classes; anything unknown stays an empty cell (no text, ever)
+    var cells = [];
+    for (var r = 0; r < 6; r++) {
+        var row = Array.isArray(rows) && Array.isArray(rows[r]) ? rows[r] : [];
+        for (var c = 0; c < 5; c++) {
+            cells.push(LIVE_COLORS[row[c]] || "is-empty");
+        }
+    }
+    return cells;
+}
+
+function livePlayer(p) {
+    var avatar = typeof p.avatar_url === "string" && LIVE_AVATAR_RE.test(p.avatar_url)
+        ? p.avatar_url : "https://cdn.discordapp.com/embed/avatars/0.png";
+    return {
+        username: String(p.username || "").slice(0, 32),
+        avatar_url: avatar,
+        cells: liveCells(p.rows),
+        done: p.done === true,
+        won: p.won === true,
+        live: p.live === true,
+    };
+}
+
 function readFlag(key) {
     try { return localStorage.getItem(key) === "1"; } catch (e) { return false; }
 }
@@ -106,6 +139,10 @@ const app = Vue.createApp({
             lb_points: null,    // points for today's game, once it's over
             lb_rank: null,      // place in this language's ranking, once it's over
             lb_hint_off: readFlag("casa24_lb_hint_off"),
+            live_players: [],   // live view: other players today (colors only)
+            live_count: 0,
+            live_loaded: false, // first answer arrived (shows the empty state)
+            live_open: false,   // narrow screens: the bottom sheet is open
         }
     },
     computed: {
@@ -172,6 +209,11 @@ const app = Vue.createApp({
 
         if (this.game_over) {
             this.show_stats_modal = true;
+        }
+        if (LB) {
+            // live view: first ask after the board has rendered, then every 8 s while visible
+            document.addEventListener("visibilitychange", this.liveVisibility);
+            this.$nextTick(() => { setTimeout(this.liveFetch, 0); });
         }
     },
     beforeUpdate() {
@@ -359,6 +401,7 @@ const app = Vue.createApp({
         keyDown(event) {
             var key = event.key;
             if (key === "Escape") { // QoL
+                this.closeLive();
                 this.showHelpModal = false;
                 this.show_stats_modal = false;
                 this.show_options_modal = false;
@@ -573,6 +616,82 @@ const app = Vue.createApp({
                 window.location.reload();
             } else {
                 this.showNotification(this.text("lb_error", "Something went wrong. Please try again."));
+            }
+        },
+        liveFetch() {
+            // one GET /api/live; schedules the next one (unless hidden or stopped)
+            clearTimeout(LIVE.timer);
+            LIVE.timer = null;
+            if (LIVE.stopped || LIVE.busy || document.hidden) {
+                return;
+            }
+            LIVE.busy = true;
+            fetch("/api/live?lang=" + encodeURIComponent(this.config.language_code), {
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Accept": "application/json" },
+            }).then((response) => {
+                return response.json().catch(() => null).then((data) => ({ ok: response.ok, status: response.status, data: data }));
+            }).then((result) => {
+                LIVE.busy = false;
+                if (result.ok && result.data && Array.isArray(result.data.players)) {
+                    this.applyLive(result.data);
+                    LIVE.delay = LIVE_EVERY;
+                } else if (result.status === 401 || result.status === 404 || result.status === 400) {
+                    LIVE.stopped = true;  // logged out / feature off: stop asking
+                    return;
+                } else {
+                    LIVE.delay = Math.min(LIVE.delay * 2, LIVE_MAX);  // 429 rate or server trouble: back off
+                }
+                this.liveSchedule();
+            }).catch(() => {
+                LIVE.busy = false;
+                LIVE.delay = Math.min(LIVE.delay * 2, LIVE_MAX);
+                this.liveSchedule();
+            });
+        },
+        liveSchedule() {
+            clearTimeout(LIVE.timer);
+            LIVE.timer = null;
+            if (!LIVE.stopped && !document.hidden) {
+                LIVE.timer = setTimeout(this.liveFetch, LIVE.delay);
+            }
+        },
+        liveVisibility() {
+            // hidden tab: no polling; visible again: ask right away
+            if (document.hidden) {
+                clearTimeout(LIVE.timer);
+                LIVE.timer = null;
+            } else {
+                this.liveFetch();
+            }
+        },
+        applyLive(data) {
+            var players = data.players.filter((p) => p && typeof p === "object").slice(0, 50).map(livePlayer);
+            this.live_players = players;
+            this.live_count = Number.isInteger(data.count) && data.count >= 0 ? data.count : players.length;
+            this.live_loaded = true;
+        },
+        toggleLive() {
+            if (this.live_open) {
+                this.closeLive();
+                return;
+            }
+            this.live_open = true;
+            this.$nextTick(() => {
+                var close = document.querySelector("[data-live-close]");
+                if (close && close.offsetParent !== null) { close.focus(); }
+            });
+        },
+        closeLive() {
+            if (!this.live_open) {
+                return;
+            }
+            this.live_open = false;
+            // drop focus (like the keys), so a physical Enter next submits a word, not this button
+            var focused = document.activeElement;
+            if (focused && focused.closest && focused.closest("#c24-live, [data-live-open]")) {
+                focused.blur();
             }
         },
         dismissLbHint() {

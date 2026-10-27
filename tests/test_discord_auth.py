@@ -1,6 +1,7 @@
-"""Discord login with a fake Discord: only the ID goes in the cookie, only the
-username goes in the store; tokens, avatar, email etc. are never stored. The
-avatar hash only reaches the player's browser, in the redirect's #dc= fragment."""
+"""Discord login with a fake Discord: only the ID goes in the cookie; the store
+keeps the ID, the username and the avatar hash (only in Discord's format, else
+NULL); tokens, email etc. are never stored. The avatar hash also reaches the
+player's browser in the redirect's #dc= fragment, never a cookie or the body."""
 
 from urllib.parse import parse_qs, urlparse
 
@@ -34,7 +35,7 @@ def test_login_redirects_to_discord_with_identify_only(lb_env, client):
         assert flag in cookie
 
 
-def test_login_flow_keeps_only_id_and_username(lb_env, client, discord, mem):
+def test_login_flow_keeps_only_id_username_and_valid_avatar(lb_env, client, discord, mem):
     r = login(client, discord)
     assert r.status_code == 302
     assert r.headers["Location"] == "/lb/es"  # fake avatar isn't a valid hash: no fragment
@@ -45,13 +46,13 @@ def test_login_flow_keeps_only_id_and_username(lb_env, client, discord, mem):
     value = client.get_cookie("c24_lb").value
     assert decode_lb_cookie(value) == USER_ID  # the cookie holds only the ID
 
-    # the store has just the username for this player
-    assert mem.players == {USER_ID: {"username": "kolo_fan", "hidden": False}}
+    # the store has the username, and no avatar (the fake one isn't a valid hash)
+    assert mem.players == {USER_ID: {"username": "kolo_fan", "hidden": False, "avatar": None}}
     assert not mem.results and not mem.games and not mem.rate
     everything = all_store_text(mem) + "\n" + "\n".join(set_cookies)
     for bit in SECRET_BITS.values():
         assert bit not in everything, bit
-    for word in ("avatar", "email", "banner", "global_name", "token", "locale"):
+    for word in ("email", "banner", "global_name", "token", "locale", "verified"):
         assert word not in all_store_text(mem)
     assert ("token", "fake-code", "http://localhost/auth/discord/callback") in discord.calls
 
@@ -102,7 +103,7 @@ def _all_memory_store_contents(mem):
 
 
 @pytest.mark.parametrize("avatar", [VALID_AVATAR, "0123456789abcdef" * 2])
-def test_avatar_hash_only_in_location_fragment(lb_env, client, discord, mem, avatar):
+def test_avatar_hash_in_store_and_fragment_only(lb_env, client, discord, mem, avatar):
     discord.avatar = avatar
     r = login(client, discord, next_path="/lb/en")
     assert r.status_code == 302
@@ -117,9 +118,14 @@ def test_avatar_hash_only_in_location_fragment(lb_env, client, discord, mem, ava
         assert avatar not in cookie
     assert avatar.encode() not in r.get_data()
     assert decode_lb_cookie(client.get_cookie("c24_lb").value) == "100000000000000001"
-    # never stored
-    assert avatar not in _all_memory_store_contents(mem)
-    assert mem.players == {"100000000000000001": {"username": "kolo_fan", "hidden": False}}
+    # stored with the player (for the live view), and nowhere else
+    assert mem.players == {"100000000000000001": {"username": "kolo_fan", "hidden": False,
+                                                  "avatar": avatar}}
+    assert _all_memory_store_contents(mem).count(avatar) == 2  # dump() + vars(): same dict
+    # refreshed at every login: removing the Discord picture clears it
+    discord.avatar = None
+    login(client, discord)
+    assert mem.players["100000000000000001"]["avatar"] is None
 
 
 @pytest.mark.parametrize("none", [None, "", 12345, ["0" * 32], {"x": 1}])
@@ -141,6 +147,7 @@ def test_invalid_avatar_hash_gives_no_fragment(lb_env, client, discord, mem, bad
     loc = r.headers["Location"]
     assert loc == "/lb/es", loc
     assert bad not in _all_memory_store_contents(mem)
+    assert mem.players["100000000000000001"]["avatar"] is None  # stored as NULL
     assert all(bad not in c for c in r.headers.getlist("Set-Cookie"))
 
 
@@ -153,7 +160,7 @@ def test_next_fragment_is_replaced(lb_env, client, discord):
     assert r.headers["Location"] == "/leaderboard?tab=en"
 
 
-def test_identify_returns_avatar_but_store_never_sees_it(discord):
+def test_identify_returns_avatar(discord):
     discord.avatar = VALID_AVATAR
     assert discord_auth.identify("c", "http://x/cb") == ("100000000000000001", "kolo_fan", VALID_AVATAR)
     discord.avatar = None

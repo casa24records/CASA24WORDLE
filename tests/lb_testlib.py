@@ -17,9 +17,10 @@ FAKE_SECRET_KEY = "test-secret-key-not-real"
 ADMIN_ID = "900000000000000001"
 TODAY = datetime.date(2026, 11, 3)
 
-# Everything Discord could send back; only id and username may be kept.
-# (The avatar here is deliberately NOT a valid Discord hash, so by default the
-# callback adds no #dc= fragment; tests set FakeDiscord.avatar for a real one.)
+# Everything Discord could send back; only id, username and a valid avatar hash
+# may be kept. (The avatar here is deliberately NOT a valid Discord hash, so by
+# default nothing is stored for it and the callback adds no #dc= fragment;
+# tests set FakeDiscord.avatar for a real one.)
 SECRET_BITS = {
     "token": "FAKE-ACCESS-TOKEN-zz9",
     "avatar": "avatarhash-aa11",
@@ -144,8 +145,12 @@ def guess(client, word, lang="es", **extra):
 
 
 def all_store_text(s):
-    """Every table, key and value in the memory store, as one string."""
-    return repr(s.dump())
+    """Every table, key and value in the memory store, as one string.
+    (Game timestamps are left out: their digits could match anything.)"""
+    tables = dict(s.dump())
+    tables["games"] = {k: {f: v for f, v in g.items() if f != "updated_at"}
+                       for k, g in tables["games"].items()}
+    return repr(tables)
 
 
 def day_of(idx):

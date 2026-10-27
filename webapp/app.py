@@ -588,10 +588,12 @@ def language(lang_code):
 ###############################################################################
 # Storage: webapp/store.py (Postgres tables wordle_players, wordle_results,
 # wordle_games, wordle_rate; an in-memory copy for tests and local dev).
-# Kept: Discord ID, username, hidden flag, per finished game lang/day/won/
-# attempts/points, today's guesses (2 days), a per-minute guess counter.
-# Never stored: Discord tokens, avatar, email, IP addresses. (The avatar hash
-# only reaches the player's own browser, in the login redirect's #dc= fragment.)
+# Kept: Discord ID, username, Discord avatar hash (Discord's format only, else
+# NULL), hidden flag, per finished game lang/day/won/attempts/points, today's
+# guesses (2 days), per-minute request counters (guesses, live polling).
+# Never stored: Discord tokens, email, IP addresses. The c24_lb cookie holds only
+# the ID; the avatar hash also reaches the player's own browser in the login
+# redirect's #dc= fragment. /api/live shows other players' colors only.
 #
 # Ranking and streaks are computed from wordle_results when read: SQL sums
 # points/wins/played per tab; streaks come from the player's ordered results
@@ -612,6 +614,9 @@ OAUTH_COOKIE = "c24_oauth"
 OAUTH_COOKIE_AGE = 10 * 60
 OAUTH_COOKIE_PATH = "/auth/discord"
 RATE_LIMIT_PER_MINUTE = 30
+LIVE_RATE_LIMIT_PER_MINUTE = 20  # own counter: polling every ~8 s never eats the guess budget
+LIVE_LIMIT = 30
+LIVE_RECENT_SECONDS = 5 * 60    # "en vivo" when the last guess is this recent
 TOP_N = 50
 
 
@@ -787,7 +792,7 @@ def discord_login():
     return response
 
 
-AVATAR_HASH_RE = re.compile(r"(a_)?[0-9a-f]{32}")
+AVATAR_HASH_RE = store_mod.AVATAR_HASH_RE  # (a_)?<32 lowercase hex>
 
 
 def _avatar_fragment(avatar_hash):
@@ -824,11 +829,12 @@ def discord_callback():
         return failed
     try:
         # the access token lives only inside discord_auth.identify()
-        # avatar_hash is never stored, logged or put in a cookie: it only goes to
-        # the player's browser in the URL fragment (browsers never send fragments)
+        # avatar_hash is stored only if it has Discord's format (else NULL), for
+        # the live view; it is never logged or put in a cookie. The player's own
+        # browser also gets it in the URL fragment (browsers never send fragments)
         discord_id, username, avatar_hash = discord_auth.identify(
             code, request.url_root + "auth/discord/callback")
-        lb_store().upsert_player(discord_id, username)
+        lb_store().upsert_player(discord_id, username, avatar_hash)
     except Exception:
         return failed  # nothing logged: messages could carry request details
     response = redirect(_safe_next(saved.get("next")).split("#", 1)[0] + _avatar_fragment(avatar_hash))
@@ -928,6 +934,57 @@ def _apply_guess(st, pid, lang, typed):
         result["points"] = int(stored["points"]) if stored else lbrules.points(won, len(guesses))
         result["rank"] = _rank(st, pid, lang)
     response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def lb_avatar_url(discord_id, avatar_hash):
+    """Discord CDN picture (64 px), or Discord's default avatar when there is no hash."""
+    if isinstance(avatar_hash, str) and AVATAR_HASH_RE.fullmatch(avatar_hash):
+        return f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.png?size=64"
+    return f"https://cdn.discordapp.com/embed/avatars/{(int(discord_id) >> 22) % 6}.png"
+
+
+def _live_player(row, answer, now):
+    """One live card: colors only. No words, no answer, no Discord ID."""
+    guesses = [g for g in row["guesses"] if isinstance(g, str)][:lbrules.MAX_GUESSES]
+    won = bool(row["won"]) if row["finished"] else answer in guesses
+    done = bool(row["finished"]) or answer in guesses or len(guesses) >= lbrules.MAX_GUESSES
+    updated = row["updated_at"]
+    if isinstance(updated, datetime.datetime) and updated.tzinfo is None:
+        updated = updated.replace(tzinfo=datetime.timezone.utc)
+    live = isinstance(updated, datetime.datetime) and \
+        (now - updated).total_seconds() <= LIVE_RECENT_SECONDS
+    return {
+        "username": row["username"],
+        "avatar_url": lb_avatar_url(row["id"], row["avatar"]),
+        "rows": [lbrules.color_guess(w, answer) for w in guesses],
+        "done": done, "won": bool(done and won), "live": bool(live),
+    }
+
+
+@app.route("/api/live")
+def api_live():
+    """Everyone else playing today's word in this language (leaderboard mode only)."""
+    if not lb_enabled():
+        return _err("disabled", 404)
+    st = lb_store()
+    try:
+        user = lb_current_user(st)
+        if not user:
+            return _err("login", 401)
+        lang = request.args.get("lang")
+        if lang not in LB_LANGS:
+            return _err("bad_lang", 400)
+        if st.rate_hit(user["id"], int(time.time() // 60), "live") > LIVE_RATE_LIMIT_PER_MINUTE:
+            return _err("rate", 429)
+        day, idx = lb_today()
+        answer = lb_answer(lang, idx)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        players = [_live_player(r, answer, now) for r in st.live(lang, day, user["id"], LIVE_LIMIT)]
+    except store_mod.StoreError:
+        return _err("store", 503)
+    response = jsonify({"players": players, "count": len(players)})
     response.headers["Cache-Control"] = "no-store"
     return response
 

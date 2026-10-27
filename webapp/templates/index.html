@@ -291,8 +291,8 @@
     {% if request.args.get('deleted') == '1' %}{{ dc.toast('deleted', L1('lb_deleted', 'Listo: borramos tus datos del leaderboard.', 'Done: your leaderboard data was deleted.'), dismiss) }}{% endif %}
     {% set privacy_body %}
     {% for code in ('es', 'en') %}<div data-l="{{ code }}" lang="{{ code }}">
-        <p>{{ tx(code, 'lb_privacy', 'Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID y tu nombre de usuario de Discord y tus resultados para mostrar el ranking.' if code == 'es' else 'Discord handles your login; we never see your password or email. We store your Discord ID, your Discord username and your results to show the ranking.') }}</p>
-        <p>{{ tx(code, 'lb_avatar_note', 'Tu foto de Discord solo se muestra en tu navegador; no la guardamos.' if code == 'es' else "Your Discord picture is only shown in your browser; we don't store it.") }}</p>
+        <p>{{ tx(code, 'lb_privacy', 'Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID, tu nombre de usuario y tu foto de perfil de Discord y tus resultados para mostrar el ranking y quién está jugando hoy. Los demás jugadores ven solo tus colores, nunca tus palabras.' if code == 'es' else 'Discord handles your login; we never see your password or email. We store your Discord ID, username and profile picture and your results to show the ranking and who is playing today. Other players see only your colors, never your words.') }}</p>
+        <p>{{ tx(code, 'lb_avatar_note', 'Tu foto de Discord la ven los demás jugadores en la lista de quién está jugando hoy.' if code == 'es' else "Other players see your Discord picture in the list of who is playing today.") }}</p>
         <p>{{ tx(code, 'lb_guest_note', 'Las partidas como invitado no se suman al ranking.' if code == 'es' else "Guest games don't count toward the ranking.") }}</p>
     </div>{% endfor %}
     {% endset %}

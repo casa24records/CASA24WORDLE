@@ -41,6 +41,7 @@
     --c24-hover: #e9e1d4;
     --c24-key-fg: var(--c24-ink);
     --c24-input-bg: #ffffff;
+    --c24-live: #1f8a46;          /* "live" dot in the live view */
 }
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -57,6 +58,7 @@
         --c24-input-bg: #17241a;
         --c24-absent-bg: #2b312d;
         --c24-correct-bg: #2f7a47;
+        --c24-live: #4cc477;
     }
 }
 :root[data-theme="dark"] {
@@ -73,6 +75,7 @@
     --c24-input-bg: #17241a;
     --c24-absent-bg: #2b312d;
     --c24-correct-bg: #2f7a47;
+    --c24-live: #4cc477;
 }
 
 /* VT323's @font-face is in the <head> of index.html and game.html, so its URL
@@ -982,6 +985,193 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 .c24-trophy-title { display: inline-block; width: 0.85em; height: 0.85em; vertical-align: -0.1em; color: var(--c24-orange); }
 .c24-lb-hint-text { display: block; margin-bottom: 0.4rem; font-weight: 600; }
 .c24-lb-hint .c24-dc-btn { text-decoration: none; }
+/* ---------- live view (leaderboard game): who else plays today, colors only ----------
+   One <aside class="c24-live">: a bottom sheet on phones, tablets and landscape phones
+   (opened by the people button .c24-live-btn), a fixed left sidebar from 1024px wide
+   (and 501px tall). The game column stays centered: at 1024px it starts at 262px,
+   right of the 240px sidebar. */
+.c24-live-btn { position: relative; }
+.c24-live-badge {
+    position: absolute;
+    top: 3px;
+    inset-inline-end: 1px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background: var(--c24-orange);
+    color: var(--c24-ink);
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 18px;
+    text-align: center;
+    pointer-events: none;
+}
+.c24-live-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: #000;
+    opacity: 0.35;
+}
+.c24-live { display: none; box-sizing: border-box; }
+.c24-live *, .c24-live *::before { box-sizing: border-box; }
+.c24-live.is-open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 50;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0 auto;
+    width: min(500px, 100%);
+    max-height: min(70vh, 100vh - 48px);
+    max-height: min(calc(var(--vh) * 70), calc(var(--vh) * 100 - 48px - env(safe-area-inset-top)));
+    background: var(--c24-surface);
+    color: var(--c24-text);
+    border: 1px solid var(--c24-line);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
+    padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+}
+.c24-live-head {
+    flex: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    padding: 0 52px 0 12px;
+}
+.c24-live-close { top: 4px; }
+.c24-live-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c24-subtle);
+}
+.c24-live-count {
+    min-width: 1.5rem;
+    padding: 0 0.4rem;
+    border-radius: 9999px;
+    background: var(--c24-hover);
+    color: var(--c24-text);
+    text-align: center;
+    letter-spacing: 0;
+}
+.c24-live-empty { margin: 0; padding: 0.75rem 12px 1.25rem; font-size: 0.85rem; color: var(--c24-subtle); }
+.c24-live-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0 4px 8px;
+    list-style: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.c24-live-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-top: 1px solid var(--c24-line);
+}
+.c24-live-card:first-child { border-top: 0; }
+.c24-live-avatar {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9999px;
+    object-fit: cover;
+    background: var(--c24-hover);
+}
+.c24-live-info { flex: 1 1 auto; min-width: 0; }
+.c24-live-name {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.c24-live-status { display: flex; align-items: center; gap: 0.4rem; min-height: 1.1rem; margin: 2px 0 0; font-size: 0.72rem; color: var(--c24-subtle); }
+.c24-live-now { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--c24-live); }
+.c24-live-dot { width: 8px; height: 8px; border-radius: 9999px; background: var(--c24-live); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c24-live) 30%, transparent); }
+.c24-live-result {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+}
+.c24-live-result.is-won { background: var(--c24-correct-bg); color: var(--c24-correct-fg); }
+.c24-live-result.is-lost { background: var(--c24-absent-bg); color: var(--c24-absent-fg); }
+/* the 6 x 5 mini board: colored squares, nothing written in them */
+.c24-live-grid {
+    --s: 10px;
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(5, var(--s));
+    grid-auto-rows: var(--s);
+    gap: 2px;
+}
+.c24-live-grid > span { border-radius: 2px; border: 1px solid var(--c24-line-strong); opacity: 0.55; }
+.c24-live-grid > .is-correct { background: var(--c24-correct-bg); border-color: var(--c24-correct-bg); opacity: 1; }
+.c24-live-grid > .is-semicorrect { background: var(--c24-present-bg); border-color: var(--c24-present-bg); opacity: 1; }
+.c24-live-grid > .is-incorrect { background: var(--c24-absent-bg); border-color: var(--c24-absent-bg); opacity: 1; }
+:root[data-theme="dark"] .c24-live-grid > .is-incorrect { border-color: var(--c24-line-strong); }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .c24-live-grid > .is-incorrect { border-color: var(--c24-line-strong); }
+}
+.c24-live-close:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+/* narrow phones: the leaderboard game header holds 2 icons on the left and 3 on the
+   right (people, stats, settings), so the side columns size to their icons and the
+   title keeps Kolo's face + badges ("Casa 24" text steps aside; the logo's alt keeps the name) */
+@media (max-width: 419px) {
+    .c24-header-lb { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .c24-header-lb .c24-title-text { display: none; }
+}
+/* wide screens: always-visible sidebar, no button, no sheet */
+@media (min-width: 1024px) and (min-height: 501px) {
+    .c24-live, .c24-live.is-open {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        z-index: 30;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: auto;
+        width: 240px;
+        max-height: none;
+        margin: 0;
+        padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+        background: var(--c24-bg);
+        border: 0;
+        border-inline-end: 1px solid var(--c24-line);
+        border-radius: 0;
+        box-shadow: none;
+    }
+    .c24-live-head { padding-right: 12px; }
+    .c24-live-btn, .c24-live-close, .c24-live-backdrop { display: none !important; }
+}
+@media (min-width: 1280px) and (min-height: 501px) {
+    .c24-live, .c24-live.is-open { width: 280px; }
+    .c24-live-grid { --s: 11px; }
+}
+@media (hover: hover) and (pointer: fine) {
+    .c24-live-card:hover { background: var(--c24-hover); }
+}
 /* narrow phones: the menu header holds avatar + trophy + info on the left;
    the info button steps aside so the title keeps its room */
 @media (max-width: 419px) {

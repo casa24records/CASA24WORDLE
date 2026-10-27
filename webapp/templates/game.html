@@ -68,7 +68,7 @@
         <!-- Header, board and keyboard: one centered column that fills the screen (style.css "game layout") -->
         <div class="c24-game{% if demo %} c24-demo{% endif %}">
             <!-- The Header: 3 columns (help / title / stats + settings), so nothing overlaps -->
-            <header class="c24-header border-b border-neutral-300">
+            <header class="c24-header{% if lb %} c24-header-lb{% endif %} border-b border-neutral-300">
                 <div class="c24-header-side">
                     {% if lb %}
                     {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
@@ -90,9 +90,25 @@
                 <h1 class="c24-title c24-header-title uppercase"><a href="/" class="inline-flex items-center gap-2">
                         <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
                         <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
-                        <span>Casa 24</span>
+                        <span class="c24-title-text">Casa 24</span>
                         <span class="c24-badge">{{ language.config.language_code }}</span>{% if lb %}<span class="c24-badge c24-badge-lb" title="{{ t('lb_title', 'Leaderboard') }}" role="img" aria-label="{{ t('lb_title', 'Leaderboard') }}">{{ dc.trophy('c24-trophy c24-trophy-badge') }}</span>{% endif %}</a></h1>
                 <div class="c24-header-side c24-header-end">
+                    {% if lb %}
+                    <!-- who else is playing today: opens the live sheet (hidden where the sidebar shows) -->
+                    <button type="button" class="c24-icon-btn c24-live-btn" data-live-open
+                        aria-label="{{ t('lb_live_open', 'See who is playing today') }}" aria-controls="c24-live"
+                        v-bind:aria-expanded="live_open ? 'true' : 'false'" v-on:click="toggleLive">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            <path d="M21 21v-2a4 4 0 0 0 -3 -3.85"></path>
+                        </svg>
+                        <span v-if="live_count > 0" class="c24-live-badge" aria-hidden="true" v-cloak>[[ live_count > 99 ? '99+' : live_count ]]</span>
+                    </button>
+                    {% endif %}
                     <button type="button" class="c24-icon-btn" aria-label="stats"
                         v-on:click="show_stats_modal = !show_stats_modal">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24"
@@ -153,6 +169,39 @@
                 {% endfor %}
             </div>
         </div>
+
+        {% if lb %}
+        <!-- Live view: other players' boards today, colors only (never letters; GET /api/live).
+             ≥1024px wide: a sidebar next to the game. Narrower or landscape phones: a bottom sheet
+             opened from the people button in the header. -->
+        <div v-show="live_open" class="c24-live-backdrop" v-on:click="closeLive" v-cloak></div>
+        <aside id="c24-live" class="c24-live" data-live v-bind:class="{ 'is-open': live_open }"
+            aria-labelledby="c24-live-title">
+            <div class="c24-live-head">
+                <h2 id="c24-live-title" class="c24-live-title">{{ t('lb_live_title', 'Playing today') }}
+                    <span v-if="live_count > 0" class="c24-live-count" v-cloak>[[ live_count ]]</span></h2>
+                <button type="button" class="c24-close c24-live-close" data-live-close
+                    aria-label="{{ t('lb_dismiss', 'Close') }}" v-on:click="closeLive">×</button>
+            </div>
+            <p v-if="live_loaded && live_players.length === 0" class="c24-live-empty" v-cloak>{{ t('lb_live_empty', 'No one else is playing right now') }}</p>
+            <ul class="c24-live-list" v-cloak>
+                <li v-for="(p, n) in live_players" v-bind:key="n + ':' + p.username" class="c24-live-card">
+                    <img class="c24-live-avatar" v-bind:src="p.avatar_url" alt="" width="34" height="34"
+                        loading="lazy" decoding="async" referrerpolicy="no-referrer">
+                    <div class="c24-live-info">
+                        <p class="c24-live-name">@[[ p.username ]]</p>
+                        <p class="c24-live-status">
+                            <span v-if="p.live" class="c24-live-now"><span class="c24-live-dot" aria-hidden="true"></span>{{ t('lb_live_now', 'live') }}</span>
+                            <span v-if="p.done" class="c24-live-result" v-bind:class="p.won ? 'is-won' : 'is-lost'">[[ p.won ? '✓' : '✗' ]]</span>
+                        </p>
+                    </div>
+                    <div class="c24-live-grid" aria-hidden="true">
+                        <span v-for="(c, k) in p.cells" v-bind:key="k" v-bind:class="c"></span>
+                    </div>
+                </li>
+            </ul>
+        </aside>
+        {% endif %}
 
         <!-- NOTIFICATIONS & MODALS-->
         <div v-show="showHelpModal || show_stats_modal || show_options_modal" class="c24-backdrop" v-cloak></div>

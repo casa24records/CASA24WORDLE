@@ -256,15 +256,17 @@ def test_postgres_store_against_fake_connection(monkeypatch):
     monkeypatch.setattr(psycopg, "connect", lambda *a, **k: Conn())
     monkeypatch.setattr(store.PostgresStore, "_schema_ready", False)
     st = store.PostgresStore("postgresql://fake")
-    st.upsert_player("42", "Robert'); DROP TABLE wordle_players;--")
+    st.upsert_player("42", "Robert'); DROP TABLE wordle_players;--", "f" * 32)
+    st.upsert_player("43", "x", "not-a-hash")
     assert st.get_player("42") == {"username": "kolo_fan", "hidden": False}
     assert st.rate_hit("42", 7) == 1
     st.delete_player("42")
     st.close()
     queries = [q for q, _ in sent]
     assert queries[:1] == [store.SQL_SCHEMA_LOCK] and store.SQL_SCHEMA[0] in queries
-    assert (store.SQL_UPSERT_PLAYER, ("42", "Robert'); DROP TABLE wordle_players;--")) in sent
-    assert (store.SQL_DELETE_PLAYER, ("42",)) in sent and (store.SQL_DELETE_RATE, ("42",)) in sent
+    assert (store.SQL_UPSERT_PLAYER, ("42", "Robert'); DROP TABLE wordle_players;--", "f" * 32)) in sent
+    assert (store.SQL_UPSERT_PLAYER, ("43", "x", None)) in sent  # malformed avatar -> NULL
+    assert (store.SQL_DELETE_PLAYER, ("42",)) in sent and (store.SQL_DELETE_RATE, (["42", "42:live"],)) in sent
     assert all("DROP" not in q for q in queries)
 
 
@@ -416,7 +418,7 @@ def test_client_date_is_ignored(lb_env, client, discord, mem):
     assert r.status_code == 200
     day, _ = app.lb_today()
     assert day == datetime.date(2026, 11, 3)
-    assert mem.games == {(P1, "es", day): {"guesses": [w]}}
+    assert list(mem.games) == [(P1, "es", day)] and mem.games[(P1, "es", day)]["guesses"] == [w]
     assert "2001" not in all_store_text(mem)
 
 

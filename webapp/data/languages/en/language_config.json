@@ -38,7 +38,7 @@
         "lb_view": "View leaderboard",
         "lb_login": "Sign in with Discord",
         "lb_logout": "Log out",
-        "lb_privacy": "Discord handles your login; we never see your password or email. We store your Discord ID, your Discord username and your results to show the ranking.",
+        "lb_privacy": "Discord handles your login; we never see your password or email. We store your Discord ID, username and profile picture and your results to show the ranking and who is playing today. Other players see only your colors, never your words.",
         "lb_guest_note": "Guest games don't count toward the ranking.",
         "lb_login_failed": "Couldn't sign in with Discord. Please try again.",
         "lb_deleted": "Done: your leaderboard data was deleted.",
@@ -63,13 +63,17 @@
         "lb_back": "Menu",
         "lb_signin": "Sign in with Discord",
         "lb_login_cancelled": "You cancelled the Discord sign-in.",
-        "lb_avatar_note": "Your Discord picture is only shown in your browser; we don't store it.",
+        "lb_avatar_note": "Other players see your Discord picture in the list of who is playing today.",
         "lb_account": "Your Discord account",
         "lb_privacy_title": "Privacy",
         "lb_play_guest": "Play as guest (doesn't count)",
         "lb_rank_label": "Rank",
         "lb_points_label": "points",
-        "lb_point_label": "point"
+        "lb_point_label": "point",
+        "lb_live_title": "Playing today",
+        "lb_live_empty": "No one else is playing right now",
+        "lb_live_now": "live",
+        "lb_live_open": "See who is playing today"
     },
     "right_to_left": "false",
     "help": {

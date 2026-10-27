@@ -10,9 +10,10 @@ Two backends with the same methods (the Store interface below):
 get_store() picks Postgres when DATABASE_URL is set, else MemoryStore when not
 on Vercel, else None (the leaderboard is then off in production).
 
-Kept per player: Discord ID, username, a hidden flag, and per finished game
-the language, day, won, attempts and points; today's guesses for 2 days; a
-per-minute guess counter. Never stored: tokens, avatar, email, IP addresses.
+Kept per player: Discord ID, username, Discord avatar hash (only when it has
+Discord's format, else NULL; refreshed at every login), a hidden flag, and per
+finished game the language, day, won, attempts and points; today's guesses for
+2 days; per-minute request counters. Never stored: tokens, email, IP addresses.
 
 Days are datetime.date values (the Panama date from daily.py).
 """
@@ -20,10 +21,35 @@ Days are datetime.date values (the Panama date from daily.py).
 import contextlib
 import datetime
 import os
+import re
 import threading
 
 GAME_KEEP_DAYS = 2   # wordle_games rows older than this are deleted
 RATE_KEEP_MINUTES = 2
+RATE_BUCKETS = ("guess", "live")  # separate per-minute counters per player
+
+# Discord avatar hash: (a_)?<32 lowercase hex>. Anything else is stored as NULL.
+AVATAR_HASH_RE = re.compile(r"(a_)?[0-9a-f]{32}")
+
+
+def clean_avatar(avatar):
+    """The avatar hash if it has Discord's format, else None."""
+    return avatar if isinstance(avatar, str) and AVATAR_HASH_RE.fullmatch(avatar) else None
+
+
+def _rate_key(discord_id, bucket):
+    """Row key in the rate table: the ID for guesses, "<id>:live" for live polling."""
+    if bucket not in RATE_BUCKETS:
+        raise ValueError("unknown rate bucket")
+    return discord_id if bucket == "guess" else discord_id + ":" + bucket
+
+
+def _rate_keys(discord_id):
+    return [_rate_key(discord_id, b) for b in RATE_BUCKETS]
+
+
+def _utcnow():
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 class StoreError(Exception):
@@ -33,15 +59,16 @@ class StoreError(Exception):
 class Store:
     """Interface. `tab` is "es", "en" or "all" (every language)."""
 
-    def upsert_player(self, discord_id, username):
+    def upsert_player(self, discord_id, username, avatar=None):
+        """Create or refresh a player. avatar is kept only if clean_avatar() accepts it."""
         raise NotImplementedError
 
     def get_player(self, discord_id):
         """{"username", "hidden"} or None."""
         raise NotImplementedError
 
-    def rate_hit(self, discord_id, minute):
-        """Count one request in this minute; returns the count so far."""
+    def rate_hit(self, discord_id, minute, bucket="guess"):
+        """Count one request in this minute (per bucket); returns the count so far."""
         raise NotImplementedError
 
     def get_game(self, discord_id, lang, day):
@@ -55,6 +82,12 @@ class Store:
 
     def record_result(self, discord_id, lang, day, won, attempts, points):
         """Insert a finished game once; False if that day was already recorded."""
+        raise NotImplementedError
+
+    def live(self, lang, day, exclude_id, limit=30):
+        """Today's games with at least one guess, newest activity first, hidden
+        players and exclude_id left out: [{id, username, avatar, guesses,
+        updated_at (aware UTC datetime), finished, won}]."""
         raise NotImplementedError
 
     def leaderboard(self, tab, limit):
@@ -99,7 +132,7 @@ class _MemoryGame:
         self.result = dict(result) if result else None
 
     def save(self, guesses):
-        self._st.games[self._key] = {"guesses": list(guesses)}
+        self._st.games[self._key] = {"guesses": list(guesses), "updated_at": _utcnow()}
         oldest = self._key[2] - datetime.timedelta(days=GAME_KEEP_DAYS)
         for k in [k for k in self._st.games if k[2] < oldest]:
             del self._st.games[k]
@@ -110,10 +143,10 @@ class _MemoryGame:
 
 class MemoryStore(Store):
     def __init__(self):
-        self.players = {}   # id -> {"username", "hidden"}
+        self.players = {}   # id -> {"username", "hidden", "avatar"}
         self.results = {}   # (id, lang, day) -> {"won", "attempts", "points"}
-        self.games = {}     # (id, lang, day) -> {"guesses": [...]}
-        self.rate = {}      # (id, minute) -> count
+        self.games = {}     # (id, lang, day) -> {"guesses": [...], "updated_at"}
+        self.rate = {}      # (id or "id:live", minute) -> count
         self._lock = threading.RLock()
 
     def dump(self):
@@ -124,19 +157,20 @@ class MemoryStore(Store):
     def is_empty(self):
         return not any(self.dump().values())
 
-    def upsert_player(self, discord_id, username):
+    def upsert_player(self, discord_id, username, avatar=None):
         with self._lock:
-            self.players.setdefault(discord_id, {"username": username, "hidden": False})
-            self.players[discord_id]["username"] = username
+            p = self.players.setdefault(discord_id, {"username": username, "hidden": False})
+            p["username"] = username
+            p["avatar"] = clean_avatar(avatar)
 
     def get_player(self, discord_id):
         with self._lock:
             p = self.players.get(discord_id)
-            return dict(p) if p else None
+            return {"username": p["username"], "hidden": p["hidden"]} if p else None
 
-    def rate_hit(self, discord_id, minute):
+    def rate_hit(self, discord_id, minute, bucket="guess"):
         with self._lock:
-            key = (discord_id, minute)
+            key = (_rate_key(discord_id, bucket), minute)
             self.rate[key] = self.rate.get(key, 0) + 1
             for k in [k for k in self.rate if k[1] < minute - RATE_KEEP_MINUTES]:
                 del self.rate[k]
@@ -187,6 +221,22 @@ class MemoryStore(Store):
         return [{"rank": i + 1, **{k: v for k, v in r.items() if k != "reached"}}
                 for i, r in enumerate(rows)]
 
+    def live(self, lang, day, exclude_id, limit=30):
+        with self._lock:
+            out = []
+            for (pid, g_lang, g_day), g in self.games.items():
+                player = self.players.get(pid)
+                if (g_lang != lang or g_day != day or pid == exclude_id or not player
+                        or player["hidden"] or not g["guesses"]):
+                    continue
+                result = self.results.get((pid, g_lang, g_day))
+                out.append({"id": pid, "username": player["username"],
+                            "avatar": player.get("avatar"), "guesses": list(g["guesses"]),
+                            "updated_at": g["updated_at"], "finished": result is not None,
+                            "won": bool(result and result["won"])})
+            out.sort(key=lambda r: r["updated_at"], reverse=True)
+            return out[:max(0, int(limit))]
+
     def leaderboard(self, tab, limit):
         with self._lock:
             return self._ranked(tab)[:limit]
@@ -206,9 +256,12 @@ class MemoryStore(Store):
     def delete_player(self, discord_id):
         with self._lock:
             self.players.pop(discord_id, None)
-            for table in (self.results, self.games, self.rate):
+            for table in (self.results, self.games):
                 for k in [k for k in table if k[0] == discord_id]:
                     del table[k]
+            rate_keys = set(_rate_keys(discord_id))
+            for k in [k for k in self.rate if k[0] in rate_keys]:
+                del self.rate[k]
 
     def set_hidden(self, discord_id, hidden):
         with self._lock:
@@ -252,13 +305,16 @@ SQL_SCHEMA = (
         minute bigint NOT NULL,
         count integer NOT NULL,
         PRIMARY KEY (discord_id, minute))""",
+    # added 2026-10-27 for the live view (existing databases get it on first use)
+    "ALTER TABLE wordle_players ADD COLUMN IF NOT EXISTS avatar text",
+    "CREATE INDEX IF NOT EXISTS wordle_games_lang_day ON wordle_games (lang, day, updated_at DESC)",
 )
 
 SQL_SCHEMA_LOCK = "SELECT pg_advisory_xact_lock(%s)"
 
 SQL_UPSERT_PLAYER = """
-    INSERT INTO wordle_players (discord_id, username) VALUES (%s, %s)
-    ON CONFLICT (discord_id) DO UPDATE SET username = EXCLUDED.username"""
+    INSERT INTO wordle_players (discord_id, username, avatar) VALUES (%s, %s, %s)
+    ON CONFLICT (discord_id) DO UPDATE SET username = EXCLUDED.username, avatar = EXCLUDED.avatar"""
 
 SQL_GET_PLAYER = "SELECT username, hidden FROM wordle_players WHERE discord_id = %s"
 
@@ -284,6 +340,20 @@ SQL_GAME_SAVE = """
     WHERE discord_id = %s AND lang = %s AND day = %s"""
 
 SQL_GAME_CLEANUP = "DELETE FROM wordle_games WHERE day < %s"
+
+# Live view: everyone else's game today in one language (params: lang, day,
+# exclude_id, limit). Words are read here but app.py only sends colors.
+SQL_LIVE = """
+    SELECT g.discord_id, p.username, p.avatar, g.guesses, g.updated_at,
+           (r.discord_id IS NOT NULL) AS finished, COALESCE(r.won, false) AS won
+    FROM wordle_games g
+    JOIN wordle_players p ON p.discord_id = g.discord_id
+    LEFT JOIN wordle_results r
+           ON r.discord_id = g.discord_id AND r.lang = g.lang AND r.day = g.day
+    WHERE g.lang = %s AND g.day = %s AND NOT p.hidden AND g.discord_id <> %s
+      AND jsonb_array_length(g.guesses) > 0
+    ORDER BY g.updated_at DESC
+    LIMIT %s"""
 
 SQL_RESULT_GET = """
     SELECT won, attempts, points FROM wordle_results
@@ -327,7 +397,7 @@ SQL_HISTORIES = """
     ORDER BY day"""
 
 SQL_DELETE_PLAYER = "DELETE FROM wordle_players WHERE discord_id = %s"  # cascades
-SQL_DELETE_RATE = "DELETE FROM wordle_rate WHERE discord_id = %s"
+SQL_DELETE_RATE = "DELETE FROM wordle_rate WHERE discord_id = ANY(%s)"  # every bucket
 SQL_SET_HIDDEN = "UPDATE wordle_players SET hidden = %s WHERE discord_id = %s RETURNING 1"
 
 
@@ -413,9 +483,9 @@ class PostgresStore(Store):
             except Exception:
                 pass
 
-    def upsert_player(self, discord_id, username):
+    def upsert_player(self, discord_id, username, avatar=None):
         with self._tx() as cur:
-            cur.execute(SQL_UPSERT_PLAYER, (discord_id, username))
+            cur.execute(SQL_UPSERT_PLAYER, (discord_id, username, clean_avatar(avatar)))
 
     def get_player(self, discord_id):
         with self._tx() as cur:
@@ -423,9 +493,9 @@ class PostgresStore(Store):
             r = cur.fetchone()
         return {"username": r[0], "hidden": bool(r[1])} if r else None
 
-    def rate_hit(self, discord_id, minute):
+    def rate_hit(self, discord_id, minute, bucket="guess"):
         with self._tx() as cur:
-            cur.execute(SQL_RATE_HIT, (discord_id, minute))
+            cur.execute(SQL_RATE_HIT, (_rate_key(discord_id, bucket), minute))
             count = int(cur.fetchone()[0])
             if count == 1:
                 cur.execute(SQL_RATE_CLEANUP, (minute - RATE_KEEP_MINUTES,))
@@ -451,6 +521,14 @@ class PostgresStore(Store):
             cur.execute(SQL_RESULT_INSERT, (discord_id, lang, day, bool(won), int(attempts), int(points)))
             return cur.fetchone() is not None
 
+    def live(self, lang, day, exclude_id, limit=30):
+        with self._tx() as cur:
+            cur.execute(SQL_LIVE, (lang, day, exclude_id, int(limit)))
+            rows = cur.fetchall()
+        return [{"id": r[0], "username": r[1], "avatar": clean_avatar(r[2]),
+                 "guesses": list(r[3]) if isinstance(r[3], list) else [],
+                 "updated_at": r[4], "finished": bool(r[5]), "won": bool(r[6])} for r in rows]
+
     def leaderboard(self, tab, limit):
         with self._tx() as cur:
             cur.execute(SQL_LEADERBOARD, {"tab": tab, "limit": int(limit)})
@@ -475,7 +553,7 @@ class PostgresStore(Store):
     def delete_player(self, discord_id):
         with self._tx() as cur:
             cur.execute(SQL_DELETE_PLAYER, (discord_id,))
-            cur.execute(SQL_DELETE_RATE, (discord_id,))
+            cur.execute(SQL_DELETE_RATE, (_rate_keys(discord_id),))
 
     def set_hidden(self, discord_id, hidden):
         with self._tx() as cur:

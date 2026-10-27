@@ -3,9 +3,10 @@
 identify(code, redirect_uri) trades the one-time code for an access token,
 asks Discord who the player is, and returns ONLY (id, username, avatar_hash).
 The token never leaves this module, is never stored and never logged.
-id + username are what the server stores. avatar_hash is only handed back to
-the player's own browser (URL fragment after login, see app.discord_callback);
-the server never stores, logs or puts it in a cookie.
+The server stores id, username and the avatar hash (only when it has Discord's
+format, for the live view's pictures; see store.clean_avatar). avatar_hash is
+also handed to the player's own browser (URL fragment after login, see
+app.discord_callback); it is never logged or put in a cookie.
 
 exchange_code() and fetch_me() are the only two network calls; tests replace
 them with fakes (monkeypatch), so the test suite never talks to Discord.
@@ -94,8 +95,9 @@ def fetch_me(access_token):
 def identify(code, redirect_uri):
     """(discord_id, username, avatar_hash) for this login. Everything else is dropped here.
 
-    avatar_hash is a string or None and must never be stored server-side: the
-    callback only passes it to the player's browser in the redirect fragment."""
+    avatar_hash is a string or None. The callback stores it only if it has
+    Discord's format (else NULL) and passes it to the player's browser in the
+    redirect fragment; it is never logged or put in a cookie."""
     me = fetch_me(exchange_code(code, redirect_uri))
     discord_id = str(me.get("id") or "")
     username = str(me.get("username") or "").strip()[:32]
