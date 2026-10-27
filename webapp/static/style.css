@@ -572,51 +572,11 @@ main .grid-cols-5 > div {
 @media (hover: hover) and (pointer: fine) { .c24-demo-langs a:hover { background: var(--c24-hover); } }
 
 /* ---------- leaderboard (es/en only; Discord login) ---------- */
-/* menu: guest / leaderboard choice, notices, links */
-.c24-mode-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
-.c24-mode {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    padding: 4px;
-    border-radius: 14px;
-    border: 1px solid var(--c24-line);
-    background: var(--c24-surface);
-}
-.c24-mode-opt {
-    min-height: 44px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 0.45rem 0.5rem;
-    border-radius: 10px;
-    text-align: center;
-    line-height: 1.15;
-    color: var(--c24-subtle);
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-}
-.c24-mode-es { font-weight: 700; font-size: 0.85rem; }
-.c24-mode-en { font-size: 0.72rem; }
-.c24-mode-opt.is-active { background: var(--c24-correct-bg); color: #fff; }
-.c24-mode-opt:focus-visible, .c24-lb-tab:focus-visible, .c24-lb-btn:focus-visible, .c24-notice-close:focus-visible {
+/* menu: Discord area, notices, links */
+.c24-lb-tab:focus-visible, .c24-lb-btn:focus-visible, .c24-notice-close:focus-visible {
     outline: 2px solid var(--c24-orange);
     outline-offset: 2px;
 }
-.c24-mode-note { font-size: 0.72rem; line-height: 1.35; color: var(--c24-subtle); text-align: center; }
-.c24-mode-note p + p { margin-top: 0.25rem; }
-.c24-notice {
-    position: relative;
-    padding: 0.6rem 2.75rem 0.6rem 0.9rem;
-    border-radius: 12px;
-    border: 2px solid var(--c24-correct-bg);
-    background: var(--c24-surface);
-    font-size: 0.85rem;
-    line-height: 1.35;
-}
-.c24-notice-warn { border-color: var(--c24-orange); }
 .c24-notice-close {
     position: absolute;
     top: 50%;
@@ -632,14 +592,6 @@ main .grid-cols-5 > div {
     line-height: 1;
     color: var(--c24-subtle);
 }
-.c24-lb-links {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.85rem;
-    margin-top: -0.5rem;
-}
 .c24-lb-link {
     min-height: 44px;
     display: inline-flex;
@@ -651,22 +603,10 @@ main .grid-cols-5 > div {
     text-decoration-color: var(--c24-orange);
     text-underline-offset: 3px;
 }
-.c24-lb-links .c24-lb-account {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    column-gap: 0.25rem;
-    color: var(--c24-subtle);
-    text-align: center;
-}
-.c24-lb-links .c24-lb-account .c24-lb-link { font-weight: 600; color: var(--c24-subtle); }
 
 /* game page */
 .c24-badge-lb { margin-inline-start: 0.25em; background: transparent; padding: 0; }
 .c24-lb-end { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; text-align: center; }
-.c24-lb-rank { font-family: var(--c24-font-display); font-size: 2rem; line-height: 1; }
-.c24-lb-points { font-weight: 700; color: var(--c24-subtle); }
 .c24-lb-hint {
     position: relative;
     padding: 0.5rem 3rem 0.5rem 1rem;
@@ -780,7 +720,7 @@ main .grid-cols-5 > div {
     touch-action: manipulation;
 }
 .c24-lb-danger { border-color: #d9534f; color: #d9534f; }
-.c24-lb-login { justify-content: center; font-weight: 700; width: 100%; max-width: 20rem; }
+.c24-lb-login { width: 100%; max-width: 20rem; align-self: center; }
 .c24-lb-privacy { font-size: 0.75rem; line-height: 1.4; color: var(--c24-subtle); }
 .c24-lb-back { text-align: center; }
 .c24-lb-back a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 0.75rem; font-weight: 700; color: var(--c24-subtle); }
@@ -789,7 +729,7 @@ main .grid-cols-5 > div {
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 @media (hover: hover) and (pointer: fine) {
-    .c24-mode-opt:not(.is-active):hover, .c24-lb-tab:not(.is-active):hover,
+    .c24-lb-tab:not(.is-active):hover,
     .c24-lb-btn:hover, .c24-lb-hide:hover, .c24-notice-close:hover, .c24-lb-back a:hover { background: var(--c24-hover); }
     .c24-lb-danger:hover { background: rgba(217, 83, 79, 0.12); }
 }
@@ -803,3 +743,252 @@ main .grid-cols-5 > div {
 .c24-lb-page .c24-lb-hide { border-width: 1px; }
 .c24-lb-page .c24-play { text-decoration: none; }
 .c24-lb-page .uppercase { text-transform: uppercase; }
+
+/* ---------- Discord: sign-in button, avatar, header account menu ---------- */
+/* (the /leaderboard page has no Tailwind reset, so size these the same way everywhere) */
+.c24-dc-btn, .c24-dc-pop, .c24-dc-pop *, .c24-dc-toast, .c24-privacy, .c24-privacy *, .c24-dc-privacy-link { box-sizing: border-box; }
+/*
+   Discord "Blurple" #5865F2 (hover #4752C4, pressed #3C45A5) with the white
+   official logo is a FIXED brand color, the one allowed exception to the
+   token-only rule: Discord's brand guidelines ask for the logo in white,
+   black or Blurple, never recolored, with clear space around it. It reads
+   the same in light and dark mode, so it has no dark override. */
+.c24-dc-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 6px 20px;
+    border-radius: 8px;
+    background: #5865F2;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.15;
+    text-align: center;
+    text-decoration: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.15s ease, transform 0.08s ease;
+}
+.c24-dc-btn .c24-dc-logo { width: 24px; height: 24px; flex: none; color: #fff; }
+.c24-dc-btn-text { display: flex; flex-direction: column; min-width: 0; }
+.c24-dc-btn-sub { font-size: 0.75rem; font-weight: 600; opacity: 0.92; }
+.c24-dc-btn:active { background: #3C45A5; transform: scale(0.98); }
+.c24-dc-btn:focus-visible { outline: 3px solid var(--c24-orange); outline-offset: 3px; }
+.c24-dc-area { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; }
+.c24-dc-area > .c24-dc-btn { width: 100%; }
+.c24-dc-area .c24-dc-privacy-link, .c24-dc-area > span { align-self: center; }
+/* the menu writes Discord texts in both languages; only the player's shows */
+html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: none !important; }
+/* "(i) Privacy" link and its dialog */
+.c24-dc-privacy-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 44px;
+    padding: 0 0.6rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--c24-subtle);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.c24-dc-privacy-link svg { width: 16px; height: 16px; flex: none; }
+.c24-dc-privacy-link:focus-visible, .c24-privacy-close:focus-visible, .c24-switch:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+.c24-privacy {
+    width: min(26rem, calc(100% - 32px));
+    max-height: calc(100dvh - 32px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--c24-line);
+    border-radius: 14px;
+    background: var(--c24-surface);
+    color: var(--c24-text);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+    overscroll-behavior: contain;
+}
+.c24-privacy::backdrop { background: rgba(0, 0, 0, 0.45); }
+.c24-privacy-box { display: flex; flex-direction: column; gap: 0.6rem; padding: 1.1rem 1.1rem 0.75rem; margin: 0; }
+.c24-privacy-title { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.05rem; font-weight: 800; }
+.c24-privacy-body { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem; line-height: 1.45; color: var(--c24-subtle); }
+.c24-privacy-body p { margin: 0; }
+.c24-privacy-body > div { display: flex; flex-direction: column; gap: 0.5rem; }
+.c24-privacy-close {
+    align-self: flex-end;
+    min-height: 44px;
+    padding: 0 1rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--c24-text);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+/* signed in: "play as guest" switch */
+.c24-guest-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    min-height: 44px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--c24-subtle);
+    cursor: pointer;
+}
+.c24-switch {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 24px;
+    margin: 0;
+    border-radius: 9999px;
+    background: var(--c24-line-strong);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.c24-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s ease;
+}
+.c24-switch:checked { background: var(--c24-correct-bg); }
+.c24-switch:checked::after { transform: translateX(16px); }
+/* login failed / cancelled, data deleted: short toast at the bottom, closes itself */
+.c24-dc-toast {
+    position: fixed;
+    left: 50%;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 70;
+    width: min(26rem, calc(100% - 32px));
+    transform: translateX(-50%);
+    padding: 0.55rem 2.9rem 0.55rem 0.9rem;
+    border-radius: 12px;
+    border: 2px solid var(--c24-correct-bg);
+    background: var(--c24-surface);
+    color: var(--c24-text);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.35;
+    transition: opacity 0.3s ease;
+}
+.c24-dc-toast p { margin: 0; }
+.c24-dc-toast-warn { border-color: var(--c24-orange); }
+.c24-dc-toast.is-leaving { opacity: 0; }
+.c24-dc-toast .c24-notice-close { background: transparent; border: 0; cursor: pointer; }
+/* leaderboard game end: rank and points as big numbers */
+.c24-lb-stats { display: flex; justify-content: center; gap: 2.5rem; margin-bottom: 0.25rem; }
+.c24-lb-stat { display: flex; flex-direction: column; align-items: center; }
+.c24-lb-stats .c24-lb-big { font-family: var(--c24-font-display); font-size: 2.5rem; line-height: 1; color: var(--c24-text); font-weight: 400; }
+.c24-lb-small { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c24-subtle); }
+.c24-dc-pop-danger, .c24-dc-pop-danger svg { color: #d9534f; }
+.c24-dc-mark { width: 18px; height: 18px; flex: none; color: #5865F2; }
+.c24-dc-avatar {
+    flex: none;
+    border-radius: 9999px;
+    background: var(--c24-line);
+    object-fit: cover;
+}
+.c24-dc-signed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--c24-subtle);
+    min-width: 0;
+}
+.c24-dc-signed > span { min-width: 0; overflow-wrap: anywhere; }
+.c24-dc-signed b { color: var(--c24-text); }
+.c24-dc-avatar-row { display: inline-block; vertical-align: middle; margin-inline-end: 0.35rem; }
+/* header: avatar button (logged in) or small Discord icon (logged out) */
+.c24-dc-menu { position: relative; display: flex; }
+.c24-dc-me { padding: 0; }
+.c24-dc-me .c24-dc-avatar-head { width: 30px; height: 30px; box-shadow: 0 0 0 2px var(--c24-surface), 0 0 0 3px #5865F2; }
+.c24-dc-icon .c24-dc-mark { width: 24px; height: 24px; }
+.c24-dc-me:focus-visible, .c24-dc-icon:focus-visible, .c24-dc-pop-item:focus-visible, .c24-header .c24-icon-btn:focus-visible {
+    outline: 2px solid var(--c24-orange);
+    outline-offset: 1px;
+}
+.c24-dc-pop {
+    position: absolute;
+    top: calc(100% + 4px);
+    inset-inline-start: 0;
+    z-index: 60;
+    width: max-content;
+    min-width: 13rem;
+    max-width: calc(100vw - 16px);
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid var(--c24-line);
+    background: var(--c24-surface);
+    color: var(--c24-text);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+    text-align: start;
+    font-family: var(--c24-font-body);
+    letter-spacing: normal;
+    text-transform: none;
+}
+.c24-dc-pop[hidden] { display: none; }
+.c24-dc-pop-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 6px 8px 8px;
+    margin: 0 0 4px;
+    border-bottom: 1px solid var(--c24-line);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+.c24-dc-pop-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+.c24-dc-pop form { margin: 0; }
+.c24-dc-pop-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: var(--c24-text);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+.c24-dc-pop-item svg { width: 20px; height: 20px; flex: none; color: var(--c24-subtle); }
+/* line trophy icon (same stroke style as the header icons) */
+.c24-trophy-inline { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: -0.2em; }
+.c24-trophy-badge { display: inline-block; width: 0.8em; height: 0.8em; vertical-align: -0.05em; color: var(--c24-orange); }
+.c24-trophy-title { display: inline-block; width: 0.85em; height: 0.85em; vertical-align: -0.1em; color: var(--c24-orange); }
+.c24-lb-hint-text { display: block; margin-bottom: 0.4rem; font-weight: 600; }
+.c24-lb-hint .c24-dc-btn { text-decoration: none; }
+/* narrow phones: the menu header holds avatar + trophy + info on the left;
+   the info button steps aside so the title keeps its room */
+@media (max-width: 419px) {
+    .c24-header .c24-hide-narrow { display: none; }
+}
+@media (hover: hover) and (pointer: fine) {
+    .c24-dc-btn:hover { background: #4752C4; }
+    .c24-dc-btn:active { background: #3C45A5; }
+    .c24-dc-pop-item:hover, .c24-dc-privacy-link:hover, .c24-privacy-close:hover { background: var(--c24-hover); }
+}

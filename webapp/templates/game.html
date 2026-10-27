@@ -1,5 +1,7 @@
 {# t(key, fallback): text from language_config.json "text", English if missing #}
 {% macro t(key, default) %}{{ language.config.text.get(key, default) | trim }}{% endmacro %}
+{% import '_discord.html' as dc %}
+{% set me = lb_user if (lb_enabled is defined and lb_enabled and lb_user is defined and lb_user) else none %}
 <!DOCTYPE html>
 <html lang="{{ language.language_code }}">
 
@@ -39,6 +41,7 @@
     <link rel="stylesheet" href="{{ asset('style.css') }}">
     <!-- light / dark theme (runs first so the page never flashes) -->
     <script src="{{ asset('theme.js') }}"></script>
+    {% if lb_enabled and language.config.language_code in ('es', 'en') %}{{ dc.script(me) }}{% endif %}
 
     <!-- backend data: raw UTF-8 JSON (see json_script in app.py) -->
     <script type="application/json" id="c24-data">{{ json_script({"word_list": language.word_list, "word_list_supplement": language.word_list_supplement, "characters": language.characters, "config": language.config}) }}</script>
@@ -67,6 +70,11 @@
             <!-- The Header: 3 columns (help / title / stats + settings), so nothing overlaps -->
             <header class="c24-header border-b border-neutral-300">
                 <div class="c24-header-side">
+                    {% if lb %}
+                    {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
+                        t('lb_account', 'Your Discord account'), t('lb_signin', 'Sign in with Discord'),
+                        t('lb_view', 'View leaderboard'), t('lb_logout', 'Log out')) }}
+                    {% endif %}
                     <button type="button" class="c24-icon-btn" aria-label="instructions"
                         v-on:click="showHelpModal = !showHelpModal">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
@@ -83,7 +91,7 @@
                         <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
                         <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
                         <span>Casa 24</span>
-                        <span class="c24-badge">{{ language.config.language_code }}</span>{% if lb %}<span class="c24-badge c24-badge-lb" title="{{ t('lb_title', 'Leaderboard') }}" aria-label="{{ t('lb_title', 'Leaderboard') }}">🏆</span>{% endif %}</a></h1>
+                        <span class="c24-badge">{{ language.config.language_code }}</span>{% if lb %}<span class="c24-badge c24-badge-lb" title="{{ t('lb_title', 'Leaderboard') }}" role="img" aria-label="{{ t('lb_title', 'Leaderboard') }}">{{ dc.trophy('c24-trophy c24-trophy-badge') }}</span>{% endif %}</a></h1>
                 <div class="c24-header-side c24-header-end">
                     <button type="button" class="c24-icon-btn" aria-label="stats"
                         v-on:click="show_stats_modal = !show_stats_modal">
@@ -348,9 +356,17 @@
                 {% if lb %}
                 <!-- leaderboard game: rank and points from the server (local stats don't apply) -->
                 <div class="c24-lb-end border-t border-solid px-3 py-4" data-lb-end>
-                    <p v-if="game_over && lb_rank" class="c24-lb-rank">[[ lbRankText() ]]</p>
-                    <p v-if="game_over && lb_points !== null" class="c24-lb-points">[[ lbPointsText() ]]</p>
-                    <a href="/leaderboard?tab={{ language.config.language_code }}" class="c24-lb-link">🏆 {{ t('lb_view', 'View leaderboard') }} →</a>
+                    <div v-if="game_over && (lb_rank || lb_points !== null)" class="c24-lb-stats">
+                        <div v-if="lb_rank" class="c24-lb-stat">
+                            <p class="c24-lb-big c24-lb-rank">#[[ lb_rank ]]</p>
+                            <p class="c24-lb-small">{{ t('lb_rank_label', 'Rank') }}</p>
+                        </div>
+                        <div v-if="lb_points !== null" class="c24-lb-stat">
+                            <p class="c24-lb-big c24-lb-points">+[[ lb_points ]]</p>
+                            <p class="c24-lb-small">[[ lb_points === 1 ? {{ t('lb_point_label', 'point')|tojson }} : {{ t('lb_points_label', 'points')|tojson }} ]]</p>
+                        </div>
+                    </div>
+                    <a href="/leaderboard?tab={{ language.config.language_code }}" class="c24-lb-link">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_view', 'View leaderboard') }} →</a>
                 </div>
                 {% else %}
                 <div class="flex flex-row justify-center items-start gap-2 border-t border-solid px-3 py-5">
@@ -375,7 +391,12 @@
                 <!-- guest game: a short, dismissible pointer to the leaderboard mode -->
                 <p v-if="game_over && !lb_hint_off" class="c24-lb-hint border-t border-solid" data-lb-hint v-cloak>
                     {% set lb_target = '/lb/' ~ language.config.language_code %}
-                    <a href="{{ lb_target if lb_user else '/auth/discord/login?next=' ~ (lb_target | urlencode) }}">🏆 {{ t('lb_hint', 'Play for the leaderboard to join the ranking') }} →</a>
+                    {% if lb_user %}
+                    <a href="{{ lb_target }}">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_hint', 'Play for the leaderboard to join the ranking') }} →</a>
+                    {% else %}
+                    <span class="c24-lb-hint-text">{{ t('lb_hint', 'Play for the leaderboard to join the ranking') }}</span>
+                    {{ dc.button('/auth/discord/login?next=' ~ (lb_target | urlencode), t('lb_signin', 'Sign in with Discord')) }}
+                    {% endif %}
                     <button type="button" class="c24-notice-close" aria-label="{{ t('lb_dismiss', 'Close') }}" v-on:click="dismissLbHint">×</button>
                 </p>
                 {% endif %}

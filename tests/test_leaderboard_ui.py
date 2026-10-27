@@ -77,30 +77,58 @@ def test_menu_without_leaderboard_has_no_choice(lb_off):
     assert "data-mode=" not in html
 
 
-def test_menu_with_leaderboard_shows_choice_and_privacy():
+DISCORD_PATH = "M20.317 4.3698"  # start of the official Discord logo path (simple-icons)
+AVATAR_HASH = "a_" + "0123456789abcdef" * 2
+DEFAULT_AVATAR = f"https://cdn.discordapp.com/embed/avatars/{(int(ME['id']) >> 22) % 6}.png"
+
+
+def main_view(html):
+    """The page without the privacy <dialog> and the <head> script."""
+    body = html[html.index("<body"):]
+    return body[:body.index('<dialog id="c24-privacy"')] if '<dialog id="c24-privacy"' in body else body
+
+
+def test_menu_logged_out_shows_discord_button():
     html = render_menu(lb_enabled=True, lb_user=None)
-    assert 'data-mode="guest"' in html and 'data-mode="lb"' in html
-    assert "Jugar como invitado" in html and "Play as guest" in html
-    assert "Jugar con leaderboard (Discord)" in html and "Play for the leaderboard (Discord)" in html
-    assert 'href="/leaderboard"' in html
-    assert "no vemos tu contraseña ni tu correo" in html
-    assert "no se suman al ranking" in html
-    assert "/auth/logout" not in html  # logged out
+    assert "data-dc-area" in html and "data-lb-menu" in html
+    assert re.search(r'<a href="/auth/discord/login\?next=/lb/(es|en)" class="c24-dc-btn ', html)
+    assert DISCORD_PATH in html
+    assert "Entrar con Discord" in html and "Sign in with Discord" in html
+    # trophy icon button to the leaderboard (no text link, no emoji)
+    assert re.search(r'<a href="/leaderboard" class="c24-icon-btn" data-lb-trophy', html)
+    assert "🏆" not in html and "Ver leaderboard</span></a>" not in html
+    # no guest/leaderboard switch: cards play as guest, the button signs in
+    assert "data-mode=" not in html and "data-guest-toggle" not in html
+    # privacy only inside the (i) dialog, not in the main view
+    assert "data-dc-privacy" in html and '<dialog id="c24-privacy"' in html
+    assert "no vemos tu contraseña" in html and "no se suman al ranking" in html and "no la guardamos" in html
+    assert "no vemos tu contraseña" not in main_view(html)
+    assert "Discord handles your login" not in main_view(html)
+    assert "/auth/logout" not in main_view(html) and "data-dc-toggle" not in main_view(html)  # logged out
     # the other 8 languages stay guest links
     assert 'href="/de"' in html and "/lb/de" not in html
 
 
-def test_menu_logged_in_shows_user_and_logout():
+def test_menu_logged_in_shows_avatar_menu_and_guest_toggle():
     html = render_menu(lb_enabled=True, lb_user=ME)
     assert "@kolo_fan" in html
-    assert re.search(r'<form method="post" action="/auth/logout"', html)
+    assert "data-dc-toggle" in html and DEFAULT_AVATAR in html
+    assert 'data-dc-id="100000000000000001"' in html
+    assert re.search(r'<form method="post" action="/auth/logout" data-dc-clear>', html)
+    assert "data-guest-toggle" in html
+    assert "c24-dc-btn" not in main_view(html)  # no big sign-in button
     assert '"username":"kolo_fan"' in html  # handed to index.js
+    assert 'var ME = "100000000000000001";' in html  # handed to the avatar script
 
 
-@pytest.mark.parametrize("query,marker", [("login=failed", "login-failed"), ("deleted=1", "deleted")])
+@pytest.mark.parametrize("query,marker", [("login=failed", "login-failed"), ("login=cancelled", "login-cancelled"),
+                                          ("deleted=1", "deleted")])
 def test_menu_notices(query, marker):
-    assert f'data-notice="{marker}"' in render_menu("/?" + query, lb_enabled=True, lb_user=None)
+    html = render_menu("/?" + query, lb_enabled=True, lb_user=None)
+    assert f'data-notice="{marker}"' in html and "data-c24-toast" in html
     assert f'data-notice="{marker}"' not in render_menu("/", lb_enabled=True, lb_user=None)
+    if marker == "login-cancelled":
+        assert "Cancelaste el inicio de sesión con Discord." in html
 
 
 # ---------- game pages ----------
@@ -123,12 +151,15 @@ def test_leaderboard_game_page_renders_server_state():
     data = re.search(r'id="c24-lb-state">(.*?)</script>', html).group(1)
     assert json.loads(data) == state
     assert "data-lb-end" in html and "/leaderboard?tab=es" in html
+    assert "data-dc-toggle" in html and "@kolo_fan" in html  # avatar menu in the header
+    assert "🏆" not in html
     assert 'v-model="allow_any_word"' not in html  # no easy mode: the server checks every word
 
 
 def test_guest_end_window_hint_only_when_enabled():
     assert "data-lb-hint" in render_game("es", lb_enabled=True, lb_user=None)
-    assert "/auth/discord/login?next=" in render_game("es", lb_enabled=True, lb_user=None)
+    out = render_game("es", lb_enabled=True, lb_user=None)
+    assert "/auth/discord/login?next=" in out and "c24-dc-btn" in out and DISCORD_PATH in out
     assert 'href="/lb/en"' in render_game("en", lb_enabled=True, lb_user=ME)
     assert "data-lb-hint" not in render_game("de", lb_enabled=True, lb_user=None)  # es/en only
     assert "data-lb-hint" not in render_game("es", demo=True, lb_enabled=True, lb_user=None)
@@ -143,9 +174,10 @@ def test_leaderboard_page_table_and_me():
     assert html.count('data-tab="') == 3
     assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="es"', html)
     assert "@alpha" in html and 'class="is-me"' in html
+    assert html.count('data-dc-id="') == 4  # header button + its menu + own row + profile line, nobody else
     assert "Jugador" in html  # Spanish tab, Spanish labels
     assert "data-lb-me" not in html  # already in the table
-    assert 'action="/api/me/delete"' in html and "window.confirm" in html
+    assert 'action="/api/me/delete"' in html and "window.confirm" in html  # in the avatar menu
     assert 'action="/auth/logout"' in html
     assert 'action="/admin/hide"' not in html
     assert "no vemos tu contraseña" in html
@@ -213,19 +245,118 @@ def test_guest_game_has_no_js_errors(lb_off, server, page):
     assert errors == []
 
 
-def test_menu_mode_switch(server, page):
-    html = render_menu(lb_enabled=True, lb_user=None)
-    page.route(server + "/menu-lb", lambda r: r.fulfill(body=html, content_type="text/html"))
-    page.goto(server + "/menu-lb")
+def open_menu(server, page, html, path="/menu-lb", frag=""):
+    page.route(server + path, lambda r: r.fulfill(body=html, content_type="text/html"))
+    page.goto(server + path + frag)
     page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('[data-lang=es]')")
-    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"
-    page.click("[data-mode=lb]")
-    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/auth/discord/login?next=%2Flb%2Fes"
-    assert page.is_visible("[data-lb-privacy]")
-    assert page.evaluate("localStorage.getItem('casa24_mode')") == "lb"
+
+
+def test_menu_logged_out_cards_and_button(server, page):
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None))
+    page.evaluate("localStorage.setItem('casa24_lang', 'en')")
     page.reload()
     page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('[data-lang=es]')")
-    assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/auth/discord/login?next=%2Flb%2Fen"
+    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"  # cards: guest
+    assert page.get_attribute("[data-dc-area] .c24-dc-btn", "href") == "/auth/discord/login?next=%2Flb%2Fen"
+    assert page.is_visible("[data-dc-area] .c24-dc-btn")
+    assert page.inner_text("[data-dc-area] .c24-dc-btn").strip() == "Sign in with Discord"  # one language
+    assert page.evaluate("getComputedStyle(document.querySelector('.c24-dc-btn')).backgroundColor") == "rgb(88, 101, 242)"
+    # privacy dialog: opens from (i), closes with Esc
+    page.click("[data-dc-area] [data-dc-privacy]")
+    assert page.is_visible("#c24-privacy")
+    assert "Discord handles your login" in page.inner_text("#c24-privacy")
+    page.keyboard.press("Escape")
+    assert not page.is_visible("#c24-privacy")
+
+
+def test_menu_logged_in_cards_and_guest_toggle(server, page):
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
+    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/lb/es"
+    page.click(".c24-guest-toggle")
+    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"
+    assert page.evaluate("localStorage.getItem('casa24_mode')") == "guest"
+    page.reload()
+    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('[data-lang=es]')")
+    assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/en"
+    assert page.is_checked("[data-guest-toggle]")
+
+
+def test_menu_avatar_from_fragment_menu_and_logout(server, page):
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+    page.route("https://cdn.discordapp.com/**", lambda r: r.fulfill(status=200, content_type="image/png", body=b""))
+    page.route(server + "/auth/logout", lambda r: r.fulfill(status=200, content_type="text/html", body="bye"))
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME), frag="#dc=" + AVATAR_HASH)
+    assert page.evaluate("location.hash") == ""
+    assert page.evaluate("location.pathname") == "/menu-lb"
+    saved = json.loads(page.evaluate("localStorage.getItem('c24_dc_avatar')"))
+    assert saved == {"id": ME["id"], "hash": AVATAR_HASH}
+    src = page.get_attribute(".c24-dc-me img", "src")
+    assert src == f"https://cdn.discordapp.com/avatars/{ME['id']}/{AVATAR_HASH}.png?size=64"
+    # header menu: opens, Esc and an outside tap close it
+    page.click("[data-dc-toggle]")
+    assert page.is_visible("[data-dc-pop]") and page.get_attribute("[data-dc-toggle]", "aria-expanded") == "true"
+    assert "@kolo_fan" in page.inner_text("[data-dc-pop]")
+    page.keyboard.press("Escape")
+    assert not page.is_visible("[data-dc-pop]")
+    page.click("[data-dc-toggle]")
+    page.mouse.click(5, 400)
+    assert not page.is_visible("[data-dc-pop]")
+    # an invalid fragment changes nothing (and is removed)
+    page.goto("about:blank")
+    page.goto(server + "/menu-lb#dc=../../evil")
+    page.wait_for_function("window.Vue && document.querySelector('[data-lang=es]')")
+    assert page.evaluate("location.hash") == ""
+    assert json.loads(page.evaluate("localStorage.getItem('c24_dc_avatar')"))["hash"] == AVATAR_HASH
+    # log out forgets the picture
+    page.click("[data-dc-toggle]")
+    page.click("[data-dc-logout]")
+    page.wait_for_url(server + "/auth/logout")
+    assert page.evaluate("localStorage.getItem('c24_dc_avatar')") is None
+    assert errors == []
+
+
+def test_avatar_of_someone_else_is_not_used(server, page):
+    page.route("https://cdn.discordapp.com/**", lambda r: r.fulfill(status=200, content_type="image/png", body=b""))
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
+    page.evaluate("localStorage.setItem('c24_dc_avatar', JSON.stringify({id: '999', hash: '%s'}))" % AVATAR_HASH)
+    page.reload()
+    page.wait_for_function("window.Vue && document.querySelector('[data-lang=es]')")
+    assert page.get_attribute(".c24-dc-me img", "src") == DEFAULT_AVATAR
+
+
+def boxes_overlap(a, b):
+    return not (a["x"] + a["width"] <= b["x"] + 0.5 or b["x"] + b["width"] <= a["x"] + 0.5
+                or a["y"] + a["height"] <= b["y"] + 0.5 or b["y"] + b["height"] <= a["y"] + 0.5)
+
+
+HEADER_BOXES = """() => [...document.querySelectorAll('header.c24-header > .c24-header-side > *, header.c24-header .c24-header-title a')]
+    .filter(e => e.getClientRects().length && getComputedStyle(e).display !== 'none')
+    .map(e => { const r = e.getBoundingClientRect(); return {x: r.x, y: r.y, width: r.width, height: r.height, n: e.className}; })"""
+
+
+@pytest.mark.parametrize("width,height", [(320, 568), (390, 844)])
+@pytest.mark.parametrize("user", [None, ME])
+def test_menu_layout_no_overlap(server, page, width, height, user):
+    page.set_viewport_size({"width": width, "height": height})
+    open_menu(server, page, render_menu("/?login=cancelled", lb_enabled=True, lb_user=user))
+    assert page.evaluate("document.documentElement.scrollWidth") <= width
+    boxes = page.evaluate(HEADER_BOXES)
+    assert len(boxes) >= 5
+    for i, a in enumerate(boxes):
+        assert a["x"] >= 0 and a["x"] + a["width"] <= width + 0.5, a
+        for b in boxes[i + 1:]:
+            assert not boxes_overlap(a, b), (a, b)
+    area = page.locator("[data-dc-area]").bounding_box()
+    card = page.locator("a.c24-play").first.bounding_box()
+    assert area["y"] + area["height"] <= card["y"]
+    if user:
+        page.click("[data-dc-toggle]")
+        pop = page.locator("[data-dc-pop]").bounding_box()
+        assert pop["x"] >= 0 and pop["x"] + pop["width"] <= width
+        btn = page.locator("[data-dc-toggle]").bounding_box()
+        assert pop["y"] >= btn["y"] + btn["height"]  # never covers its own button
 
 
 def test_leaderboard_game_flow(server, page):

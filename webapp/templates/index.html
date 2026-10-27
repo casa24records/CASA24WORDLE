@@ -3,8 +3,15 @@
    the inline strings are the fallback. #}
 {% macro tx(lang, key, fallback) %}{% if texts is defined and texts and texts.get(lang) %}{{ texts[lang].get(key, fallback) }}{% else %}{{ fallback }}{% endif %}{% endmacro %}
 {% macro bi(key, es, en, sep=' / ') %}<span lang="es">{{ tx('es', key, es) }}</span>{{ sep }}<span lang="en">{{ tx('en', key, en) }}</span>{% endmacro %}
+{% import '_discord.html' as dc %}
+{#- L1: both languages in the page, only the player's one shows (CSS on data-l) -#}
+{% macro L1(key, es, en) %}<span data-l="es">{{ tx('es', key, es) }}</span><span data-l="en">{{ tx('en', key, en) }}</span>{% endmacro %}
+{% set lb_on = lb_enabled is defined and lb_enabled %}
+{% set me = lb_user if (lb_on and lb_user is defined and lb_user) else none %}
+{#- language for the Discord login target before index.js knows the saved one -#}
+{% set ui = request.accept_languages.best_match(['es', 'en']) or 'es' %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ ui }}">
 
 <head>
     <meta charset="UTF-8">
@@ -42,6 +49,7 @@
     <link rel="stylesheet" href="{{ asset('style.css') }}">
     <!-- light / dark theme (runs first so the page never flashes) -->
     <script src="{{ asset('theme.js') }}"></script>
+    {% if lb_on %}{{ dc.script(me) }}{% endif %}
 
     <script type="application/json" id="c24-languages">{{ json_script(languages) }}</script>
     <script type="application/json" id="c24-lb">{{ json_script({"enabled": (lb_enabled is defined and lb_enabled) and true or false, "user": lb_user if (lb_user is defined and lb_user) else none}) }}</script>
@@ -57,7 +65,17 @@
         <!-- The Header: 3 columns (about / title / theme + stats), so nothing overlaps -->
         <header class="c24-header c24-header-menu border-b border-neutral-300">
             <div class="c24-header-side">
-                <button type="button" class="c24-icon-btn" v-on:click="showAboutModal = !showAboutModal" aria-label="about">
+                {% if lb_on %}
+                {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ ui) | urlencode,
+                    tx('es', 'lb_account', 'Tu cuenta de Discord') ~ ' / ' ~ tx('en', 'lb_account', 'Your Discord account'),
+                    tx('es', 'lb_signin', 'Entrar con Discord') ~ ' / ' ~ tx('en', 'lb_signin', 'Sign in with Discord'),
+                    L1('lb_view', 'Ver leaderboard', 'View leaderboard'),
+                    L1('lb_logout', 'Cerrar sesión', 'Log out')) }}
+                <a href="/leaderboard" class="c24-icon-btn" data-lb-trophy
+                    aria-label="{{ tx('es', 'lb_view', 'Ver leaderboard') }} / {{ tx('en', 'lb_view', 'View leaderboard') }}"
+                    title="{{ tx('es', 'lb_view', 'Ver leaderboard') }} / {{ tx('en', 'lb_view', 'View leaderboard') }}" v-pre>{{ dc.trophy() }}</a>
+                {% endif %}
+                <button type="button" class="c24-icon-btn{% if lb_on %} c24-hide-narrow{% endif %}" v-on:click="showAboutModal = !showAboutModal" aria-label="about">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24"
                         height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -108,42 +126,25 @@
                 </p>
             </section>
 
-            {% if lb_enabled %}
-            <!-- Leaderboard (es/en only): login result notices, dismissible -->
-            {% if request.args.get('login') == 'failed' %}
-            <div class="c24-notice c24-notice-warn" role="alert" data-notice="login-failed">
-                <p>{{ bi('lb_login_failed', 'No se pudo entrar con Discord. Intenta de nuevo.', "Couldn't log in with Discord. Please try again.", sep='<br>'|safe) }}</p>
-                <button type="button" class="c24-notice-close" aria-label="{{ tx('es', 'lb_dismiss', 'Cerrar') }} / {{ tx('en', 'lb_dismiss', 'Close') }}" onclick="this.parentElement.remove()">×</button>
-            </div>
-            {% endif %}
-            {% if request.args.get('deleted') == '1' %}
-            <div class="c24-notice" role="status" data-notice="deleted">
-                <p>{{ bi('lb_deleted', 'Listo: borramos tus datos del leaderboard.', 'Done: your leaderboard data was deleted.', sep='<br>'|safe) }}</p>
-                <button type="button" class="c24-notice-close" aria-label="{{ tx('es', 'lb_dismiss', 'Cerrar') }} / {{ tx('en', 'lb_dismiss', 'Close') }}" onclick="this.parentElement.remove()">×</button>
-            </div>
-            {% endif %}
-
-            <!-- Guest or leaderboard: decides where the Español/English cards go -->
-            <section class="c24-mode-wrap" data-lb-menu>
-                <div class="c24-mode" role="radiogroup" aria-label="{{ tx('es', 'lb_mode_label', 'Modo de juego') }} / {{ tx('en', 'lb_mode_label', 'Game mode') }}">
-                    <button type="button" role="radio" class="c24-mode-opt" data-mode="guest"
-                        :aria-checked="mode === 'guest' ? 'true' : 'false'" :class="{ 'is-active': mode === 'guest' }"
-                        v-on:click="setMode('guest')">
-                        <span class="c24-mode-es" lang="es">{{ tx('es', 'lb_mode_guest', 'Jugar como invitado') }}</span>
-                        <span class="c24-mode-en" lang="en">{{ tx('en', 'lb_mode_guest', 'Play as guest') }}</span>
-                    </button>
-                    <button type="button" role="radio" class="c24-mode-opt" data-mode="lb"
-                        :aria-checked="mode === 'lb' ? 'true' : 'false'" :class="{ 'is-active': mode === 'lb' }"
-                        v-on:click="setMode('lb')">
-                        <span class="c24-mode-es" lang="es">🏆 {{ tx('es', 'lb_mode_lb', 'Jugar con leaderboard (Discord)') }}</span>
-                        <span class="c24-mode-en" lang="en">{{ tx('en', 'lb_mode_lb', 'Play for the leaderboard (Discord)') }}</span>
-                    </button>
-                </div>
-                <div v-if="mode === 'lb'" class="c24-mode-note" data-lb-privacy v-cloak>
-                    <p lang="es">{{ tx('es', 'lb_privacy', 'Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID y tu nombre de usuario de Discord y tus resultados para mostrar el ranking.') }} {{ tx('es', 'lb_guest_note', 'Las partidas como invitado no se suman al ranking.') }}</p>
-                    <p lang="en">{{ tx('en', 'lb_privacy', 'Discord handles your login; we never see your password or email. We store your Discord ID, your Discord username and your results to show the ranking.') }} {{ tx('en', 'lb_guest_note', "Guest games don't count toward the ranking.") }}</p>
-                </div>
+            {% if lb_on %}
+            <!-- Discord (es/en only), server-rendered so it shows at once. Text in ONE language:
+                 data-l="es|en" follows <html lang> (index.js sets it to the player's language). -->
+            {% if not me %}
+            <section class="c24-dc-area" data-dc-area data-lb-menu v-pre>
+                {{ dc.button('/auth/discord/login?next=' ~ ('/lb/' ~ ui) | urlencode,
+                    L1('lb_signin', 'Entrar con Discord', 'Sign in with Discord')) }}
+                {{ dc.privacy_link(L1('lb_privacy_title', 'Privacidad', 'Privacy')) }}
             </section>
+            {% else %}
+            <section class="c24-dc-area" data-dc-area data-lb-menu>
+                <label class="c24-guest-toggle">
+                    <input type="checkbox" class="c24-switch" data-guest-toggle
+                        :checked="mode === 'guest'" v-on:change="setMode($event.target.checked ? 'guest' : 'lb')">
+                    <span>{{ L1('lb_play_guest', 'Jugar como invitado (no cuenta)', "Play as guest (doesn't count)") }}</span>
+                </label>
+                <span v-pre>{{ dc.privacy_link(L1('lb_privacy_title', 'Privacidad', 'Privacy')) }}</span>
+            </section>
+            {% endif %}
             {% endif %}
 
             <!-- Español / English: the player's language first -->
@@ -153,9 +154,8 @@
                     :data-lang="lang.language_code"
                     class="c24-play" :class="i === 0 ? 'c24-play-main' : 'c24-play-alt'">
                     <span class="c24-play-name">[[ lang.language_name_native ]]</span>
-                    <span v-if="mode === 'lb'" class="c24-play-status">
-                        <span v-if="lb.user">🏆 [[ lang.language_code === 'es' ? 'Jugar' : 'Play' ]] →</span>
-                        <span v-else>[[ lang.language_code === 'es' ? {{ tx('es', 'lb_login', 'Entrar con Discord')|tojson }} : {{ tx('en', 'lb_login', 'Log in with Discord')|tojson }} ]] →</span>
+                    <span v-if="mode === 'lb'" class="c24-play-status" data-lb-status>
+                        {{ dc.trophy('c24-trophy c24-trophy-inline') }} [[ lang.language_code === 'es' ? 'Jugar' : 'Play' ]] →
                     </span>
                     <span v-else class="c24-play-status">
                         <span v-if="status[lang.language_code].played_today">✓ [[ lang.language_code === 'es' ? 'Jugada hoy' : 'Played today' ]]</span>
@@ -174,18 +174,6 @@
                 {% endif %}
             </section>
 
-            {% if lb_enabled %}
-            <!-- leaderboard link (always) and the Discord session -->
-            <section class="c24-lb-links" data-lb-links>
-                <a href="/leaderboard" class="c24-lb-link"><span>🏆 {{ bi('lb_view', 'Ver leaderboard', 'View leaderboard') }}</span></a>
-                {% if lb_user %}
-                <form method="post" action="/auth/logout" class="c24-lb-account">
-                    <span>{{ bi('lb_logged_in_as', 'Conectado como', 'Logged in as') }} <b>@{{ lb_user.username }}</b></span>
-                    <button type="submit" class="c24-lb-link">{{ bi('lb_logout', 'Cerrar sesión', 'Log out') }}</button>
-                </form>
-                {% endif %}
-            </section>
-            {% endif %}
 
             <!-- The other 8 languages, smaller -->
             <section aria-labelledby="more-languages">
@@ -296,6 +284,20 @@
 
     </div>
 
+    {% if lb_on %}
+    {% set dismiss = tx('es', 'lb_dismiss', 'Cerrar') ~ ' / ' ~ tx('en', 'lb_dismiss', 'Close') %}
+    {% if request.args.get('login') == 'failed' %}{{ dc.toast('login-failed', L1('lb_login_failed', 'No se pudo entrar con Discord. Intenta de nuevo.', "Couldn't sign in with Discord. Please try again."), dismiss, warn=true) }}{% endif %}
+    {% if request.args.get('login') == 'cancelled' %}{{ dc.toast('login-cancelled', L1('lb_login_cancelled', 'Cancelaste el inicio de sesión con Discord.', 'You cancelled the Discord sign-in.'), dismiss) }}{% endif %}
+    {% if request.args.get('deleted') == '1' %}{{ dc.toast('deleted', L1('lb_deleted', 'Listo: borramos tus datos del leaderboard.', 'Done: your leaderboard data was deleted.'), dismiss) }}{% endif %}
+    {% set privacy_body %}
+    {% for code in ('es', 'en') %}<div data-l="{{ code }}" lang="{{ code }}">
+        <p>{{ tx(code, 'lb_privacy', 'Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID y tu nombre de usuario de Discord y tus resultados para mostrar el ranking.' if code == 'es' else 'Discord handles your login; we never see your password or email. We store your Discord ID, your Discord username and your results to show the ranking.') }}</p>
+        <p>{{ tx(code, 'lb_avatar_note', 'Tu foto de Discord solo se muestra en tu navegador; no la guardamos.' if code == 'es' else "Your Discord picture is only shown in your browser; we don't store it.") }}</p>
+        <p>{{ tx(code, 'lb_guest_note', 'Las partidas como invitado no se suman al ranking.' if code == 'es' else "Guest games don't count toward the ranking.") }}</p>
+    </div>{% endfor %}
+    {% endset %}
+    {{ dc.privacy_dialog(L1('lb_privacy_title', 'Privacidad', 'Privacy'), privacy_body, L1('lb_dismiss', 'Cerrar', 'Close')) }}
+    {% endif %}
     <script defer src="{{ asset('index.js') }}"></script>
 </body>
 

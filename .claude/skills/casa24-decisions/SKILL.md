@@ -42,9 +42,9 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Guest mode + Discord leaderboard (decided 2026-10-26)
 How it works: `casa24-leaderboard`.
-- **Two modes in the es/en menu:** "Jugar como invitado" (the old game, nothing leaves the browser) and "Jugar con leaderboard (Discord)" (all-time ranking with Discord username and points). Other languages stay guest only.
+- **Two modes for es/en:** guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest); when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch. Other languages stay guest only.
 - **Discord login, scope `identify` only, no bot.** Discord app "Casa 24 Wordle". We never see passwords or email.
-- **Minimal data:** Discord ID, username, a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), a per-minute counter. **Never** tokens, avatar, email or IPs. Privacy note on the menu and `/leaderboard`, plus "Borrar mis datos".
+- **Minimal data:** Discord ID, username, a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), a per-minute counter. **Never** tokens, avatar, email or IPs. Privacy text in a small "ⓘ Privacidad" popover (see below), plus "Borrar mis datos".
 - **Database: Neon Postgres** through the Vercel Marketplace, a new separate database `casa24-wordle-db`. Not Upstash (the first plan, dropped by the owner), and not GitHub-as-a-database. The kanban project has its own Neon and Upstash: **never share or reuse them**.
 - **Points:** win in 1 = 6 … win in 6 = 1, loss = 0. Ranking: points, then wins, then who reached the total first. The server computes everything; the answer never reaches the browser in leaderboard mode.
 - **Guest games never count** and are never imported when someone logs in later.
@@ -52,6 +52,17 @@ How it works: `casa24-leaderboard`.
 - **Moderation:** admins (`ADMIN_DISCORD_IDS`) can hide offensive names.
 - **Testing in production was approved by the owner** (2026-10-26).
 - Secrets are entered only by the owner in the Vercel dashboard, never by Claude.
+
+## Discord sign-in UI and avatar (decided 2026-10-26/27)
+How it works: `casa24-leaderboard` (login flow, avatar, UI); look: `casa24-branding`.
+- **Official Discord sign-in button:** Discord Blurple `#5865F2`, white official Discord logo (inline SVG), 48 px tall, hover `#4752C4`. A fixed brand color is an allowed exception to the tokens-only rule.
+- **On the menu the Discord button shows right away** on page load (no need to pick a mode first), and it is **server-rendered**, so nothing jumps when the page loads.
+- **Logged in: the player's Discord avatar (round) sits in the top-left of the header, before the trophy icon.** Tapping it opens a small popover: @username, "Ver leaderboard", "Cerrar sesión" (and "Borrar mis datos").
+- **The avatar never touches our server's storage.** The callback passes the hash only in the redirect's URL fragment `#dc=<hash>`; the page keeps it in localStorage `c24_dc_avatar` `{id, hash}`, removes the fragment with `history.replaceState`, and the browser loads the picture from `cdn.discordapp.com`. No hash → Discord's default avatar `embed/avatars/<(id>>22)%6>.png`. Cleared on logout. **The privacy promise stays true:** the photo is shown only in the player's own browser; we never store it. Don't add the avatar to the database, cookies or logs.
+- **Cancel on Discord is not an error:** `?error=access_denied` → `/?login=cancelled` (a gentle notice); other failures → `/?login=failed`. `prompt=none` stays.
+- **Leaderboard access is a trophy line icon (SVG)** in the top-left of the header, not an emoji and not a "Ver leaderboard" text link. The 🏆 emoji is replaced by this SVG everywhere.
+- **Less text, UI that speaks for itself:** no privacy paragraph on the menu; the full privacy text lives only in a small "ⓘ Privacidad" popover. Notices are short toasts that close themselves. The end window shows rank and points as big numbers. "Borrar mis datos" is secondary (avatar popover or a small link), never a big button.
+- **Nothing may overlap anything at any screen size.** Check at 320, 375, 390, 844×390 (landscape), 768 and 1366 px wide (see `casa24-responsive`).
 
 ## Privacy
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.

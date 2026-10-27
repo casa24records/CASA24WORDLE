@@ -590,7 +590,8 @@ def language(lang_code):
 # wordle_games, wordle_rate; an in-memory copy for tests and local dev).
 # Kept: Discord ID, username, hidden flag, per finished game lang/day/won/
 # attempts/points, today's guesses (2 days), a per-minute guess counter.
-# Never stored: Discord tokens, avatar, email, IP addresses.
+# Never stored: Discord tokens, avatar, email, IP addresses. (The avatar hash
+# only reaches the player's own browser, in the login redirect's #dc= fragment.)
 #
 # Ranking and streaks are computed from wordle_results when read: SQL sums
 # points/wins/played per tab; streaks come from the player's ordered results
@@ -599,6 +600,7 @@ def language(lang_code):
 # POSTs check that Origin (or Referer) matches this host when the browser sends
 # one; the c24_lb cookie is also SameSite=Lax, so other sites can't post with it.
 
+import re
 import secrets
 import unicodedata
 
@@ -785,12 +787,30 @@ def discord_login():
     return response
 
 
+AVATAR_HASH_RE = re.compile(r"(a_)?[0-9a-f]{32}")
+
+
+def _avatar_fragment(avatar_hash):
+    """"#dc=<hash>" for the player's browser ("#dc=" when they have no avatar).
+    A hash that doesn't look like Discord's format is dropped (no fragment)."""
+    if avatar_hash is None:
+        return "#dc="
+    if isinstance(avatar_hash, str) and AVATAR_HASH_RE.fullmatch(avatar_hash):
+        return "#dc=" + avatar_hash
+    return ""
+
+
 @app.route("/auth/discord/callback")
 def discord_callback():
     if not lb_enabled():
         abort(404)
     failed = redirect("/?login=failed")
     failed.delete_cookie(OAUTH_COOKIE, path=OAUTH_COOKIE_PATH)
+    if request.args.get("error") == "access_denied":
+        # the player pressed Cancel on Discord: a gentle notice, not an error
+        cancelled = redirect("/?login=cancelled")
+        cancelled.delete_cookie(OAUTH_COOKIE, path=OAUTH_COOKIE_PATH)
+        return cancelled
     raw = request.cookies.get(OAUTH_COOKIE)
     try:
         saved = _serializer("c24-oauth").loads(raw, max_age=OAUTH_COOKIE_AGE) if raw else None
@@ -804,11 +824,15 @@ def discord_callback():
         return failed
     try:
         # the access token lives only inside discord_auth.identify()
-        discord_id, username = discord_auth.identify(code, request.url_root + "auth/discord/callback")
+        # avatar_hash is never stored, logged or put in a cookie: it only goes to
+        # the player's browser in the URL fragment (browsers never send fragments)
+        discord_id, username, avatar_hash = discord_auth.identify(
+            code, request.url_root + "auth/discord/callback")
         lb_store().upsert_player(discord_id, username)
     except Exception:
         return failed  # nothing logged: messages could carry request details
-    response = redirect(_safe_next(saved.get("next")))
+    response = redirect(_safe_next(saved.get("next")).split("#", 1)[0] + _avatar_fragment(avatar_hash))
+    response.set_data(b"")  # the hash only in the Location header, not echoed in an HTML body
     response.delete_cookie(OAUTH_COOKIE, path=OAUTH_COOKIE_PATH)
     _set_lb_cookie(response, discord_id)
     response.headers["Cache-Control"] = "no-store"

@@ -1,0 +1,170 @@
+{#- Discord pieces shared by index.html, game.html and leaderboard.html.
+    Import with: {% import '_discord.html' as dc %}
+    - dc.logo(): the official Discord logo (simple-icons path), fill = currentColor
+    - dc.button(href, label): the official-style "Sign in with Discord" button
+    - dc.avatar(user, size): the player's own avatar (default avatar until JS knows the hash)
+    - dc.header_slot(...): header avatar with a small menu, or a small Discord login icon
+    - dc.privacy_link / dc.privacy_dialog: the "(i) Privacy" link and its dialog
+    - dc.toast(...): short notice (login failed/cancelled, data deleted) that closes itself
+    - dc.trophy(): line trophy icon (same style as the header icons)
+    - dc.script(lb_user): reads #dc=<avatar hash> after login, keeps it in localStorage
+      (c24_dc_avatar, this browser only) and fills every img[data-dc-avatar].
+    Pieces inside the Vue apps carry v-pre so Vue leaves them alone. -#}
+
+{% macro logo(cls='c24-dc-logo') -%}
+<svg class="{{ cls }}" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>
+{%- endmacro %}
+
+{% macro trophy(cls='c24-trophy') -%}
+<svg class="{{ cls }}" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M17 4v8a5 5 0 0 1 -10 0v-8"/><circle cx="5" cy="9" r="2"/><circle cx="19" cy="9" r="2"/></svg>
+{%- endmacro %}
+
+{#- Official-style button: Blurple, white logo, 48px. `label` may be markup. -#}
+{% macro button(href, label, cls='') -%}
+<a href="{{ href }}" class="c24-dc-btn {{ cls }}" data-dc-login>{{ logo() }}<span class="c24-dc-btn-text">{{ label }}</span></a>
+{%- endmacro %}
+
+{#- Default Discord avatar for this ID ((id >> 22) % 6); JS swaps in the real one. -#}
+{% macro default_avatar(user) -%}
+https://cdn.discordapp.com/embed/avatars/{{ ((user.id | int) // 4194304) % 6 }}.png
+{%- endmacro %}
+
+{% macro avatar(user, size=32, cls='c24-dc-avatar') -%}
+<img src="{{ default_avatar(user) }}" data-dc-avatar data-dc-id="{{ user.id }}" width="{{ size }}" height="{{ size }}"
+    alt="" loading="lazy" referrerpolicy="no-referrer" class="{{ cls }}">
+{%- endmacro %}
+
+{#- Header slot (top left). Logged in: avatar button with a small menu
+    (@username, leaderboard, log out, optionally delete my data). Logged out:
+    small Discord login icon. Labels may be markup; aria_* are plain text. -#}
+{% macro header_slot(user, login_href, aria_account, aria_login, view_label, logout_label, delete_label=none, delete_confirm='') -%}
+{% if user %}
+<div class="c24-dc-menu" data-dc-menu v-pre>
+    <button type="button" class="c24-icon-btn c24-dc-me" data-dc-toggle aria-haspopup="true" aria-expanded="false"
+        aria-label="{{ aria_account }}: @{{ user.username }}" title="@{{ user.username }}">{{ avatar(user, 30, 'c24-dc-avatar c24-dc-avatar-head') }}</button>
+    <div class="c24-dc-pop" data-dc-pop hidden>
+        <p class="c24-dc-pop-user">{{ avatar(user, 32) }}<span class="c24-dc-pop-name">@{{ user.username }}</span>{{ logo('c24-dc-mark') }}</p>
+        <a href="/leaderboard" class="c24-dc-pop-item">{{ trophy() }}<span>{{ view_label }}</span></a>
+        <form method="post" action="/auth/logout" data-dc-clear>
+            <button type="submit" class="c24-dc-pop-item" data-dc-logout><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 8V6a2 2 0 0 0 -2 -2H5a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2"/><path d="M9 12h12l-3 -3"/><path d="M18 15l3 -3"/></svg><span>{{ logout_label }}</span></button>
+        </form>
+        {% if delete_label %}
+        <form method="post" action="/api/me/delete" data-dc-clear data-confirm="{{ delete_confirm }}" onsubmit="return window.confirm(this.dataset.confirm)">
+            <button type="submit" class="c24-dc-pop-item c24-dc-pop-danger" data-lb-delete><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg><span>{{ delete_label }}</span></button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<a href="{{ login_href }}" class="c24-icon-btn c24-dc-icon" aria-label="{{ aria_login }}" title="{{ aria_login }}" data-dc-login v-pre>{{ logo('c24-dc-mark') }}</a>
+{% endif %}
+{%- endmacro %}
+
+{#- Small "(i) Privacy" link that opens the privacy dialog. -#}
+{% macro privacy_link(label) -%}
+<button type="button" class="c24-dc-privacy-link" data-dc-privacy aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M11 12h1v4h1"/></svg><span>{{ label }}</span></button>
+{%- endmacro %}
+
+{#- The privacy dialog (native <dialog>: Esc and the close button close it). Put it outside the Vue app. -#}
+{% macro privacy_dialog(title, body, close_label) -%}
+<dialog id="c24-privacy" class="c24-privacy" aria-labelledby="c24-privacy-title">
+    <form method="dialog" class="c24-privacy-box">
+        <h2 id="c24-privacy-title" class="c24-privacy-title">{{ logo('c24-dc-mark') }}<span>{{ title }}</span></h2>
+        <div class="c24-privacy-body">{{ body }}</div>
+        <button type="submit" class="c24-privacy-close" autofocus>{{ close_label }}</button>
+    </form>
+</dialog>
+{%- endmacro %}
+
+{#- Short notice that closes itself after a few seconds. Put it outside the Vue app. -#}
+{% macro toast(marker, body, close_label, warn=false) -%}
+<div class="c24-dc-toast{% if warn %} c24-dc-toast-warn{% endif %}" role="{{ 'alert' if warn else 'status' }}" data-notice="{{ marker }}" data-c24-toast>
+    <p>{{ body }}</p>
+    <button type="button" class="c24-notice-close" aria-label="{{ close_label }}" data-c24-toast-close>×</button>
+</div>
+{%- endmacro %}
+
+{#- In <head>: handles the #dc= fragment left by the login, the avatar URL,
+    the header menu, and clears the saved avatar on log out / delete. -#}
+{% macro script(user) -%}
+<script>
+(function () {
+    var ME = {{ (user.id if user else none) | tojson }};
+    var KEY = "c24_dc_avatar", HASH = /^(a_)?[0-9a-f]{32}$/;
+    function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+    function save(v) { try { if (v) { localStorage.setItem(KEY, JSON.stringify(v)); } else { localStorage.removeItem(KEY); } } catch (e) { } }
+    // after the Discord login the server sends us to <page>#dc=<avatar hash>
+    var m = /^#dc=([^&]*)$/.exec(window.location.hash);
+    if (m) {
+        var h = m[1];
+        if (ME && HASH.test(h)) { save({ id: ME, hash: h }); }
+        else if (ME && h === "") { save(null); }  // no picture on Discord: default avatar
+        if (window.history.replaceState) { window.history.replaceState(null, "", window.location.pathname + window.location.search); }
+    }
+    function avatarUrl(id) {
+        var s = load();
+        if (s && s.id === id && HASH.test(s.hash || "")) {
+            return "https://cdn.discordapp.com/avatars/" + id + "/" + s.hash + ".png?size=64";
+        }
+        var i = 0;
+        try { i = Number((BigInt(id) >> BigInt(22)) % BigInt(6)); } catch (e) { }
+        return "https://cdn.discordapp.com/embed/avatars/" + i + ".png";
+    }
+    window.c24DcAvatars = function () {
+        var imgs = document.querySelectorAll("img[data-dc-avatar]");
+        for (var k = 0; k < imgs.length; k++) {
+            var url = avatarUrl(imgs[k].getAttribute("data-dc-id"));
+            if (imgs[k].getAttribute("src") !== url) { imgs[k].setAttribute("src", url); }
+        }
+    };
+    // deferred scripts (Vue apps) have mounted by now
+    document.addEventListener("DOMContentLoaded", window.c24DcAvatars);
+    function closeMenus(except) {
+        var open = document.querySelectorAll("[data-dc-pop]:not([hidden])");
+        for (var k = 0; k < open.length; k++) {
+            if (open[k] === except) { continue; }
+            open[k].hidden = true;
+            var b = open[k].parentNode.querySelector("[data-dc-toggle]");
+            if (b) { b.setAttribute("aria-expanded", "false"); }
+        }
+    }
+    document.addEventListener("click", function (e) {
+        var t = e.target.closest ? e.target.closest("[data-dc-toggle]") : null;
+        if (t) {
+            var pop = t.parentNode.querySelector("[data-dc-pop]");
+            closeMenus(pop);
+            pop.hidden = !pop.hidden;
+            t.setAttribute("aria-expanded", pop.hidden ? "false" : "true");
+            t.blur();
+            return;
+        }
+        if (!(e.target.closest && e.target.closest("[data-dc-pop]"))) { closeMenus(null); }
+    });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeMenus(null); } });
+    document.addEventListener("click", function (e) {
+        if (!e.target.closest) { return; }
+        if (e.target.closest("[data-dc-privacy]")) {
+            var d = document.getElementById("c24-privacy");
+            closeMenus(null);
+            if (d && d.showModal) { d.showModal(); } else if (d) { d.setAttribute("open", ""); }
+            return;
+        }
+        var d2 = document.getElementById("c24-privacy");
+        if (d2 && e.target === d2) { d2.close(); }  // tap on the backdrop
+        var x = e.target.closest("[data-c24-toast-close]");
+        if (x) { x.parentNode.remove(); }
+    });
+    // notices close themselves
+    document.addEventListener("DOMContentLoaded", function () {
+        var toasts = document.querySelectorAll("[data-c24-toast]");
+        for (var k = 0; k < toasts.length; k++) {
+            (function (el) { setTimeout(function () { el.classList.add("is-leaving"); setTimeout(function () { el.remove(); }, 300); }, 6000); })(toasts[k]);
+        }
+    });
+    document.addEventListener("submit", function (e) {
+        // log out / delete my data: forget the picture too
+        if (!e.defaultPrevented && e.target.hasAttribute && e.target.hasAttribute("data-dc-clear")) { save(null); }
+    });
+})();
+</script>
+{%- endmacro %}

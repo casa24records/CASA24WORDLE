@@ -36,6 +36,7 @@ All layout CSS is in the "LAYOUT" section of `webapp/static/style.css`; the clas
 - `--vh`: `1vh`, or `1dvh` where the browser has it. Write `calc(var(--vh) * N)`, not `vh`.
 - `.c24-game`: the game page column (header, board, keyboard). `height: calc(var(--vh) * 100)`, max 500px wide, side safe areas.
 - `.c24-header`: 3-column grid (`1fr auto 1fr`), 52px + top safe area, so the title never covers the icons. `.c24-header-title` font is `clamp(1.25rem, …, 2.25rem)`. `.c24-icon-btn`: 44×44 icon buttons.
+- **Header left group when the leaderboard is on** (`.c24-header-side`, flex row): menu = Discord avatar button or small Discord icon (`dc.header_slot`), then the trophy link to `/leaderboard`, then the info button; leaderboard game = avatar/icon then help; `/leaderboard` = back arrow then avatar/icon. Three 44px icons don't fit next to the title on narrow phones, so the menu's info button has `.c24-hide-narrow` and is **hidden under 420px** (`@media (max-width: 419px)`). The avatar popover `.c24-dc-pop` opens below the avatar, `max-width: calc(100vw - 16px)`, long usernames cut with ….
 - `.c24-board-area` (the `<main>`): takes the leftover height, `container-type: size`.
 - `.c24-board`: `--w: min(420px, 100cqw - 20px, (100cqh - 20px - 5*gap) / 1.2 + 4*gap)`, i.e. as big as fits, max 420px. Tiles are square; their font follows the tile size (`main .grid-cols-5 > div`: 62% of a tile, at least 14px).
 - `.c24-keyboard` with `style="--rows: N"` (set in `game.html` from the row count) and one `.c24-key-row` per row. Key height `--kh` = `clamp(24px, …, 58px)`: about 7dvh, less when there are many rows (all rows share about 42dvh). Keys `flex: 1 1 0`; ⇨ and ⌫ get `flex-grow: 1.5`. Bottom padding `max(8px, env(safe-area-inset-bottom))`.
@@ -45,11 +46,14 @@ All layout CSS is in the "LAYOUT" section of `webapp/static/style.css`; the clas
 - `.c24-kolo` (end-screen picture): at most `min(160px, 22dvh)` tall. `.c24-hero-kolo` (menu): 150px, 96px on screens under 700px tall.
 - Start screen: `.c24-start`, `.c24-primary` (two big buttons side by side at ≥640px), `.c24-chips` (2 columns, 4 at ≥640px); the dashed "🔒 Developer view" card `.c24-play-demo` spans the full row under them (only when `DEMO_PASSWORD` is set).
 - **Leaderboard** (styles in the "leaderboard" section of `style.css`, not in LAYOUT; details of the feature: `casa24-leaderboard`):
-  - Menu: `.c24-mode` guest/leaderboard switch (2 equal columns, each option at least 44px tall, Spanish line over a smaller English line), `.c24-notice` boxes (44px ×), `.c24-lb-links` (View leaderboard, logged-in name, Log out). When the leaderboard is on, these make the start screen taller, so recheck the phone height after changes (the < 2000px test runs with the leaderboard off).
-  - Game `/lb/<lang>` uses the normal game layout; only the end window differs (`.c24-lb-end`: rank, points, link).
+  - Menu: `.c24-dc-area` above the cards. Logged out: the full-width Discord button `.c24-dc-btn` (48px) + the small privacy link `.c24-dc-privacy-link` (44px tall). Logged in: the guest switch `.c24-guest-toggle` (44px row, 40×24 `.c24-switch`) + privacy link. Short on purpose (owner: less text), but it still makes the start screen taller, so recheck the phone height after changes (the < 2000px test runs with the leaderboard off).
+  - Privacy: native `<dialog class="c24-privacy">`, `width: min(26rem, 100% - 32px)`, `max-height: calc(100dvh - 32px)`, Esc/backdrop/Close (44px) close it.
+  - Toasts `.c24-dc-toast` (login failed/cancelled, data deleted): `position: fixed` at the bottom center, `width: min(26rem, 100% - 32px)`, above the safe area, gone after 6 s or on ×. They are **the one allowed exception to "nothing overlaps"**: they float over the page for a moment on purpose.
+  - Game `/lb/<lang>` uses the normal game layout; only the end window differs (`.c24-lb-end`: `.c24-lb-stats` with two big VT323 numbers `.c24-lb-big` side by side, then the link). A guest es/en end window may show the hint `.c24-lb-hint` with a Discord button.
   - `/leaderboard` (`leaderboard.html`) is a **standalone page**: it loads `style.css` but **not Tailwind or Vue**, so the end of the leaderboard section has its own small reset (`.c24-lb-page` margins, buttons, links, `.uppercase`). Use `c24-*` classes there, not Tailwind classes. One column `.c24-lb`, max 40rem; it scrolls normally (`min-height` full screen, not fixed height).
   - Table `.c24-lb-table`: rank, player (long names cut with …), points always shown. **Wins** (`.c24-lb-opt1`) appear from **400px** wide, **streak and best streak** (`.c24-lb-opt2`) from **520px**, so a 320px phone never scrolls sideways.
-  - Tabs, buttons, Back link and Log in are at least 44px tap targets (the admin-only Hide button is 32px). Side padding is `max(16px, safe area)`.
+  - Under the table: one compact centered line `.c24-dc-signed` (avatar + @username, wraps long names) or the Discord button `.c24-lb-login` (max 20rem), then the privacy link.
+  - Tabs, buttons, Back link and the Discord button are at least 44px tap targets (the admin-only Hide button is 32px). Side padding is `max(16px, safe area)`.
 - Hover styles only inside `@media (hover: hover) and (pointer: fine)`.
 - Viewport meta: `width=device-width, initial-scale=1, viewport-fit=cover` (pinch-zoom allowed). theme-color: light `#f4efe6`, dark `#0f1a12`.
 - Physical keys: `keyDown()` / `normalizeKey()` in `game.js` (rules in `casa24-text-and-languages`).
@@ -81,7 +85,9 @@ Performance done:
 - Targets (Core Web Vitals, mobile): LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1. Check with Lighthouse in mobile mode.
 
 ## Sizes to test
-320×568, 375×667, 390×844, 430×932, 844×390 (landscape), 768×1024, 1024×768, 1366×768, 1920×1080. Use `is_mobile`/`has_touch` for phones and tablets.
+**Owner rule: nothing may overlap** (header icons vs title, popover, Discord area, cards, end-window numbers) at **320, 375, 390, 844×390 landscape, 768 and 1366** wide; check these on every leaderboard/Discord UI change, logged in and logged out, on `/`, `/lb/es` and `/leaderboard`. Only the toasts may cover content (see above).
+
+Full list: 320×568, 375×667, 390×844, 430×932, 844×390 (landscape), 768×1024, 1024×768, 1366×768, 1920×1080. Use `is_mobile`/`has_touch` for phones and tablets.
 - Check in light and dark mode, and with es, vi (9 key rows), ko (7 rows), ar (RTL) and de/fr/tr (11-key rows).
 - For each size, measure:
   - no vertical or horizontal page scroll on the game

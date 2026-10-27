@@ -33,8 +33,9 @@ const app = Vue.createApp({
             total_stats: {},
             countdown: "",
             lb: lb_info,
-            // "guest" (default) or "lb": where the Español/English cards go
-            mode: lb_info.enabled && readStorage("casa24_mode") === "lb" ? "lb" : "guest",
+            // where the Español/English cards go: signed in with Discord → "lb" (the
+            // leaderboard game) unless the player switched on "play as guest"; else "guest"
+            mode: lb_info.enabled && lb_info.user && readStorage("casa24_mode") !== "guest" ? "lb" : "guest",
         }
     },
     computed: {
@@ -76,17 +77,22 @@ const app = Vue.createApp({
     },
     mounted() {
         window.addEventListener('keydown', this.keyDown);
+        // the Discord sign-in links (server-rendered, v-pre) go to the player's language
+        if (this.lb.enabled && !this.lb.user) {
+            var href = "/auth/discord/login?next=" + encodeURIComponent("/lb/" + this.preferredLanguage);
+            var links = document.querySelectorAll("[data-dc-login]");
+            for (var i = 0; i < links.length; i++) links[i].setAttribute("href", href);
+        }
     },
     methods: {
         setMode(mode) {
-            this.mode = mode === "lb" ? "lb" : "guest";
+            this.mode = mode === "lb" && this.lb.user ? "lb" : "guest";
             writeStorage("casa24_mode", this.mode);
         },
         playHref(code) {
-            // guest: /es; leaderboard: /lb/es (through the Discord login when needed)
-            if (this.mode !== "lb" || !this.lb.enabled) return "/" + code;
-            var target = "/lb/" + code;
-            return this.lb.user ? target : "/auth/discord/login?next=" + encodeURIComponent(target);
+            // guest: /es; leaderboard (signed in): /lb/es
+            if (this.mode !== "lb" || !this.lb.enabled || !this.lb.user) return "/" + code;
+            return "/lb/" + code;
         },
         tick() {
             // time left until midnight in Panama, as "11h 48m 03s"

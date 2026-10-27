@@ -18,6 +18,8 @@ ADMIN_ID = "900000000000000001"
 TODAY = datetime.date(2026, 11, 3)
 
 # Everything Discord could send back; only id and username may be kept.
+# (The avatar here is deliberately NOT a valid Discord hash, so by default the
+# callback adds no #dc= fragment; tests set FakeDiscord.avatar for a real one.)
 SECRET_BITS = {
     "token": "FAKE-ACCESS-TOKEN-zz9",
     "avatar": "avatarhash-aa11",
@@ -30,6 +32,7 @@ SECRET_BITS = {
 class FakeDiscord:
     def __init__(self):
         self.user = {"id": "100000000000000001", "username": "kolo_fan"}
+        self.avatar = SECRET_BITS["avatar"]  # str, None, or anything Discord might send
         self.calls = []
 
     def exchange_code(self, code, redirect_uri):
@@ -41,7 +44,7 @@ class FakeDiscord:
         self.calls.append(("me",))
         return {
             **self.user,
-            "avatar": SECRET_BITS["avatar"],
+            "avatar": self.avatar,
             "email": SECRET_BITS["email"],
             "banner": SECRET_BITS["banner"],
             "global_name": SECRET_BITS["global_name"],
@@ -102,6 +105,9 @@ def rendered():
     template_rendered.connect(record, app.app)
     yield seen
     template_rendered.disconnect(record, app.app)
+
+
+VALID_AVATAR = "a_" + "0123456789abcdef" * 2  # Discord format: (a_)?<32 hex>
 
 
 def login(client, discord, user_id=None, username=None, next_path="/lb/es"):

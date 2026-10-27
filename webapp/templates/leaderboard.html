@@ -5,6 +5,9 @@
     the fallback. -#}
 {% set tab = tab if tab in ('es', 'en', 'all') else 'all' %}
 {% set ui = tab if tab in ('es', 'en') else (request.accept_languages.best_match(['es', 'en']) or 'es') %}
+{% import '_discord.html' as dc %}
+{% set me = lb_user if (lb_user is defined and lb_user) else none %}
+{% set login_href = '/auth/discord/login?next=' ~ ('/leaderboard?tab=' ~ tab) | urlencode %}
 {% macro L(key, es, en) %}{% if texts is defined and texts and texts.get(ui) %}{{ texts[ui].get(key, es if ui == 'es' else en) }}{% else %}{{ es if ui == 'es' else en }}{% endif %}{% endmacro %}
 <!DOCTYPE html>
 <html lang="{{ ui }}">
@@ -23,6 +26,7 @@
     <style>@font-face { font-family: "VT323"; src: url("{{ asset('fonts/VT323-Regular.ttf') }}") format("truetype"); font-display: swap; }</style>
     <link rel="stylesheet" href="{{ asset('style.css') }}">
     <script src="{{ asset('theme.js') }}"></script>
+    {{ dc.script(me) }}
 </head>
 
 <body class="c24-lb-page">
@@ -31,6 +35,13 @@
             <a href="/" class="c24-icon-btn" aria-label="{{ L('lb_back', 'Menú', 'Menu') }}" title="{{ L('lb_back', 'Menú', 'Menu') }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg>
             </a>
+            {% if lb_enabled %}
+            {{ dc.header_slot(me, login_href, L('lb_account', 'Tu cuenta de Discord', 'Your Discord account'),
+                L('lb_signin', 'Entrar con Discord', 'Sign in with Discord'),
+                L('lb_view', 'Ver leaderboard', 'View leaderboard'), L('lb_logout', 'Cerrar sesión', 'Log out'),
+                L('lb_delete', 'Borrar mis datos', 'Delete my data'),
+                L('lb_delete_confirm', '¿Borrar todos tus datos del leaderboard? No se puede deshacer.', "Delete all your leaderboard data? This can't be undone.")) }}
+            {% endif %}
         </div>
         <h1 class="c24-title c24-header-title uppercase"><a href="/" class="c24-lb-home">
             <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
@@ -44,7 +55,7 @@
     </header>
 
     <main class="c24-lb">
-        <h2 class="c24-title c24-lb-title">🏆 {{ L('lb_title', 'Leaderboard', 'Leaderboard') }}</h2>
+        <h2 class="c24-title c24-lb-title">{{ dc.trophy('c24-trophy c24-trophy-title') }} {{ L('lb_title', 'Leaderboard', 'Leaderboard') }}</h2>
 
         <nav class="c24-lb-tabs" aria-label="{{ L('lb_title', 'Leaderboard', 'Leaderboard') }}">
             {% for code, label in (('es', L('lb_tab_es', 'Español', 'Español')), ('en', L('lb_tab_en', 'English', 'English')), ('all', L('lb_tab_all', 'Combinado', 'Combined'))) %}
@@ -70,7 +81,7 @@
                 {% for row in rows %}
                 <tr{% if row.is_me %} class="is-me" aria-current="true"{% endif %}>
                     <td class="c24-lb-n">{{ row.rank }}</td>
-                    <td class="c24-lb-name"><span class="c24-lb-user">@{{ row.username }}</span>{% if row.is_me %} <span class="c24-lb-you">{{ L('lb_you', 'Tú', 'You') }}</span>{% endif %}</td>
+                    <td class="c24-lb-name">{% if row.is_me and me %}{{ dc.avatar(me, 20, 'c24-dc-avatar c24-dc-avatar-row') }}{% endif %}<span class="c24-lb-user">@{{ row.username }}</span>{% if row.is_me %} <span class="c24-lb-you">{{ L('lb_you', 'Tú', 'You') }}</span>{% endif %}</td>
                     <td class="c24-lb-num c24-lb-pts">{{ row.points }}</td>
                     <td class="c24-lb-num c24-lb-opt1">{{ row.wins }}</td>
                     <td class="c24-lb-num c24-lb-opt2">{% if row.current_streak %}🔥 {% endif %}{{ row.current_streak }}</td>
@@ -100,26 +111,22 @@
         {% endif %}
 
         <section class="c24-lb-account">
-            {% if lb_user %}
-            <p>{{ L('lb_logged_in_as', 'Conectado como', 'Logged in as') }} <b>@{{ lb_user.username }}</b></p>
-            <div class="c24-lb-actions">
-                <form method="post" action="/auth/logout">
-                    <button type="submit" class="c24-lb-btn">{{ L('lb_logout', 'Cerrar sesión', 'Log out') }}</button>
-                </form>
-                <form method="post" action="/api/me/delete" data-confirm="{{ L('lb_delete_confirm', '¿Borrar todos tus datos del leaderboard? No se puede deshacer.', "Delete all your leaderboard data? This can't be undone.") }}"
-                    onsubmit="return window.confirm(this.dataset.confirm)">
-                    <button type="submit" class="c24-lb-btn c24-lb-danger" data-lb-delete>{{ L('lb_delete', 'Borrar mis datos', 'Delete my data') }}</button>
-                </form>
-            </div>
+            {% if me %}
+            <p class="c24-dc-signed" data-dc-signed>{{ dc.avatar(me, 32) }}<span><b>@{{ me.username }}</b></span>{{ dc.logo('c24-dc-mark') }}</p>
             {% elif lb_enabled %}
-            <a href="/auth/discord/login?next={{ ('/leaderboard?tab=' ~ tab) | urlencode }}" class="c24-play c24-play-main c24-lb-login">{{ L('lb_login', 'Entrar con Discord', 'Log in with Discord') }}</a>
+            {{ dc.button(login_href, L('lb_signin', 'Entrar con Discord', 'Sign in with Discord'), 'c24-lb-login') }}
             {% endif %}
-            <p class="c24-lb-privacy">{{ L('lb_privacy', 'Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID y tu nombre de usuario de Discord y tus resultados para mostrar el ranking.', 'Discord handles your login; we never see your password or email. We store your Discord ID, your Discord username and your results to show the ranking.') }}
-                {{ L('lb_guest_note', 'Las partidas como invitado no se suman al ranking.', "Guest games don't count toward the ranking.") }}</p>
+            {{ dc.privacy_link(L('lb_privacy_title', 'Privacidad', 'Privacy')) }}
         </section>
 
         <p class="c24-lb-back"><a href="/">← {{ L('lb_back', 'Menú', 'Menu') }}</a></p>
     </main>
+    {% set privacy_body %}
+    <p>{{ L('lb_privacy', 'Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID y tu nombre de usuario de Discord y tus resultados para mostrar el ranking.', 'Discord handles your login; we never see your password or email. We store your Discord ID, your Discord username and your results to show the ranking.') }}</p>
+    <p>{{ L('lb_avatar_note', 'Tu foto de Discord solo se muestra en tu navegador; no la guardamos.', "Your Discord picture is only shown in your browser; we don't store it.") }}</p>
+    <p>{{ L('lb_guest_note', 'Las partidas como invitado no se suman al ranking.', "Guest games don't count toward the ranking.") }}</p>
+    {% endset %}
+    {{ dc.privacy_dialog(L('lb_privacy_title', 'Privacidad', 'Privacy'), privacy_body, L('lb_dismiss', 'Cerrar', 'Close')) }}
 </body>
 
 </html>

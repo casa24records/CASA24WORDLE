@@ -575,15 +575,6 @@ const app = Vue.createApp({
                 this.showNotification(this.text("lb_error", "Something went wrong. Please try again."));
             }
         },
-        lbRankText() {
-            return this.text("lb_rank", "Your rank: #{rank}").replace("{rank}", this.lb_rank);
-        },
-        lbPointsText() {
-            if (this.lb_points === 1) {
-                return this.text("lb_point_one", "+1 point");
-            }
-            return this.text("lb_points", "+{points} points").replace("{points}", this.lb_points);
-        },
         dismissLbHint() {
             this.lb_hint_off = true;
             try { localStorage.setItem("casa24_lb_hint_off", "1"); } catch (e) { }

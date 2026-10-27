@@ -1,8 +1,11 @@
 """Discord login (OAuth2, scope "identify" only), stdlib urllib.
 
 identify(code, redirect_uri) trades the one-time code for an access token,
-asks Discord who the player is, and returns ONLY (id, username). The token
-never leaves this module, is never stored and never logged.
+asks Discord who the player is, and returns ONLY (id, username, avatar_hash).
+The token never leaves this module, is never stored and never logged.
+id + username are what the server stores. avatar_hash is only handed back to
+the player's own browser (URL fragment after login, see app.discord_callback);
+the server never stores, logs or puts it in a cookie.
 
 exchange_code() and fetch_me() are the only two network calls; tests replace
 them with fakes (monkeypatch), so the test suite never talks to Discord.
@@ -89,11 +92,16 @@ def fetch_me(access_token):
 
 
 def identify(code, redirect_uri):
-    """(discord_id, username) for this login. Everything else is dropped here."""
+    """(discord_id, username, avatar_hash) for this login. Everything else is dropped here.
+
+    avatar_hash is a string or None and must never be stored server-side: the
+    callback only passes it to the player's browser in the redirect fragment."""
     me = fetch_me(exchange_code(code, redirect_uri))
     discord_id = str(me.get("id") or "")
     username = str(me.get("username") or "").strip()[:32]
-    del me  # avatar, email, etc. are never kept
+    avatar = me.get("avatar")
+    avatar_hash = avatar if isinstance(avatar, str) and avatar else None
+    del me  # email, banner, etc. are never kept
     if not (discord_id.isdigit() and len(discord_id) <= 20 and username):
         raise DiscordError("bad user object")
-    return discord_id, username
+    return discord_id, username, avatar_hash

@@ -11,19 +11,23 @@ Casa 24 Records' daily word game. Published from `main`; feature work happens on
 - Flask app `webapp/app.py` + Vue 3.5 (jsdelivr) and Tailwind (Play CDN) from CDNs, no build step of our own, in `webapp/templates/` and `webapp/static/`.
 - 10 languages in `webapp/data/languages/`: en, es, ar, fr, pt, ru, de, tr, vi, ko. Casa 24 words only in **es** and **en**.
 - **One word per language per day, the same for every player.** It changes at midnight Panama time (UTC-5). About 1 day in 5 the es/en word is a Casa 24 word. Details: `casa24-daily-word`.
-- **Two ways to play** (chosen on the start screen, remembered as `casa24_mode` in localStorage):
+- **Two ways to play:**
   - **Guest** (default, all 10 languages): no account, nothing sent to the server. Stats live in the browser's localStorage.
-  - **Leaderboard** (es and en only): log in with Discord (scope `identify`, only the Discord ID and username are stored). The server checks and colors every guess, keeps the score in a Postgres database, and ranks players. The browser never gets the answer until the game is over. Off (all its routes 404) unless the Discord env vars, `SECRET_KEY` and a store are there. Details, scoring, privacy and storage: `casa24-leaderboard`.
+  - **Leaderboard** (es and en only): sign in with Discord (scope `identify`, only the Discord ID and username are stored). The server checks and colors every guess, keeps the score in a Postgres database, and ranks players. The browser never gets the answer until the game is over. Off (all its routes 404) unless the Discord env vars, `SECRET_KEY` and a store are there. Details, scoring, privacy and storage: `casa24-leaderboard`.
 - No analytics.
-- Start screen (`/`): when the leaderboard is on, a guest/leaderboard switch (with a privacy note), a "🏆 View leaderboard" link and the Discord account (log out) sit around the Español/English cards. Español/English first (last played, else browser language) with "played today" and streak, then the other 8 languages. No links to other sites.
+- Start screen (`/`): Español/English cards first (last played, else browser language) with "played today" and streak, then the other 8 languages. No links to other sites. When the leaderboard is on (owner rule: less text, the UI speaks for itself):
+  - **Logged out:** the official Discord sign-in button (Blurple, server-rendered so it shows at once) above the cards, plus a small "ⓘ Privacidad" link that opens a `<dialog>` (the full privacy text lives only there). The cards play the guest game.
+  - **Logged in:** the cards go to `/lb/es`, `/lb/en` (trophy icon on the card); a small switch "Jugar como invitado (no cuenta)" sends them to the guest game instead, remembered as `casa24_mode=guest` in localStorage.
+  - **Header top-left:** the player's Discord avatar (popover: @username, Ver leaderboard, Cerrar sesión) or, logged out, a small Discord icon; then a line trophy icon linking to `/leaderboard`; then the info button (hidden under 420 px). No 🏆 emoji anywhere.
+  - Login failed/cancelled and "data deleted" are short toasts (6 s, ×). Discord texts show in one language (`<html lang>` from Accept-Language, then `index.js` sets the player's language).
 - **Developer view** (internally "demo"; team only, on when the `DEMO_PASSWORD` env var is set): a "🔒 Developer view" card on `/` → `/demo` (password page, `demo_login.html`, es+en side by side) → signed session cookie (30 days) → `/demo/es` or `/demo/en` (other codes redirect to es). It acts like the real game and opens with the real word of the day; the only extras are two buttons in `.c24-demo-bar`: ↻ Restart goes to `?skip=<word>`, and `demo_game()` in `app.py` then picks a random answer from the daily-word pool, never the same word. ✓ Fill in word (`demoFillAnswer()`) types the answer and presses Enter, so the normal win flow runs. The `DEMO` constant in `game.html` makes `game.js` skip every localStorage save/load, results, stats and `casa24_lang`; the end window is the normal one. Responses are `no-store`, not in the sitemap. No `DEMO_PASSWORD` → no card, `/demo` is 404. Why: `casa24-decisions`; env setup: `casa24-deploy`.
 
 ## Routes
 - Guest: `/`, `/<lang>`, `/sitemap.xml`. Developer view: `/demo`, `/demo/<lang>`.
 - Leaderboard (all 404 when it's off):
-  - `/lb/<lang>` (es/en; other codes go to `/lb/es`): the game in leaderboard mode, same `game.html` with `lb=True` and a 🏆 badge. Not logged in → Discord login first.
-  - `/leaderboard?tab=es|en|all`: public ranking page (`leaderboard.html`).
-  - `/auth/discord/login?next=…`, `/auth/discord/callback`, `/auth/logout` (POST): Discord login; the signed `c24_lb` cookie holds only the Discord ID.
+  - `/lb/<lang>` (es/en; other codes go to `/lb/es`): the game in leaderboard mode, same `game.html` with `lb=True`, a line trophy badge and the avatar menu in the header. Not logged in → Discord login first.
+  - `/leaderboard?tab=es|en|all`: public ranking page (`leaderboard.html`); compact line under the table (avatar + @username, or the sign-in button) and the privacy link; "Borrar mis datos" is in the avatar popover.
+  - `/auth/discord/login?next=…`, `/auth/discord/callback`, `/auth/logout` (POST): Discord login; the signed `c24_lb` cookie holds only the Discord ID. After login the redirect carries `#dc=<avatar hash>`, which the page keeps only in localStorage `c24_dc_avatar` (never on the server). Cancel → `/?login=cancelled`, other errors → `/?login=failed`.
   - `/api/guess` (POST, JSON `{lang, guess}`): checks and colors one guess.
   - `/api/me/delete` (POST): "Delete my data", removes the player and all results.
   - `/admin/hide` (POST): admins (`ADMIN_DISCORD_IDS`) hide a name on the ranking.
@@ -43,7 +47,7 @@ Animations and Kolo pictures: `casa24-branding`.
 2. `submitLb()`: the repeat check runs in the browser first (same notification). Then `POST /api/guess`.
 3. The server resolves accents, checks the word, refuses repeats/finished games, saves the guess and returns the colors (and, once the game is over, the answer, points and rank). Errors become the usual notifications (`invalid_word`, `repeat`); `login` sends the player to Discord again; anything else shows `lb_error`.
 4. `applyLbGuess()` puts the server's spelling and colors in the row, then calls the same `commitRow()` as a guest game, so the flip, keyboard colors, bounce and `gameWon`/`gameLost` are identical.
-5. Nothing goes to localStorage. A reload rebuilds the board from the server (`restoreLb()` with the `c24-lb-state` JSON). The end window shows rank, points and a "View leaderboard" link instead of the local stats. A finished guest es/en game shows a small, dismissible "🏆 Play for the leaderboard" hint.
+5. Nothing goes to localStorage. A reload rebuilds the board from the server (`restoreLb()` with the `c24-lb-state` JSON). The end window shows rank and points as big numbers (`.c24-lb-big`) and a trophy "View leaderboard" link instead of the local stats. A finished guest es/en game shows a small, dismissible hint: a trophy link to `/lb/<lang>` when logged in, else short text + the Discord sign-in button.
 
 ## Which skill to use
 | Task | Skill |
@@ -70,7 +74,9 @@ webapp/leaderboard.py    leaderboard rules (pure): server-side colors, accent re
 webapp/store.py          leaderboard storage: Postgres when DATABASE_URL is set, in-memory store locally/tests
 webapp/data/languages/   word lists, language_config.json, keyboards
 webapp/templates/        index.html (start screen), game.html (game, also Developer view with demo=True),
-                         demo_login.html (Developer view password page), leaderboard.html (/leaderboard)
+                         demo_login.html (Developer view password page), leaderboard.html (/leaderboard),
+                         _discord.html (shared Discord macros: sign-in button, logo, trophy, avatar, header menu,
+                         privacy link + dialog, toasts, #dc= avatar script; imported by index/game/leaderboard)
 webapp/static/           game.js, index.js, theme.js, style.css, images/kolo/ (WebP), fonts/, favicon/
 scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py, casa24/ (seed word CSVs)
 tests/                   pytest + Playwright

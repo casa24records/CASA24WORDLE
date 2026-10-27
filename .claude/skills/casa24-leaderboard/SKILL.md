@@ -12,29 +12,32 @@ Files:
 - `webapp/discord_auth.py`: Discord login (stdlib `urllib`)
 - `webapp/leaderboard.py`: pure rules (points, coloring port, streaks)
 - `webapp/store.py`: storage (`PostgresStore`, `MemoryStore`, `get_store()`)
-- `webapp/templates/index.html` + `static/index.js` (menu choice), `game.html` + `static/game.js` (leaderboard game), `templates/leaderboard.html`
+- `webapp/templates/_discord.html` (shared Discord macros), `templates/index.html` + `static/index.js` (menu Discord area, guest toggle), `game.html` + `static/game.js` (leaderboard game), `templates/leaderboard.html`
 - texts: `lb_*` keys in `webapp/data/languages/{es,en}/language_config.json`
 
 ## What players see
-- **Menu (es/en area):** a two-option switch, **Jugar como invitado / Play as guest** and **🏆 Jugar con leaderboard (Discord) / Play for the leaderboard (Discord)**. The choice is remembered in localStorage `casa24_mode` (`guest` default, or `lb`). It decides where the Español/English cards go:
-  - guest → `/es`, `/en`: exactly the old game, nothing leaves the browser
-  - leaderboard → `/lb/es`, `/lb/en`; when not logged in, the card says "Entrar con Discord" and goes through `/auth/discord/login?next=/lb/es`
-  - the other 8 languages are always guest only
-  - below: "🏆 Ver leaderboard" link, and when logged in "Conectado como @usuario" + "Cerrar sesión"
-  - notices: `/?login=failed` (login failed) and `/?deleted=1` (data deleted); the URL is cleaned so a reload doesn't show them again
-  - **The switch and links only appear when the leaderboard is enabled** (see `lb_enabled` below).
-- **Leaderboard game `/lb/<lang>`:** same `game.html` with a 🏆 badge. The answer is **not** in the page. Every Enter sends the word to the server, which answers with the colors; the flip animation and keyboard colors work as usual. Progress is restored from the server (another device works too), and nothing is saved in localStorage. End window adds **"Tu puesto: #N"**, **"+N puntos"** and a "Ver leaderboard" link. Other language codes redirect to `/lb/es`.
-- **Guest end window (es/en, only when enabled):** a dismissible hint "Juega con leaderboard para entrar al ranking" (dismissal saved in localStorage `casa24_lb_hint_off`).
-- **`/leaderboard`** (public, `?tab=es|en|all`, default `all` = "Combinado"): top 50 with rank, @username, points, wins, current streak (🔥), best streak. Your own row is highlighted ("Tú"); if you are outside the top 50, "Tu posición: #N" shows below. Page language follows the tab (`all` uses the browser language). Logged out: "Entrar con Discord" button. Logged in: "Cerrar sesión" and **"Borrar mis datos"** (asks for confirmation).
-- **Privacy note** (menu leaderboard option and `/leaderboard`): Discord handles the login, we never see password or email; we store Discord ID, username and results to show the ranking; guest games don't count.
-- **Delete my data:** removes the player row, all results and saved games, and the rate counter, then logs out and shows the "deleted" notice. Logging in again later starts from zero.
+UI rules decided by the owner on 2026-10-26/27 (record: `casa24-decisions`; look: `casa24-branding`). Shared pieces are Jinja macros in **`webapp/templates/_discord.html`** (`dc.button`, `dc.logo`, `dc.trophy`, `dc.avatar`, `dc.header_slot`, `dc.privacy_link`/`dc.privacy_dialog`, `dc.toast`, `dc.script`), imported by `index.html`, `game.html` and `leaderboard.html`.
+- **Rules:** less text, the UI speaks for itself. Trophy **line SVG icon** for the leaderboard (never the 🏆 emoji). Official Discord button (Blurple `#5865F2`, white logo, 48 px). **Nothing overlaps at any size** (check 320, 375, 390, 844×390 landscape, 768, 1366).
+- **Header, top-left (menu, leaderboard games, `/leaderboard`):** logged in → the player's **round Discord avatar**; tapping it opens a small popover with @username, "Ver leaderboard", "Cerrar sesión" (and "Borrar mis datos" on `/leaderboard`). Logged out → a small Discord-logo icon that starts the login. On the menu a **trophy icon** link to `/leaderboard` sits right after it (no "Ver leaderboard" text link). Esc or a tap outside closes the popover.
+- **Menu (es/en area), server-rendered so nothing jumps:**
+  - logged out → the **Discord sign-in button shows immediately** (no mode to pick first) + a small "ⓘ Privacidad" link. The Español/English cards play the guest game. The sign-in `next` is `/lb/<player's language>` (`index.js` fixes the href after load).
+  - logged in → the cards go to `/lb/es`, `/lb/en` (trophy icon on the card), with a small switch **"Jugar como invitado (no cuenta)"** that sends them to the guest game instead. localStorage `casa24_mode` = `guest` only when that switch is on; otherwise mode is `lb`.
+  - guest → `/es`, `/en`: exactly the old game, nothing leaves the browser. The other 8 languages are always guest only.
+  - **No privacy paragraph on the menu.** The full privacy text lives only in the "ⓘ Privacidad" dialog (`<dialog id="c24-privacy">`).
+  - Notices are **short toasts that close themselves** (~6 s, × to close): `/?login=failed`, `/?login=cancelled` (gentle, not a warning), `/?deleted=1`. The URL is cleaned so a reload doesn't show them again.
+  - **Everything above appears only when the leaderboard is enabled** (see `lb_enabled` below).
+- **Leaderboard game `/lb/<lang>`:** same `game.html`, with the trophy SVG as a badge after the language badge and the avatar in the header. The answer is **not** in the page. Every Enter sends the word to the server, which answers with the colors; the flip animation and keyboard colors work as usual. Progress is restored from the server (another device works too), and nothing is saved in localStorage. End window shows **rank and points as big numbers** ("#N", "+N", both `.c24-lb-big`, small labels `lb_rank_label` / `lb_points_label` or `lb_point_label` for exactly 1) and a trophy "Ver leaderboard" link. Other language codes redirect to `/lb/es`.
+- **Guest end window (es/en, only when enabled):** a dismissible hint (dismissal saved in localStorage `casa24_lb_hint_off`): logged in → a trophy link to `/lb/<lang>`; logged out → short text + the Discord sign-in button.
+- **`/leaderboard`** (public, `?tab=es|en|all`, default `all` = "Combinado"): top 50 with rank, @username, points, wins, current streak (🔥), best streak. Your own row is highlighted ("Tú") with your avatar; if you are outside the top 50, "Tu posición: #N" shows below. Page language follows the tab (`all` uses the browser language). Below the table: logged out → Discord sign-in button; logged in → avatar + @username. Plus the small "ⓘ Privacidad" link. Cerrar sesión and **Borrar mis datos** (asks for confirmation) are in the avatar popover: delete is secondary, never a big button.
+- **Privacy text** (the dialog): Discord handles the login, we never see password or email; we store Discord ID, username and results to show the ranking; **your Discord picture is only shown in your browser, we don't store it**; guest games don't count. That promise must stay true (see "Avatar" below).
+- **Delete my data:** removes the player row, all results and saved games, and the rate counter, then logs out, clears `c24_dc_avatar`, and shows the "deleted" toast. Logging in again later starts from zero.
 - **Admin hide:** Discord user IDs in `ADMIN_DISCORD_IDS` see an "Ocultar" button on each row. A hidden player disappears from every ranking but can still play (their results keep being recorded).
 
 ## Data
 | Stored (Neon Postgres) | Never stored |
 |---|---|
 | Discord user ID, Discord username (max 32 chars, refreshed on each login), `hidden` flag, created date | Discord access token (lives only inside `discord_auth.identify()`) |
-| Per finished leaderboard game: language, Panama date, won, attempts, points, finish time | avatar, email, banner, display name, locale or anything else Discord returns |
+| Per finished leaderboard game: language, Panama date, won, attempts, points, finish time | avatar hash (only passed to the player's own browser in the login redirect's `#dc=` fragment), email, banner, display name, locale or anything else Discord returns |
 | Today's guesses (deleted after 2 days) | IP addresses, user agent |
 | Guesses per minute counter (deleted after ~2 minutes) | guest games (never sent, never imported on login) |
 
@@ -45,14 +48,25 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 - `c24_oauth`: the login `state` + where to go after, 10 minutes, path `/auth/discord` only.
 
 ## Login flow
-1. Player clicks "Entrar con Discord" → `GET /auth/discord/login?next=/lb/es`.
-2. Server makes a random `state`, puts it (and `next`) in `c24_oauth`, redirects to `https://discord.com/oauth2/authorize` with `scope=identify`, `prompt=none`, `client_id`, and `redirect_uri = <this site>/auth/discord/callback`.
+1. Player clicks the Discord sign-in button → `GET /auth/discord/login?next=/lb/es`.
+2. Server makes a random `state`, puts it (and `next`) in `c24_oauth`, redirects to `https://discord.com/oauth2/authorize` with `scope=identify`, `prompt=none` (kept on purpose), `client_id`, and `redirect_uri = <this site>/auth/discord/callback`.
 3. Player approves on Discord; Discord sends them to `/auth/discord/callback?code=…&state=…`.
-4. Server checks `state` against the cookie (constant-time compare), trades the code for a token (`POST https://discord.com/api/oauth2/token`), calls `GET /api/users/@me`, keeps only `id` and `username`, drops the rest and the token.
-5. Upserts the player, sets `c24_lb`, deletes `c24_oauth`, redirects to `next` (only relative paths like `/lb/es`; anything else → `/`).
-6. Any error, cancel, bad/missing state → redirect `/?login=failed`. Nothing is logged.
-- **Logout:** `POST /auth/logout` clears `c24_lb` and goes to `/`.
+4. **Cancel first:** if the callback has `?error=access_denied` (the player pressed Cancel on Discord), the server deletes `c24_oauth` and redirects to **`/?login=cancelled`** (a gentle notice, not an error). This is checked **before** the state check.
+5. Server checks `state` against the cookie (constant-time compare), trades the code for a token (`POST https://discord.com/api/oauth2/token`), calls `GET /api/users/@me`. `discord_auth.identify()` returns only **`(id, username, avatar_hash)`** and drops the rest and the token.
+6. Upserts the player (id + username only), sets `c24_lb`, deletes `c24_oauth`, redirects to `next` (only relative paths like `/lb/es`; anything else → `/`) with any `#…` in `next` replaced by the avatar fragment:
+   - `#dc=<hash>` when the hash matches `^(a_)?[0-9a-f]{32}$`
+   - `#dc=` (empty) when the player has no Discord avatar
+   - no fragment at all when the hash doesn't match that format
+   The redirect body is empty (the hash is only in the `Location` header) and `Cache-Control: no-store`.
+7. Any other failure (Discord error, bad/missing state, expired cookie, token/user call failed, database error) → `/?login=failed`. Nothing is logged.
+- **Logout:** `POST /auth/logout` clears `c24_lb` and goes to `/`. The page also clears localStorage `c24_dc_avatar`.
 - The `redirect_uri` is built from the address the visitor used, so **each domain must be listed in the Discord app's Redirects** exactly.
+
+## Avatar (shown only in the player's own browser)
+- **The server never stores, logs or puts the avatar hash in a cookie.** It only passes through the login redirect's URL fragment; browsers never send fragments back to servers. So the privacy promise stays true: "your Discord photo is shown only in your browser; we don't store it".
+- The page reads `#dc=` on load, saves localStorage **`c24_dc_avatar` = `{id, hash}`** (id = the logged-in Discord ID from the page), then removes the fragment with `history.replaceState`.
+- Picture URL, loaded by the browser straight from Discord: `https://cdn.discordapp.com/avatars/<id>/<hash>.png` (animated hashes start with `a_`). No hash (empty `#dc=`) or a load error → default avatar `https://cdn.discordapp.com/embed/avatars/<(id >> 22) % 6>.png` (compute with `BigInt`, the id is too big for a JS number).
+- A stored `c24_dc_avatar` whose `id` differs from the logged-in player is ignored. It is **removed on logout** (and on "Borrar mis datos").
 
 ## Anti-cheat
 - In leaderboard mode the **answer is never sent to the browser** until the game is over (`daily_word` is blanked; the server colors guesses).
@@ -92,7 +106,7 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 | Route | What | Responses |
 |---|---|---|
 | `GET /auth/discord/login?next=` | start login | 302 to Discord; 404 if disabled |
-| `GET /auth/discord/callback` | finish login | 302 to `next`, or `/?login=failed` |
+| `GET /auth/discord/callback` | finish login | 302 to `next` + `#dc=<hash>`; `/?login=cancelled` on `error=access_denied`; `/?login=failed` otherwise |
 | `POST /auth/logout` | log out | 302 `/`; 403 other site |
 | `GET /lb/<lang>` | leaderboard game (es/en) | page; 302 to login if logged out; 404 if disabled |
 | `POST /api/guess` JSON `{lang, guess}` | one guess | 200 `{word, colors[5], done, won, answer, points, rank}` (answer/points/rank only when done, else null) |
@@ -102,7 +116,7 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 
 `/api/guess` errors are JSON `{"error": code}`: `disabled` 404, `forbidden` 403, `login` 401, `rate` 429, `bad_request` 400, `bad_lang` 400, `invalid_word` 400, `finished` 400, `too_many` 400, `repeat` 400, `store` 503. In `game.js`, `lbError()` handles them: `login` → back through Discord login; `invalid_word`/`repeat` → the usual notices; `finished` → reload; anything else → "Algo salió mal".
 
-Templates get `lb_enabled` and `lb_user` (`{id, username}` or none) from a context processor. **`lb_enabled`** = `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` and `SECRET_KEY` set, and a store exists. If false, every leaderboard route is 404 and the menu shows no choice.
+Templates get `lb_enabled` and `lb_user` (`{id, username}` or none) from a context processor. **`lb_enabled`** = `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` and `SECRET_KEY` set, and a store exists. If false, every leaderboard route is 404 and the menu shows no Discord pieces (no button, avatar/Discord icon, trophy, toggle or privacy link).
 
 ## Env vars
 Set in Vercel → casa24-wordle → Settings → Environment Variables, for Production, Preview and Development (details and current state: `casa24-deploy`). Only the owner types secret values there; never write values in the repo or chat.
@@ -112,8 +126,8 @@ Set in Vercel → casa24-wordle → Settings → Environment Variables, for Prod
 - Locally, `app.py` reads `.env.local` (git- and Vercel-ignored) when not on Vercel and never overrides variables already set. `.env.example` lists the names.
 
 ## Tests
-- `tests/lb_testlib.py`: shared fixtures. `FakeDiscord` replaces `discord_auth.exchange_code` / `fetch_me` (returns extra fields like email/avatar on purpose); `mem` = a fresh `MemoryStore`; `lb_env` = fake env values + frozen Panama date; helpers `login()`, `guess()`, `answer()`, `wrong_words()`.
-- `tests/test_discord_auth.py`: login only asks `identify`, only id + username kept, bad/missing state, cancel, Discord error, `next` must be relative, logout, tampered cookie.
+- `tests/lb_testlib.py`: shared fixtures. `FakeDiscord` replaces `discord_auth.exchange_code` / `fetch_me` (returns extra fields like email/avatar on purpose; `FakeDiscord.avatar` defaults to a deliberately invalid hash so no `#dc=` is added, `VALID_AVATAR` is a real-format one); `mem` = a fresh `MemoryStore`; `lb_env` = fake env values + frozen Panama date; helpers `login()`, `guess()`, `answer()`, `wrong_words()`.
+- `tests/test_discord_auth.py`: login only asks `identify`, only id + username stored, bad/missing state, cancel → `/?login=cancelled`, other Discord error → `/?login=failed`, avatar hash only in the `Location` fragment (never in store/cookies/body), empty `#dc=` without avatar, no fragment for a malformed hash, `next`'s own fragment replaced, `next` must be relative, logout, tampered cookie.
 - `tests/test_leaderboard.py`: points, order, streaks, accents, coloring vs `game.js` (node), MemoryStore, `get_store()` choice, SQL parameterized, PostgresStore against a fake connection, `.env.local` loader, disabled without env, guess validation, other-site refused, records once, client date ignored, rate limit, guest makes zero writes, ranking rows, delete, admin hide/unhide.
 - `tests/test_leaderboard_ui.py`: rendered menu/game/leaderboard templates, plus Playwright browser tests with a faked `/api/guess`.
 - **No test talks to Discord or a real database.**
@@ -128,15 +142,16 @@ Set in Vercel → casa24-wordle → Settings → Environment Variables, for Prod
 - **Add an admin:** owner finds their Discord user ID (Discord → Settings → Advanced → Developer Mode, then right-click own name → Copy User ID), adds it to `ADMIN_DISCORD_IDS` in Vercel (comma-separated for more), redeploys.
 - **Hide a user:** as admin, "Ocultar" on `/leaderboard`. **Unhide:** there is no button (hidden users aren't listed). Either POST `/admin/hide` with `discord_id=<id>&hidden=0` while logged in as admin, or in the Neon SQL editor: `UPDATE wordle_players SET hidden = false WHERE discord_id = '<id>';`.
 - **Change points:** edit `points()` in `webapp/leaderboard.py` and `test_points`. Results already stored keep their old points (they are saved per game); to recompute, run an `UPDATE wordle_results SET points = …` only with the owner's OK.
-- **Add another language to the leaderboard** (now es/en only): add it to `LB_LANGS` and `LB_TABS` in `app.py`, add a tab in `leaderboard.html`, add the `lb_*` text keys to that language's `language_config.json`, show the mode switch for it in `index.html`/`index.js` (they currently assume es/en), add a Discord-free test, and check `casa24-text-and-languages` for its accent rules.
+- **Add another language to the leaderboard** (now es/en only): add it to `LB_LANGS` and `LB_TABS` in `app.py`, add a tab in `leaderboard.html`, add the `lb_*` text keys to that language's `language_config.json`, show the Discord area / guest toggle for its card in `index.html`/`index.js` (they currently assume es/en), add a Discord-free test, and check `casa24-text-and-languages` for its accent rules.
 - **Delete someone's data on request:** they can use "Borrar mis datos"; otherwise `DELETE FROM wordle_players WHERE discord_id = '<id>';` (cascades) plus `DELETE FROM wordle_rate WHERE discord_id = '<id>';`.
 
 ## Troubleshooting
 | Symptom | Likely cause |
 |---|---|
 | Discord says "Invalid OAuth2 redirect_uri" | this domain's `/auth/discord/callback` isn't in the Discord app's Redirects (exact match, https, no trailing slash) |
+| Back on `/?login=cancelled` | the player pressed Cancel on Discord's screen (expected, not a bug) |
 | Back on `/?login=failed` | wrong/missing `DISCORD_CLIENT_SECRET` for that environment, secret reset in Discord but not in Vercel, the 10-minute login cookie expired, cookies blocked, or the database is unreachable |
-| `/leaderboard`, `/lb/es` are 404 and no mode switch in the menu | `lb_enabled` is false: one of `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `SECRET_KEY` or `DATABASE_URL` is missing **for that environment**, or no redeploy since adding it |
+| `/leaderboard`, `/lb/es` are 404 and no Discord button in the menu | `lb_enabled` is false: one of `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `SECRET_KEY` or `DATABASE_URL` is missing **for that environment**, or no redeploy since adding it |
 | Everyone got logged out | `SECRET_KEY` changed (this also logs out Developer view) |
 | "Algo salió mal" on every guess | database error (503 `store`): check Neon status and `DATABASE_URL` |
 | Local login goes to `localhost` and fails | open `http://127.0.0.1:5050`, not `localhost` |
