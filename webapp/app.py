@@ -664,7 +664,7 @@ def lb_player_id():
 
 
 def lb_current_user(st=None):
-    """{"id", "username"} for the logged-in player, None if logged out or deleted."""
+    """{"id", "username", "avatar_url", "has_avatar"} for the logged-in player, None if logged out or deleted."""
     pid = lb_player_id()
     st = st or lb_store()
     if not pid or st is None:
@@ -673,7 +673,29 @@ def lb_current_user(st=None):
         player = st.get_player(pid)
     except store_mod.StoreError:
         return None
-    return {"id": pid, "username": player["username"]} if player else None
+    if not player:
+        return None
+    try:
+        avatar = st.get_avatar(pid)
+    except store_mod.StoreError:
+        avatar = None
+    return {"id": pid, "username": player["username"],
+            "avatar_url": lb_avatar_url(pid, avatar), "has_avatar": bool(avatar)}
+
+
+AVATAR_REFRESH_COOKIE = "c24_avr"
+
+
+def lb_avatar_refresh(user, next_path):
+    """Players who signed in before we stored pictures have no avatar saved.
+    Pass them once through Discord (prompt=none, no extra click) to fetch it;
+    a 1-day cookie stops this from repeating if they have no Discord picture."""
+    if not user or user.get("has_avatar") or request.cookies.get(AVATAR_REFRESH_COOKIE):
+        return None
+    response = redirect(f"/auth/discord/login?next={next_path}")
+    response.set_cookie(AVATAR_REFRESH_COOKIE, "1", max_age=60 * 60 * 24, httponly=True,
+                        secure=request.is_secure, samesite="Lax")
+    return response
 
 
 @app.context_processor
@@ -864,6 +886,9 @@ def lb_game(lang_code):
     user = lb_current_user(st)
     if not user:
         return redirect(f"/auth/discord/login?next=/lb/{lang_code}")
+    refresh = lb_avatar_refresh(user, f"/lb/{lang_code}")
+    if refresh is not None:
+        return refresh
     cookie_key = f"keyboard_layout_{lang_code}"
     language = Language(lang_code, language_codes_5words[lang_code],
                         request.args.get("layout") or request.cookies.get(cookie_key))

@@ -206,3 +206,23 @@ def test_tampered_cookie_is_ignored(lb_env, client, discord):
 
 def guess_status(client):
     return client.post("/api/guess", json={"lang": "es", "guess": "perro"}).status_code
+
+
+def test_avatar_refresh_once_when_no_picture_saved(lb_env, client, discord):
+    """Players with no saved picture pass once through Discord (prompt=none) to fetch it."""
+    login(client, discord)              # fake user has no valid avatar -> none saved
+    client.delete_cookie("c24_avr")
+    r = client.get("/lb/es")
+    assert r.status_code == 302 and r.headers["Location"] == "/auth/discord/login?next=/lb/es"
+    assert client.get_cookie("c24_avr") is not None
+    assert client.get("/lb/es").status_code == 200   # no loop: the cookie stops it
+
+
+def test_no_avatar_refresh_when_picture_saved(lb_env, client, discord):
+    discord.avatar = VALID_AVATAR
+    login(client, discord)
+    client.delete_cookie("c24_avr")
+    r = client.get("/lb/es")
+    assert r.status_code == 200
+    assert f"/avatars/{discord.user['id']}/{VALID_AVATAR}.png" in r.get_data(as_text=True)
+

@@ -161,3 +161,5 @@ Set in Vercel → casa24-wordle → Settings → Environment Variables, for Prod
 | Local login goes to `localhost` and fails | open `http://127.0.0.1:5050`, not `localhost` |
 | Leaderboard empty locally after restart | MemoryStore (no `DATABASE_URL`) loses data on restart; that's expected |
 | Ranking colors differ from guest game | the Python port and `game.js` drifted; run the node comparison test |
+
+- **Your own avatar comes from the server (fixed 2026-10-27):** `lb_current_user()` adds `avatar_url` (from `store.get_avatar`) and `has_avatar`; `_discord.html` renders it directly, and the `c24_dc_avatar` localStorage copy only overrides it when present. Players who signed in before avatars were stored get **one silent pass through Discord** (`lb_avatar_refresh()` on `/lb/<lang>`: redirect to `/auth/discord/login?next=…` with `prompt=none`), guarded by a 1-day `c24_avr` cookie so it never loops (e.g. users with no Discord picture). Tests: `test_avatar_refresh_once_when_no_picture_saved`, `test_no_avatar_refresh_when_picture_saved`; `lb_testlib.login()` sets `c24_avr` to skip it elsewhere.

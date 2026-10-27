@@ -328,7 +328,7 @@ def test_lb_page_needs_login_and_hides_answer(lb_env, client, discord, rendered)
     assert ctx["language"].daily_word == ""
     assert ctx["lb_state"] == {"guesses": [], "done": False, "won": False,
                                "answer": None, "points": None, "rank": None}
-    assert ctx["lb_user"] == {"id": P1, "username": "kolo_fan"}
+    assert {k: ctx["lb_user"][k] for k in ("id", "username")} == {"id": P1, "username": "kolo_fan"}
 
 
 def test_guess_needs_login(lb_env, client):
@@ -494,7 +494,7 @@ def test_leaderboard_me_row_outside_top(lb_env, client, discord, mem, rendered):
     ctx = rendered[-1][1]
     assert len(ctx["rows"]) == 50
     assert ctx["me_row"]["rank"] == 56 and ctx["me_row"]["is_me"] is True
-    assert ctx["lb_user"] == {"id": P1, "username": "kolo_fan"}
+    assert {k: ctx["lb_user"][k] for k in ("id", "username")} == {"id": P1, "username": "kolo_fan"}
 
 
 def test_delete_my_data(lb_env, client, discord, mem):

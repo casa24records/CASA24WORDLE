@@ -117,6 +117,9 @@ def login(client, discord, user_id=None, username=None, next_path="/lb/es"):
     r = client.get("/auth/discord/login", query_string={"next": next_path})
     assert r.status_code == 302
     state = parse_qs(urlparse(r.headers["Location"]).query)["state"][0]
+    # most fake users have no valid picture; skip the one-time avatar refresh
+    # (tested on its own in test_discord_auth.py)
+    client.set_cookie("c24_avr", "1")
     return client.get("/auth/discord/callback", query_string={"code": "fake-code", "state": state})
 
 

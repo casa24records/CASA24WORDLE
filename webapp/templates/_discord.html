@@ -26,7 +26,7 @@
 
 {#- Default Discord avatar for this ID ((id >> 22) % 6); JS swaps in the real one. -#}
 {% macro default_avatar(user) -%}
-https://cdn.discordapp.com/embed/avatars/{{ ((user.id | int) // 4194304) % 6 }}.png
+{{ user.avatar_url if user.avatar_url else 'https://cdn.discordapp.com/embed/avatars/%d.png' % (((user.id | int) // 4194304) % 6) }}
 {%- endmacro %}
 
 {% macro avatar(user, size=32, cls='c24-dc-avatar') -%}
@@ -106,15 +106,13 @@ https://cdn.discordapp.com/embed/avatars/{{ ((user.id | int) // 4194304) % 6 }}.
         if (s && s.id === id && HASH.test(s.hash || "")) {
             return "https://cdn.discordapp.com/avatars/" + id + "/" + s.hash + ".png?size=64";
         }
-        var i = 0;
-        try { i = Number((BigInt(id) >> BigInt(22)) % BigInt(6)); } catch (e) { }
-        return "https://cdn.discordapp.com/embed/avatars/" + i + ".png";
+        return null;  // keep the picture the server rendered (saved avatar or Discord default)
     }
     window.c24DcAvatars = function () {
         var imgs = document.querySelectorAll("img[data-dc-avatar]");
         for (var k = 0; k < imgs.length; k++) {
             var url = avatarUrl(imgs[k].getAttribute("data-dc-id"));
-            if (imgs[k].getAttribute("src") !== url) { imgs[k].setAttribute("src", url); }
+            if (url && imgs[k].getAttribute("src") !== url) { imgs[k].setAttribute("src", url); }
         }
     };
     // deferred scripts (Vue apps) have mounted by now

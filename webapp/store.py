@@ -67,6 +67,10 @@ class Store:
         """{"username", "hidden"} or None."""
         raise NotImplementedError
 
+    def get_avatar(self, discord_id):
+        """The saved Discord avatar hash, or None."""
+        raise NotImplementedError
+
     def rate_hit(self, discord_id, minute, bucket="guess"):
         """Count one request in this minute (per bucket); returns the count so far."""
         raise NotImplementedError
@@ -167,6 +171,11 @@ class MemoryStore(Store):
         with self._lock:
             p = self.players.get(discord_id)
             return {"username": p["username"], "hidden": p["hidden"]} if p else None
+
+    def get_avatar(self, discord_id):
+        with self._lock:
+            p = self.players.get(discord_id)
+            return p.get("avatar") if p else None
 
     def rate_hit(self, discord_id, minute, bucket="guess"):
         with self._lock:
@@ -317,6 +326,7 @@ SQL_UPSERT_PLAYER = """
     ON CONFLICT (discord_id) DO UPDATE SET username = EXCLUDED.username, avatar = EXCLUDED.avatar"""
 
 SQL_GET_PLAYER = "SELECT username, hidden FROM wordle_players WHERE discord_id = %s"
+SQL_GET_AVATAR = "SELECT avatar FROM wordle_players WHERE discord_id = %s"
 
 SQL_RATE_HIT = """
     INSERT INTO wordle_rate (discord_id, minute, count) VALUES (%s, %s, 1)
@@ -492,6 +502,12 @@ class PostgresStore(Store):
             cur.execute(SQL_GET_PLAYER, (discord_id,))
             r = cur.fetchone()
         return {"username": r[0], "hidden": bool(r[1])} if r else None
+
+    def get_avatar(self, discord_id):
+        with self._tx() as cur:
+            cur.execute(SQL_GET_AVATAR, (discord_id,))
+            r = cur.fetchone()
+        return r[0] if r else None
 
     def rate_hit(self, discord_id, minute, bucket="guess"):
         with self._tx() as cur:
