@@ -158,3 +158,6 @@ screenshots/
 skills-lock.json
 .claude/skills/neon
 .claude/skills/neon-postgres
+
+# macOS
+.DS_Store
