@@ -1,0 +1,5 @@
+/* Source for webapp/static/tailwind.css (build: .venv/bin/python scripts/build_css.py).
+   Not served: excluded from Vercel uploads. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

@@ -21,3 +21,9 @@ webapp/static/fonts/Gilroy-*
 .env*
 .agents/
 skills-lock.json
+# Tailwind build inputs: the compiled webapp/static/tailwind.css is committed and uploaded;
+# the CLI cache (.cache/, git-ignored), its config, source CSS and build script are not needed on Vercel
+.cache/
+tailwind.config.js
+scripts/build_css.py
+webapp/static/src/

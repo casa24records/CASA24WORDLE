@@ -37,16 +37,17 @@
     <link rel="apple-touch-icon" href="{{ asset('favicon/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ asset('favicon/site.webmanifest') }}">
 
-    <!-- tailwind (Play CDN; must stay synchronous so the page never shows unstyled) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue 3 production build with the template compiler (templates compile in the browser).
+    <!-- Vue 3.5.13 production build with the template compiler, served from our origin (templates compile in the browser).
          defer: runs after parsing, in order, before index.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+    <script defer src="{{ asset('vendor/vue.global.prod.js') }}"></script>
     <!-- pixel font: preload and @font-face use the same URL (with ?v), or the preload is wasted -->
     <link rel="preload" href="{{ asset('fonts/VT323-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
     <style>@font-face { font-family: "VT323"; src: url("{{ asset('fonts/VT323-Regular.ttf') }}") format("truetype"); font-display: swap; }</style>
     <!-- stylesheet -->
     <link rel="stylesheet" href="{{ asset('style.css') }}">
+    <!-- Tailwind, compiled by scripts/build_css.py. AFTER style.css on purpose: the old Play CDN
+         injected its styles last, so Tailwind wins same-specificity ties (style.css overrides use !important) -->
+    <link rel="stylesheet" href="{{ asset('tailwind.css') }}">
     <!-- light / dark theme (runs first so the page never flashes) -->
     <script src="{{ asset('theme.js') }}"></script>
     {% if lb_on %}{{ dc.script(me) }}{% endif %}
