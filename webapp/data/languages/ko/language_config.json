@@ -38,6 +38,7 @@
         "lb_dismiss": "닫기",
         "lb_error": "문제가 생겼어요. 다시 시도해 주세요.",
         "lb_hint": "리더보드 모드로 플레이하면 순위에 올라가요",
+        "lb_guest_sync": "Discord로 로그인하면 이 게임을 Discord에서 이어서 하고 순위에 반영할 수 있어요.",
         "lb_title": "리더보드",
         "lb_tab_es": "Español",
         "lb_tab_en": "English",

@@ -94,8 +94,14 @@ const app = Vue.createApp({
         this.tick();
         setInterval(this.tick, 1000);
         // ?login=failed / ?deleted=1 notices show once; a reload shouldn't bring them back
+        // (only those two params go: anything else in the query, like the Discord Activity's
+        // frame_id / instance_id / platform, must stay)
         if (/[?&](login|deleted)=/.test(window.location.search) && window.history.replaceState) {
-            window.history.replaceState(null, "", window.location.pathname);
+            var params = new URLSearchParams(window.location.search);
+            params.delete("login");
+            params.delete("deleted");
+            var query = params.toString();
+            window.history.replaceState(null, "", window.location.pathname + (query ? "?" + query : "") + window.location.hash);
         }
     },
     mounted() {

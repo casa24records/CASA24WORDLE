@@ -193,9 +193,23 @@ def json_script(obj):
     return Markup(text)
 
 
+def public_url():
+    """Canonical public origin for share links ("https://casa-24-wordle.vercel.app").
+    PUBLIC_URL (env, optional) wins; else the address the visitor used (ProxyFix
+    makes it the real https host). Never the page's own origin in the browser:
+    inside the Discord Activity that is a discordsays.com proxy nobody can open."""
+    env = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
+    parsed = urlparse(env)
+    if parsed.scheme in ("http", "https") and parsed.netloc and not parsed.path \
+            and not parsed.query and not parsed.fragment:
+        return env
+    return request.url_root.rstrip("/")
+
+
 @app.context_processor
 def inject_asset_helpers():
-    return {"asset": asset, "asset_version": asset_version, "json_script": json_script}
+    return {"asset": asset, "asset_version": asset_version, "json_script": json_script,
+            "public_url": public_url()}
 
 
 ###############################################################################
@@ -616,6 +630,7 @@ OAUTH_COOKIE_AGE = 10 * 60
 OAUTH_COOKIE_PATH = "/auth/discord"
 RATE_LIMIT_PER_MINUTE = 30
 LIVE_RATE_LIMIT_PER_MINUTE = 20  # own counter: polling every ~8 s never eats the guess budget
+STATE_RATE_LIMIT_PER_MINUTE = 30  # own counter for GET /api/state (focus/visibility/day-change reloads)
 LIVE_LIMIT = 30
 LIVE_RECENT_SECONDS = 5 * 60    # "en vivo" when the last guess is this recent
 TOP_N = 50
@@ -803,24 +818,48 @@ def _record_result(st, pid, lang, day, won, attempts):
 
 
 def lb_game_state(st, pid, lang):
-    """Resume state for /lb/<lang>: today's guesses with colors; the answer only once done."""
+    """The player's game today, as the server sees it (the single source of truth).
+
+    Same shape for the /lb/<lang> page embed (#c24-lb-state), GET /api/state and
+    the "state" field of /api/guess's stale/finished errors:
+    {"day": "YYYY-MM-DD" (Panama), "puzzle": day number, "guesses": [{"word", "colors"}],
+     "status": "playing"|"won"|"lost", "attempts": n, "done", "won",
+     "answer": only once done (else None), "points", "rank" (None while playing)}.
+    The guesses are the player's own words; the answer never leaves while playing."""
     day, idx = lb_today()
     answer = lb_answer(lang, idx)
     guesses, result = st.get_game(pid, lang, day)
-    guesses = [g for g in guesses if isinstance(g, str)]
+    guesses = [g for g in guesses if isinstance(g, str)][:lbrules.MAX_GUESSES]
     won = answer in guesses
     done = won or len(guesses) >= lbrules.MAX_GUESSES or result is not None
     if result is not None:
         won = bool(result["won"])
+    won = bool(done and won)
     state = {
+        "day": day.isoformat(), "puzzle": idx,
         "guesses": [{"word": w, "colors": lbrules.color_guess(w, answer)} for w in guesses],
-        "done": done, "won": bool(done and won), "answer": None, "points": None, "rank": None,
+        "status": ("won" if won else "lost") if done else "playing",
+        "attempts": len(guesses),
+        "done": done, "won": won, "answer": None, "points": None, "rank": None,
     }
     if done:
         state["answer"] = answer
         state["points"] = int(result["points"]) if result else lbrules.points(won, len(guesses))
         state["rank"] = _rank(st, pid, lang)
     return state
+
+
+def _no_store(response):
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _err_state(code, status, st, pid, lang):
+    """An /api/guess refusal that also carries the current state, so the client
+    can repaint from the server instead of showing an error."""
+    response = jsonify({"error": code, "state": lb_game_state(st, pid, lang)})
+    response.status_code = status
+    return _no_store(response)
 
 
 @app.route("/auth/discord/login")
@@ -946,46 +985,90 @@ def api_guess():
         lang = body.get("lang")
         if lang not in LB_LANGS:
             return _err("bad_lang", 400)
-        return _apply_guess(st, pid, lang, body["guess"])
+        attempt = _read_attempt(body)
+        if attempt is False:
+            return _err("bad_request", 400)
+        return _apply_guess(st, pid, lang, body["guess"], attempt)
     except store_mod.StoreError:
         return _err("store", 503)
 
 
-def _apply_guess(st, pid, lang, typed):
+def _read_attempt(body):
+    """Optional "attempt": the 0-based row the client is filling (= how many
+    guesses it believes exist). None when absent; False when malformed."""
+    if "attempt" not in body or body["attempt"] is None:
+        return None
+    value = body["attempt"]
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= lbrules.MAX_GUESSES:
+        return False
+    return value
+
+
+def _apply_guess(st, pid, lang, typed, attempt=None):
     day, idx = lb_today()
     answer = lb_answer(lang, idx)
     word = lb_normalize(lang, typed)
     main, sup, fold_map = _lb_words(lang)
     word = lbrules.resolve_accents(word, answer, main, sup, _accent_insensitive(lang), fold_map)
-    if len(word) != 5 or not (word in main or word in sup or word == answer):
-        return _err("invalid_word", 400)
+    valid = len(word) == 5 and (word in main or word in sup or word == answer)
 
     # the game row stays locked until this block ends, so two guesses can't race
+    # (web + Discord Activity at once: the second one sees a new count -> 409 stale)
+    refusal = None
     with st.game(pid, lang, day) as game:
         guesses = [g for g in game.guesses if isinstance(g, str)]
         if answer in guesses or game.result is not None:
-            return _err("finished", 400)
-        if len(guesses) >= lbrules.MAX_GUESSES:
-            return _err("too_many", 400)
-        if word in guesses:
+            refusal = ("finished", 400)
+        elif len(guesses) >= lbrules.MAX_GUESSES:
+            refusal = ("too_many", 400)
+        elif attempt is not None and attempt != len(guesses):
+            refusal = ("stale", 409)
+        elif not valid:
+            return _err("invalid_word", 400)
+        elif word in guesses:
             return _err("repeat", 400)
-        guesses.append(word)
-        game.save(guesses)
-        won = word == answer
-        done = won or len(guesses) >= lbrules.MAX_GUESSES
-        if done:
-            game.record(won, len(guesses), lbrules.points(won, len(guesses)))
+        else:
+            guesses.append(word)
+            game.save(guesses)
+            won = word == answer
+            done = won or len(guesses) >= lbrules.MAX_GUESSES
+            if done:
+                game.record(won, len(guesses), lbrules.points(won, len(guesses)))
+    if refusal:
+        # state read after the lock is released
+        return _err_state(refusal[0], refusal[1], st, pid, lang)
 
     result = {"word": word, "colors": lbrules.color_guess(word, answer), "done": done,
-              "won": won, "answer": None, "points": None, "rank": None}
+              "won": won, "answer": None, "points": None, "rank": None,
+              "day": day.isoformat(), "attempts": len(guesses)}
     if done:
         _, stored = st.get_game(pid, lang, day)
         result["answer"] = answer
         result["points"] = int(stored["points"]) if stored else lbrules.points(won, len(guesses))
         result["rank"] = _rank(st, pid, lang)
-    response = jsonify(result)
-    response.headers["Cache-Control"] = "no-store"
-    return response
+    return _no_store(jsonify(result))
+
+
+@app.route("/api/state")
+def api_state():
+    """Read-only: the logged-in player's game today in one language (the same
+    shape as the /lb/<lang> page embed). Web and the Discord Activity repaint from it."""
+    if not lb_enabled():
+        return _err("disabled", 404)
+    st = lb_store()
+    try:
+        user = lb_current_user(st)
+        if not user:
+            return _err("login", 401)
+        lang = request.args.get("lang")
+        if lang not in LB_LANGS:
+            return _err("bad_lang", 400)
+        if st.rate_hit(user["id"], int(time.time() // 60), "state") > STATE_RATE_LIMIT_PER_MINUTE:
+            return _err("rate", 429)
+        state = lb_game_state(st, user["id"], lang)
+    except store_mod.StoreError:
+        return _err("store", 503)
+    return _no_store(jsonify(state))
 
 
 def lb_avatar_url(discord_id, avatar_hash):

@@ -266,7 +266,7 @@ def test_postgres_store_against_fake_connection(monkeypatch):
     assert queries[:1] == [store.SQL_SCHEMA_LOCK] and store.SQL_SCHEMA[0] in queries
     assert (store.SQL_UPSERT_PLAYER, ("42", "Robert'); DROP TABLE wordle_players;--", "f" * 32)) in sent
     assert (store.SQL_UPSERT_PLAYER, ("43", "x", None)) in sent  # malformed avatar -> NULL
-    assert (store.SQL_DELETE_PLAYER, ("42",)) in sent and (store.SQL_DELETE_RATE, (["42", "42:live"],)) in sent
+    assert (store.SQL_DELETE_PLAYER, ("42",)) in sent and (store.SQL_DELETE_RATE, (["42", "42:live", "42:state"],)) in sent
     assert all("DROP" not in q for q in queries)
 
 
@@ -326,7 +326,9 @@ def test_lb_page_needs_login_and_hides_answer(lb_env, client, discord, rendered)
     assert name == "game.html"
     assert ctx["lb"] is True and ctx["demo"] is False
     assert ctx["language"].daily_word == ""
-    assert ctx["lb_state"] == {"guesses": [], "done": False, "won": False,
+    day, idx = app.lb_today()
+    assert ctx["lb_state"] == {"day": day.isoformat(), "puzzle": idx, "guesses": [],
+                               "status": "playing", "attempts": 0, "done": False, "won": False,
                                "answer": None, "points": None, "rank": None}
     assert {k: ctx["lb_user"][k] for k in ("id", "username")} == {"id": P1, "username": "kolo_fan"}
 
@@ -382,7 +384,7 @@ def test_win_records_once(lb_env, client, discord, mem):
     body = r.get_json()
     assert body["done"] and body["won"] and body["answer"] == answer("es")
     assert body["points"] == 5 and body["rank"] == 1
-    assert guess(client, wrong_words("es", 2)[1]).get_json() == {"error": "finished"}
+    assert guess(client, wrong_words("es", 2)[1]).get_json()["error"] == "finished"
     day, idx = app.lb_today()
     # a second finish can't count twice
     assert app._record_result(mem, P1, "es", day, True, 1) is False
@@ -601,7 +603,7 @@ def test_guess_colors_and_win_every_language(lb_env, client, discord, mem, rende
     body = guess(client, ans, lang=lang).get_json()
     assert body["won"] and body["colors"] == [C] * 5 and body["answer"] == ans
     assert body["points"] == 5 and body["rank"] == 1
-    assert guess(client, wrong_words(lang, 2)[1], lang=lang).get_json() == {"error": "finished"}
+    assert guess(client, wrong_words(lang, 2)[1], lang=lang).get_json()["error"] == "finished"
     day, _ = app.lb_today()
     assert app._record_result(mem, P1, lang, day, True, 1) is False  # counted once
     assert [k for k in mem.results] == [(P1, lang, day)]

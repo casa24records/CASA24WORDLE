@@ -28,17 +28,18 @@
     <link rel="apple-touch-icon" href="{{ asset('favicon/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ asset('favicon/site.webmanifest') }}">
 
-    <!-- Tailwind (Play CDN; must stay synchronous so the page never shows unstyled) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue 3 production build with the template compiler (templates compile in the browser).
+    <!-- Vue 3.5.13 production build with the template compiler, served from our origin (templates compile in the browser).
          defer: runs after parsing, in order, before game.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+    <script defer src="{{ asset('vendor/vue.global.prod.js') }}"></script>
 
     <!-- pixel font: preload and @font-face use the same URL (with ?v), or the preload is wasted -->
     <link rel="preload" href="{{ asset('fonts/VT323-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
     <style>@font-face { font-family: "VT323"; src: url("{{ asset('fonts/VT323-Regular.ttf') }}") format("truetype"); font-display: swap; }</style>
     <!-- CSS -->
     <link rel="stylesheet" href="{{ asset('style.css') }}">
+    <!-- Tailwind, compiled by scripts/build_css.py. AFTER style.css on purpose: the old Play CDN
+         injected its styles last, so Tailwind wins same-specificity ties (style.css overrides use !important) -->
+    <link rel="stylesheet" href="{{ asset('tailwind.css') }}">
     <!-- light / dark theme (runs first so the page never flashes) -->
     <script src="{{ asset('theme.js') }}"></script>
     {% if lb_enabled %}{{ dc.script(me) }}{% endif %}
@@ -64,7 +65,8 @@
 </head>
 
 <body class="c24-game-page">
-    <div id="app">
+    <!-- data-public-origin: the canonical public address for share links (public_url() in app.py) -->
+    <div id="app" data-public-origin="{{ public_url }}">
         <!-- Header, board and keyboard: one centered column that fills the screen (style.css "game layout") -->
         <div class="c24-game{% if demo %} c24-demo{% endif %}">
             <!-- The Header: 3 columns (help / title / stats + settings), so nothing overlaps -->
@@ -284,6 +286,10 @@
                     </div>
 
                     <div class="border-t-2 border-gray-300"></div>
+                    {% if lb_enabled and not lb and not demo and not lb_user %}
+                    <!-- guest game: one short line on signing in (the end window has the button) -->
+                    <p class="text-sm" data-lb-guest-sync>{{ t('lb_guest_sync', 'Sign in with Discord to continue this game on Discord and count it toward the ranking.') }}</p>
+                    {% endif %}
 
                     <button type="button" class="c24-text-btn uppercase font-bold text-sm tracking-wider"
                         v-on:click="showHelpModal = false">{{ language.config.help.close }}
@@ -451,7 +457,7 @@
                     {% if lb_user %}
                     <a href="{{ lb_target }}">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_hint', 'Play for the leaderboard to join the ranking') }} →</a>
                     {% else %}
-                    <span class="c24-lb-hint-text">{{ t('lb_hint', 'Play for the leaderboard to join the ranking') }}</span>
+                    <span class="c24-lb-hint-text">{{ t('lb_guest_sync', 'Sign in with Discord to continue this game on Discord and count it toward the ranking.') }}</span>
                     {{ dc.button('/auth/discord/login?next=' ~ (lb_target | urlencode), t('lb_signin', 'Sign in with Discord')) }}
                     {% endif %}
                     <button type="button" class="c24-notice-close" aria-label="{{ t('lb_dismiss', 'Close') }}" v-on:click="dismissLbHint">×</button>

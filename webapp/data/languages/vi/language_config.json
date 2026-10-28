@@ -38,6 +38,7 @@
         "lb_dismiss": "Đóng",
         "lb_error": "Đã có lỗi xảy ra. Vui lòng thử lại.",
         "lb_hint": "Chơi tính điểm để vào bảng xếp hạng",
+        "lb_guest_sync": "Đăng nhập bằng Discord để tiếp tục ván này trên Discord và được tính vào bảng xếp hạng.",
         "lb_title": "Bảng xếp hạng",
         "lb_tab_es": "Español",
         "lb_tab_en": "English",

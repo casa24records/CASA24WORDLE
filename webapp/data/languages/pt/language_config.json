@@ -38,6 +38,7 @@
         "lb_dismiss": "Fechar",
         "lb_error": "Algo deu errado. Tente de novo.",
         "lb_hint": "Jogue valendo ranking para entrar na classificação",
+        "lb_guest_sync": "Entre com o Discord para continuar esta partida no Discord e fazer ela contar no ranking.",
         "lb_title": "Ranking",
         "lb_tab_es": "Español",
         "lb_tab_en": "English",

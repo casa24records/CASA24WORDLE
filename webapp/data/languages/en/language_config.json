@@ -45,6 +45,7 @@
         "lb_dismiss": "Close",
         "lb_error": "Something went wrong. Please try again.",
         "lb_hint": "Play for the leaderboard to join the ranking",
+        "lb_guest_sync": "Sign in with Discord to continue this game on Discord and count it toward the ranking.",
         "lb_title": "Leaderboard",
         "lb_tab_es": "Español",
         "lb_tab_en": "English",

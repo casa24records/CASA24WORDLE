@@ -38,6 +38,7 @@
         "lb_dismiss": "Kapat",
         "lb_error": "Bir şeyler ters gitti. Lütfen tekrar dene.",
         "lb_hint": "Sıralamaya girmek için liderlik tablosu modunda oyna",
+        "lb_guest_sync": "Bu oyuna Discord'da devam etmek ve sıralamaya saydırmak için Discord ile giriş yap.",
         "lb_title": "Liderlik tablosu",
         "lb_tab_es": "Español",
         "lb_tab_en": "English",

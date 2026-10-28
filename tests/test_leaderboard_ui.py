@@ -504,7 +504,7 @@ def test_leaderboard_game_flow(server, page):
         page.keyboard.press(c)
     page.keyboard.press("Enter")
     wait_reveal(page, 2)
-    assert calls[-1] == {"lang": "es", "guess": "jamon"}
+    assert calls[-1] == {"lang": "es", "guess": "jamon", "attempt": 1}
     tiles = page.locator("main .grid-cols-5").nth(1).inner_text()
     assert "ó" in tiles.lower()  # server spelling shown
     page.wait_for_selector("[data-lb-end] .c24-lb-rank", state="visible", timeout=6000)

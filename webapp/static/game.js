@@ -52,6 +52,37 @@ function livePlayer(p, rtl) {
     };
 }
 
+// Leaderboard game sync. Rule: the server is the single source of truth for a
+// logged-in player's game; the web page (and the Discord Activity) only paint it.
+// loadState() = GET /api/state + repaint; submitGuess() = POST /api/guess with
+// "attempt" (a 409 "stale" or "finished" answer carries the state to repaint).
+// Reloads on focus / visible tab (at most once per 5 s), every 60 s while visible,
+// and when the Panama date changes (new word: empty board and keyboard).
+const SYNC_MIN_GAP = 5000;
+const SYNC_EVERY = 60000;
+const SYNC = { busy: false, at: 0, gen: 0, stopped: false };
+const EMPTY_TILE = "border-2 border-neutral-300";
+
+function panamaDate(ms) {
+    // "YYYY-MM-DD" in Panama (UTC-5, no daylight saving), like daily.panama_today()
+    return new Date((ms === undefined ? Date.now() : ms) - 5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+// Canonical public address for share links (server-side public_url(); never the
+// page's own origin, which inside the Discord Activity is a proxy nobody can open).
+const PUBLIC_ORIGIN = (function () {
+    var el = document.getElementById("app");
+    var value = el ? (el.getAttribute("data-public-origin") || "") : "";
+    return /^https?:\/\/[^\s\/?#]+$/.test(value.replace(/\/+$/, "")) ? value.replace(/\/+$/, "") : window.location.origin;
+})();
+
+function pageKey() {
+    // localStorage key of a saved guest game: the last path segment ("/es" -> "es"),
+    // never the query string (?frame_id=... broke it). Same key as older saves.
+    var path = window.location.pathname.replace(/\/+$/, "");
+    return path.substring(path.lastIndexOf("/") + 1);
+}
+
 function readFlag(key) {
     try { return localStorage.getItem(key) === "1"; } catch (e) { return false; }
 }
@@ -142,6 +173,8 @@ const app = Vue.createApp({
             lb_points: null,    // points for today's game, once it's over
             lb_rank: null,      // place in this language's ranking, once it's over
             lb_hint_off: readFlag("casa24_lb_hint_off"),
+            lb_day: (LB_STATE && LB_STATE.day) || null,  // the server's Panama date for this game
+            lb_local_day: panamaDate(),                 // this device's Panama date (midnight check)
             live_players: [],   // live view: other players today (colors only)
             live_count: 0,
             live_loaded: false, // first answer arrived (shows the empty state)
@@ -202,6 +235,14 @@ const app = Vue.createApp({
         // print time until next day every 5 seconds
         setInterval(() => {
             this.time_until_next_day = this.get_time_until_next_day();
+            if (LB) {
+                // Panama midnight on this device: ask the server for the new day's game
+                var local_day = panamaDate();
+                if (local_day !== this.lb_local_day) {
+                    this.lb_local_day = local_day;
+                    this.loadState(true);
+                }
+            }
         }, 1000);
         if (LB) {
             this.restoreLb(LB_STATE);
@@ -217,6 +258,11 @@ const app = Vue.createApp({
             // live view: first ask after the board has rendered, then every 8 s while visible
             document.addEventListener("visibilitychange", this.liveVisibility);
             this.$nextTick(() => { setTimeout(this.liveFetch, 0); });
+            // sync: the page already has fresh state; reload when the player comes back
+            SYNC.at = Date.now();
+            document.addEventListener("visibilitychange", this.syncOnReturn);
+            window.addEventListener("focus", this.syncOnReturn);
+            setInterval(() => { if (!document.hidden) { this.loadState(); } }, SYNC_EVERY);
         }
     },
     beforeUpdate() {
@@ -228,7 +274,7 @@ const app = Vue.createApp({
         async shareResults() {
             // share text, e.g. "Casa 24 Wordle ES #123 3/6" + link + emoji grid
             this.emoji_board = this.getEmojiBoard();
-            var text_to_share = "Casa 24 Wordle " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + window.location.origin + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
+            var text_to_share = "Casa 24 Wordle " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + PUBLIC_ORIGIN + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
             if (navigator.share) {
                 try {
                     await navigator.share({
@@ -433,8 +479,8 @@ const app = Vue.createApp({
                     return;
                 }
                 if (LB) {
-                    // the server checks the word and colors it (submitLb)
-                    this.submitLb();
+                    // the server checks the word and colors it (submitGuess)
+                    this.submitGuess();
                     return;
                 }
                 // if checkWord returns true, then go to next row
@@ -525,6 +571,8 @@ const app = Vue.createApp({
             if (!state || !Array.isArray(state.guesses)) {
                 return;
             }
+            if (typeof state.day === "string") { this.lb_day = state.day; }
+            if (Number.isInteger(state.puzzle)) { this.todays_idx = String(state.puzzle); }
             var keys = Object.assign({}, this.key_classes);
             var guesses = state.guesses.slice(0, 6);
             for (let r = 0; r < guesses.length; r++) {
@@ -548,8 +596,107 @@ const app = Vue.createApp({
                 this.emoji_board = this.getEmojiBoard();
             }
         },
-        submitLb() {
-            // leaderboard game: the server checks the guess, colors it and keeps score
+        resetBoard() {
+            // empty board and keyboard, no end window: before painting the server's state
+            for (let r = 0; r < 6; r++) {
+                for (let i = 0; i < 5; i++) {
+                    this.tiles[r][i] = "";
+                    this.tile_classes[r][i] = EMPTY_TILE;
+                }
+            }
+            var keys = {};
+            for (var k in this.key_classes) { keys[k] = ""; }
+            Object.assign(this.key_classes, keys);
+            this.pending_key_classes = null;
+            this.active_row = 0;
+            this.active_cell = 0;
+            this.full_word_inputted = false;
+            this.game_over = false;
+            this.game_won = false;
+            this.game_lost = false;
+            this.todays_word = "";
+            this.lb_points = null;
+            this.lb_rank = null;
+            this.kolo_image = "";
+            this.emoji_board = "";
+            this.attempts = "0";
+        },
+        paintState(state) {
+            // repaint from the server's state (GET /api/state, or a 409/finished answer).
+            // Same day and same progress: keep what the player is typing, only refresh numbers.
+            if (!state || !Array.isArray(state.guesses)) {
+                return;
+            }
+            var same_day = state.day === this.lb_day;
+            var n = Math.min(state.guesses.length, 6);
+            if (same_day && n === this.active_row && !!state.done === this.game_over) {
+                if (state.done) {
+                    this.lb_points = state.points === undefined ? null : state.points;
+                    this.lb_rank = state.rank === undefined ? null : state.rank;
+                }
+                if (Number.isInteger(state.puzzle)) { this.todays_idx = String(state.puzzle); }
+                return;
+            }
+            var was_over = this.game_over;
+            this.resetBoard();
+            this.restoreLb(state);
+            this.revealing_row = -1;
+            this.showTiles();
+            if (!same_day) {
+                // a new word: close the old end window and the old answer toast
+                this.hideNotification();
+                this.show_stats_modal = false;
+            }
+            if (this.game_over && (!was_over || !same_day)) {
+                this.show_stats_modal = true;  // finished elsewhere (another tab, Discord)
+            }
+        },
+        loadState(force) {
+            // GET /api/state and repaint. Skipped while a guess is on its way or flipping;
+            // at most once per 5 s unless forced (day change, 409, finished).
+            if (!LB || SYNC.stopped || SYNC.busy || this.lb_busy || this.revealing) {
+                return Promise.resolve(false);
+            }
+            var now = Date.now();
+            if (!force && now - SYNC.at < SYNC_MIN_GAP) {
+                return Promise.resolve(false);
+            }
+            SYNC.at = now;
+            SYNC.busy = true;
+            var gen = SYNC.gen;
+            return fetch("/api/state?lang=" + encodeURIComponent(this.config.language_code), {
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Accept": "application/json" },
+            }).then((response) => {
+                return response.json().catch(() => null).then((data) => ({ ok: response.ok, status: response.status, data: data }));
+            }).then((result) => {
+                SYNC.busy = false;
+                if (result.status === 401 || result.status === 404 || result.status === 400) {
+                    SYNC.stopped = true;  // logged out / feature off: the next guess handles it
+                    return false;
+                }
+                // a guess started meanwhile: its answer is newer than this state
+                if (!result.ok || gen !== SYNC.gen || this.lb_busy || this.revealing) {
+                    return false;
+                }
+                this.paintState(result.data);
+                return true;
+            }).catch(() => {
+                SYNC.busy = false;
+                return false;
+            });
+        },
+        syncOnReturn() {
+            // back to the tab / window: the game may have moved on elsewhere (Discord, another device)
+            if (!document.hidden) {
+                this.loadState();
+            }
+        },
+        submitGuess() {
+            // leaderboard game: the server checks the guess, colors it and keeps score.
+            // "attempt" = the row being filled; if the server has a different count
+            // (played elsewhere meanwhile) it answers 409 with its state and nothing is saved.
             if (this.lb_busy) {
                 return;
             }
@@ -567,20 +714,30 @@ const app = Vue.createApp({
                 return;
             }
             this.lb_busy = true;
+            SYNC.gen++;
             var lang = this.config.language_code;
             fetch("/api/guess", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ lang: lang, guess: typed }),
+                body: JSON.stringify({ lang: lang, guess: typed, attempt: row }),
             }).then((response) => {
                 return response.json().catch(() => ({})).then((data) => ({ ok: response.ok, status: response.status, data: data }));
             }).then((result) => {
                 this.lb_busy = false;
-                if (result.ok && result.data && Array.isArray(result.data.colors)) {
-                    this.applyLbGuess(result.data);
+                var data = result.data || {};
+                if (result.ok && Array.isArray(data.colors)) {
+                    if (typeof data.day === "string" && this.lb_day && data.day !== this.lb_day) {
+                        // the day changed under us: paint the new day's game from the server
+                        this.loadState(true);
+                        return;
+                    }
+                    this.applyLbGuess(data);
+                } else if (data.state && (result.status === 409 || data.error === "finished" || data.error === "too_many")) {
+                    // played elsewhere meanwhile: just show the server's game, no error
+                    this.paintState(data.state);
                 } else {
-                    this.lbError((result.data && result.data.error) || (result.status === 401 ? "login" : ""));
+                    this.lbError(data.error || (result.status === 401 ? "login" : ""));
                 }
             }).catch(() => {
                 this.lb_busy = false;
@@ -614,9 +771,9 @@ const app = Vue.createApp({
                 this.showNotification(this.text("notification-not-valid", "Word is not valid"));
             } else if (code === "repeat") {
                 this.showNotification(this.text("notification-repeated", "You already tried that word"));
-            } else if (code === "finished") {
-                // finished in another tab: show the saved result
-                window.location.reload();
+            } else if (code === "finished" || code === "too_many" || code === "stale") {
+                // finished or moved on elsewhere: show the server's game
+                this.loadState(true);
             } else {
                 this.showNotification(this.text("lb_error", "Something went wrong. Please try again."));
             }
@@ -911,8 +1068,7 @@ const app = Vue.createApp({
         saveToLocalStorage() {
             if (DEMO || LB) { return; }  // demo games are never saved; leaderboard games live on the server
             // saves tiles, tile_classes, active_row and active_cell to local storage with key: page_name
-            var url = window.location.href;
-            var page_name = url.substring(url.lastIndexOf('/') + 1);
+            var page_name = pageKey();
             var data = {
                 tiles: this.tiles,
                 tile_classes: this.tile_classes,
@@ -932,8 +1088,7 @@ const app = Vue.createApp({
         loadFromLocalStorage() {
             if (DEMO || LB) { return; }
             // if local storage has data and the daily word is the same as the todays word, then load data
-            var url = window.location.href;
-            var page_name = url.substring(url.lastIndexOf('/') + 1);
+            var page_name = pageKey();
             var data = JSON.parse(localStorage.getItem(page_name));
             if (data && data.todays_word === this.todays_word) {
                 this.tiles = data.tiles;

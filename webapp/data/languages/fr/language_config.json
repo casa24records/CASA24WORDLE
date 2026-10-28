@@ -38,6 +38,7 @@
         "lb_dismiss": "Fermer",
         "lb_error": "Un problème est survenu. Réessaie.",
         "lb_hint": "Joue pour le classement pour y apparaître",
+        "lb_guest_sync": "Connecte-toi avec Discord pour continuer cette partie sur Discord et la faire compter au classement.",
         "lb_title": "Classement",
         "lb_tab_es": "Español",
         "lb_tab_en": "English",

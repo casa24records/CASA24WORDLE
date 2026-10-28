@@ -38,6 +38,7 @@
         "lb_dismiss": "Schließen",
         "lb_error": "Etwas ist schiefgelaufen. Versuch es nochmal.",
         "lb_hint": "Spiel für die Rangliste, um mitzumachen",
+        "lb_guest_sync": "Melde dich mit Discord an, um dieses Spiel auf Discord fortzusetzen und es für die Rangliste zählen zu lassen.",
         "lb_title": "Rangliste",
         "lb_tab_es": "Español",
         "lb_tab_en": "English",
