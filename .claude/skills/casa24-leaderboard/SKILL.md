@@ -5,7 +5,7 @@ description: Casa 24 Wordle's guest mode and Discord leaderboard — what player
 
 # Guest mode + Discord leaderboard
 
-Built 2026-10-26 on branch `leaderboard-discord` (commits `dfb5dea` backend, `ad8610f` UI, then the storage moved from Redis to Neon Postgres). Why it was built this way: `casa24-decisions`. Hosting and env vars: `casa24-deploy`. The **live view** (who else is playing today, colors only, `GET /api/live`; added 2026-10-27): **`casa24-live-view`**.
+Built 2026-10-26 on branch `leaderboard-discord` (commits `dfb5dea` backend, `ad8610f` UI, then the storage moved from Redis to Neon Postgres). **Since 2026-10-28 (branch `all-langs`) it covers all 10 languages** (it was es/en only); see "Every language" below. Why it was built this way: `casa24-decisions`. Hosting and env vars: `casa24-deploy`. The **live view** (who else is playing today, colors only, `GET /api/live`; added 2026-10-27): **`casa24-live-view`**.
 
 Files:
 - `webapp/app.py`, section "DISCORD LEADERBOARD": routes, cookies, checks
@@ -13,25 +13,34 @@ Files:
 - `webapp/leaderboard.py`: pure rules (points, coloring port, streaks)
 - `webapp/store.py`: storage (`PostgresStore`, `MemoryStore`, `get_store()`)
 - `webapp/templates/_discord.html` (shared Discord macros), `templates/index.html` + `static/index.js` (menu Discord area, guest toggle), `game.html` + `static/game.js` (leaderboard game), `templates/leaderboard.html`
-- texts: `lb_*` keys in `webapp/data/languages/{es,en}/language_config.json`
+- texts: `lb_*` keys in all 10 `webapp/data/languages/<lang>/language_config.json` files
 
 ## What players see
 UI rules decided by the owner on 2026-10-26/27 (record: `casa24-decisions`; look: `casa24-branding`). Shared pieces are Jinja macros in **`webapp/templates/_discord.html`** (`dc.button`, `dc.logo`, `dc.trophy`, `dc.avatar`, `dc.header_slot`, `dc.privacy_link`/`dc.privacy_dialog`, `dc.toast`, `dc.script`), imported by `index.html`, `game.html` and `leaderboard.html`.
 - **Rules:** less text, the UI speaks for itself. Trophy **line SVG icon** for the leaderboard (never the 🏆 emoji). Official Discord button (Blurple `#5865F2`, white logo, 48 px). **Nothing overlaps at any size** (check 320, 375, 390, 844×390 landscape, 768, 1366).
 - **Header, top-left (menu, leaderboard games, `/leaderboard`):** logged in → the player's **round Discord avatar**; tapping it opens a small popover with @username, "Ver leaderboard", "Cerrar sesión" (and "Borrar mis datos" on `/leaderboard`). Logged out → a small Discord-logo icon that starts the login. On the menu a **trophy icon** link to `/leaderboard` sits right after it (no "Ver leaderboard" text link). Esc or a tap outside closes the popover.
-- **Menu (es/en area), server-rendered so nothing jumps:**
-  - logged out → the **Discord sign-in button shows immediately** (no mode to pick first) + a small "ⓘ Privacidad" link. The Español/English cards play the guest game. The sign-in `next` is `/lb/<player's language>` (`index.js` fixes the href after load).
-  - logged in → the cards go to `/lb/es`, `/lb/en` (trophy icon on the card), with a small switch **"Jugar como invitado (no cuenta)"** that sends them to the guest game instead. localStorage `casa24_mode` = `guest` only when that switch is on; otherwise mode is `lb`.
-  - guest → `/es`, `/en`: exactly the old game, nothing leaves the browser. The other 8 languages are always guest only.
+- **Menu (Discord area above the 10 language cards), server-rendered so nothing jumps:**
+  - logged out → the **Discord sign-in button shows immediately** (no mode to pick first) + a small "ⓘ Privacidad" link. All cards play the guest game. The sign-in `next` is `/lb/<last language played>` (localStorage `casa24_lang`, any of the 10), else the preferred es/en (`loginLanguage` in `index.js` fixes the href after load; the server renders `/lb/<es|en>` first).
+  - logged in → every card goes to `/lb/<code>` (trophy icon on the card; `playHref()` in `index.js`), with a small switch **"Jugar como invitado (no cuenta)"** that sends them to the guest game instead. localStorage `casa24_mode` = `guest` only when that switch is on; otherwise mode is `lb`.
+  - guest → `/<code>`: exactly the old game, nothing leaves the browser.
   - **No privacy paragraph on the menu.** The full privacy text lives only in the "ⓘ Privacidad" dialog (`<dialog id="c24-privacy">`).
   - Notices are **short toasts that close themselves** (~6 s, × to close): `/?login=failed`, `/?login=cancelled` (gentle, not a warning), `/?deleted=1`. The URL is cleaned so a reload doesn't show them again.
   - **Everything above appears only when the leaderboard is enabled** (see `lb_enabled` below).
-- **Leaderboard game `/lb/<lang>`:** same `game.html`, with the trophy SVG as a badge after the language badge and the avatar in the header. The answer is **not** in the page. Every Enter sends the word to the server, which answers with the colors; the flip animation and keyboard colors work as usual. Progress is restored from the server (another device works too), and nothing is saved in localStorage. End window shows **rank and points as big numbers** ("#N", "+N", both `.c24-lb-big`, small labels `lb_rank_label` / `lb_points_label` or `lb_point_label` for exactly 1) and a trophy "Ver leaderboard" link. Other language codes redirect to `/lb/es`.
-- **Guest end window (es/en, only when enabled):** a dismissible hint (dismissal saved in localStorage `casa24_lb_hint_off`): logged in → a trophy link to `/lb/<lang>`; logged out → short text + the Discord sign-in button.
-- **`/leaderboard`** (public, `?tab=es|en|all`, default `all` = "Combinado"): top 50 with rank, @username, points, wins, current streak (🔥), best streak. Your own row is highlighted ("Tú") with your avatar; if you are outside the top 50, "Tu posición: #N" shows below. Page language follows the tab (`all` uses the browser language). Below the table: logged out → Discord sign-in button; logged in → avatar + @username. Plus the small "ⓘ Privacidad" link. Cerrar sesión and **Borrar mis datos** (asks for confirmation) are in the avatar popover: delete is secondary, never a big button.
+- **Leaderboard game `/lb/<lang>`:** same `game.html`, with the trophy SVG as a badge after the language badge and the avatar in the header. The answer is **not** in the page. Every Enter sends the word to the server, which answers with the colors; the flip animation and keyboard colors work as usual. Progress is restored from the server (another device works too), and nothing is saved in localStorage. End window shows **rank and points as big numbers** ("#N", "+N", both `.c24-lb-big`, small labels `lb_rank_label` / `lb_points_label` or `lb_point_label` for exactly 1) and a trophy "Ver leaderboard" link. Works for all 10 languages; unknown codes redirect to `/lb/es`.
+- **Guest end window (any language, only when enabled):** a dismissible hint (dismissal saved in localStorage `casa24_lb_hint_off`): logged in → a trophy link to `/lb/<lang>`; logged out → short text + the Discord sign-in button.
+- **`/leaderboard`** (public, `?tab=<lang>|all`, default `all` = "Combinado"; **11 tabs**: the 10 languages in menu order with their native names, then Combinado; one scrollable row on phones, a 6-column grid from 600px, the active tab scrolled into view): top 50 with rank, @username, points, wins, current streak (🔥), best streak. Your own row is highlighted ("Tú") with your avatar; if you are outside the top 50, "Tu posición: #N" shows below. Page language follows the tab (Arabic tab → `dir="rtl"`; `all` uses the browser's es/en). Below the table: logged out → Discord sign-in button; logged in → avatar + @username. Plus the small "ⓘ Privacidad" link. Cerrar sesión and **Borrar mis datos** (asks for confirmation) are in the avatar popover: delete is secondary, never a big button.
 - **Privacy text** (the dialog; `lb_privacy`, `lb_avatar_note`, `lb_guest_note`; changed 2026-10-27): Discord handles the login, we never see password or email; we store Discord ID, username, **profile picture** and results to show the ranking and who is playing today; **other players see only your colors, never your words**; other players see your Discord picture in the live list (the ranking shows only your own); guest games don't count. The old "only shown in your browser, we don't store it" promise is gone (the live view needs the avatar). The inline fallbacks in `index.html` / `leaderboard.html` match the JSON keys; change both together.
 - **Delete my data:** removes the player row (with the avatar hash), all results and saved games, and the rate counters (guess and `:live` buckets), then logs out, clears `c24_dc_avatar`, and shows the "deleted" toast. Logging in again later starts from zero.
 - **Admin hide:** Discord user IDs in `ADMIN_DISCORD_IDS` see an "Ocultar" button on each row. A hidden player disappears from every ranking but can still play (their results keep being recorded).
+
+## Every language (2026-10-28) — backend gotchas
+- `LB_LANGS = tuple(language_codes)`: every loaded language, **menu order** (es, en, then alphabetical: ar, de, fr, ko, pt, ru, tr, vi). `LB_TABS = LB_LANGS + ("all",)`. `/lb/<lang>`, `/api/guess`, `/api/live`, `/admin/hide`'s `tab` all check these.
+- `leaderboard.html` gets `lb_tabs` (`lb_tabs()` = `[{code, name_native}]` + `{"code": "all"}`), `lb_langs`, and `texts` for **es, en + the tab's language** (`LB_TEXT_FALLBACK`). Tab labels are the native names (`lang` + `dir="auto"` on each); Combinado uses `lb_tab_all`. The `lb_tab_es` / `lb_tab_en` keys are no longer used by the tabs.
+- **Korean word lists are decomposed jamo (NFD):** the board has one tile per jamo. `lb_normalize(lang, typed)` lowercases and puts the guess in **the same Unicode form as that language's lists** (`_lb_norm_form` detects NFD-only lists → NFD, else NFC). Plain NFC on a Korean guess would merge the jamo into syllables and reject it. Decomposed input on NFC languages (e.g. a Vietnamese/French keyboard sending combining marks) is composed to NFC.
+- **Turkish I/İ:** `lb_normalize` maps `I` → `ı` and `İ` → `i` before lowercasing (for `tr`, and `az` if ever added), like `game.js` `normalizeKey` (`toLocaleLowerCase`). Python's `lower()` alone would give `i` / `i̇`.
+- **Accent folding only for es/fr/pt** (`accent_insensitive` in their configs); `de`, `tr`, `vi`, `ru`, `ar`, `ko`, `en` need the exact letters.
+- `color_guess` works **per code point**, the same as the client tiles (so Korean colors are per jamo).
+- Arabic (RTL): the game page is already RTL; the live mini boards are reversed per row in `game.js`; `/leaderboard?tab=ar` sets `dir="rtl"`, usernames keep `dir="ltr"`.
 
 ## Data
 | Stored (Neon Postgres) | Never stored |
@@ -71,8 +80,8 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 
 ## Anti-cheat
 - In leaderboard mode the **answer is never sent to the browser** until the game is over (`daily_word` is blanked; the server colors guesses).
-- `POST /api/guess` checks, in order: leaderboard enabled → same origin → logged in (`c24_lb` valid and player exists) → rate limit (**30 per minute** per player, else 429) → body is `{lang, guess}` with lang `es`/`en`.
-- Then: today = **Panama date from `daily.py`** (any date the client sends is ignored), answer = the real daily word, accents resolved on the server (same as the guest game), word must be 5 letters and in the main or supplement list, not already guessed, at most 6 guesses, game not finished.
+- `POST /api/guess` checks, in order: leaderboard enabled → same origin → logged in (`c24_lb` valid and player exists) → rate limit (**30 per minute** per player, else 429) → body is `{lang, guess}` with lang in `LB_LANGS` (any of the 10).
+- Then: today = **Panama date from `daily.py`** (any date the client sends is ignored), answer = the real daily word, the guess normalized to the word lists' form (`lb_normalize`, see "Every language"), accents resolved on the server (same as the guest game; es/fr/pt only), word must be 5 letters and in the main or supplement list, not already guessed, at most 6 guesses, game not finished.
 - The game row is **locked** (`SELECT … FOR UPDATE`) while a guess is processed, so two tabs can't race.
 - The result is written once: `INSERT … ON CONFLICT DO NOTHING` on (discord_id, lang, day). **The client never sends points**; the server computes them.
 - **Same-origin check** on every POST (`/api/guess`, `/auth/logout`, `/api/me/delete`, `/admin/hide`): if the browser sends `Origin` or `Referer`, its host must equal this site's host, else 403. Plus `SameSite=Lax` cookies.
@@ -81,7 +90,7 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 ## Scoring, tiebreaks, streaks
 - **Points:** win in 1 guess = 6, 2 = 5, 3 = 4, 4 = 3, 5 = 2, 6 = 1, loss = 0 (`leaderboard.points()`).
 - **Ranking order:** total points, then wins, then **who reached that total first** (earlier "last day you scored points"; players with 0 points use their first day), then Discord ID. Computed by SQL each time (`SQL_RANKED` in `store.py`; `MemoryStore._ranked` mirrors it).
-- Tabs: `es`, `en` count only that language; `all` (Combinado) adds both.
+- Tabs: each language tab counts only that language; `all` (Combinado) adds every language.
 - **Streaks** (`leaderboard.streaks()`), recomputed from results only for rows on screen:
   - per language: consecutive Panama days with a win; a loss resets to 0
   - combined: consecutive days with a win in **any** language; a loss does not break it, two wins on one day count once
@@ -110,9 +119,9 @@ No app logging of tokens or IPs. Vercel's own platform request logs exist outsid
 | `GET /auth/discord/login?next=` | start login | 302 to Discord; 404 if disabled |
 | `GET /auth/discord/callback` | finish login | 302 to `next` + `#dc=<hash>`; `/?login=cancelled` on `error=access_denied`; `/?login=failed` otherwise |
 | `POST /auth/logout` | log out | 302 `/`; 403 other site |
-| `GET /lb/<lang>` | leaderboard game (es/en) | page; 302 to login if logged out; 404 if disabled |
+| `GET /lb/<lang>` | leaderboard game (any of the 10; unknown → `/lb/es`) | page; 302 to login if logged out; 404 if disabled |
 | `POST /api/guess` JSON `{lang, guess}` | one guess | 200 `{word, colors[5], done, won, answer, points, rank}` (answer/points/rank only when done, else null) |
-| `GET /api/live?lang=es\|en` | who else plays today, colors only (`casa24-live-view`) | 200 `{players:[{username, avatar_url, rows, done, won, live}], count}`; 401 `login`, 400 `bad_lang`, 429 `rate` (own 20/min bucket), 503 `store`, 404 `disabled`; `Cache-Control: no-store` |
+| `GET /api/live?lang=<lang>` | who else plays today, colors only (`casa24-live-view`) | 200 `{players:[{username, avatar_url, rows, done, won, live}], count}`; 401 `login`, 400 `bad_lang`, 429 `rate` (own 20/min bucket), 503 `store`, 404 `disabled`; `Cache-Control: no-store` |
 | `GET /leaderboard?tab=` | ranking page | page; 404 if disabled |
 | `POST /api/me/delete` | delete my data | 302 `/?deleted=1`; 401 JSON `login` if no cookie; 403 other site |
 | `POST /admin/hide` form `discord_id`, `hidden` (1/0), `tab` | hide/unhide | 302 `/leaderboard`; 403 not admin; 400 bad id |
@@ -132,6 +141,7 @@ Set in Vercel → casa24-wordle → Settings → Environment Variables, for Prod
 - `tests/lb_testlib.py`: shared fixtures. `FakeDiscord` replaces `discord_auth.exchange_code` / `fetch_me` (returns extra fields like email/avatar on purpose; `FakeDiscord.avatar` defaults to a deliberately invalid hash so no `#dc=` is added, `VALID_AVATAR` is a real-format one); `mem` = a fresh `MemoryStore`; `lb_env` = fake env values + frozen Panama date; helpers `login()`, `guess()`, `answer()`, `wrong_words()`.
 - `tests/test_discord_auth.py`: login only asks `identify`, only id + username + valid avatar hash stored, bad/missing state, cancel → `/?login=cancelled`, other Discord error → `/?login=failed`, avatar hash in the store (valid format only) and the `Location` fragment, never in cookies or the body, empty `#dc=` without avatar, no fragment for a malformed hash, `next`'s own fragment replaced, `next` must be relative, logout, tampered cookie.
 - `tests/test_leaderboard.py`: points, order, streaks, accents, coloring vs `game.js` (node), MemoryStore, `get_store()` choice, SQL parameterized, PostgresStore against a fake connection, `.env.local` loader, disabled without env, guess validation, other-site refused, records once, client date ignored, rate limit, guest makes zero writes, ranking rows, delete, admin hide/unhide.
+- Every-language tests (2026-10-28): `test_lb_langs_are_every_language`, `test_lb_page_renders_every_language`, `test_guess_colors_and_win_every_language`, `test_combined_sums_every_language`, `test_leaderboard_tabs_and_texts`, `test_korean_guess_matches_jamo_lists`, `test_turkish_dotted_and_dotless_i`, `test_decomposed_input_matches_nfc_lists`, `test_no_accent_folding_outside_es_fr_pt` (in `test_leaderboard.py`); `test_leaderboard_page_tabs_for_every_language`, `test_leaderboard_game_page_any_language`, `test_menu_ten_big_cards_then_developer_view`, `test_menu_logged_in_every_card_goes_to_leaderboard`, `test_menu_sign_in_goes_to_last_language_played` (in `test_leaderboard_ui.py`).
 - `tests/test_leaderboard_ui.py`: rendered menu/game/leaderboard templates, plus Playwright browser tests with a faked `/api/guess` (and live view tests with a faked `/api/live`).
 - `tests/test_live.py`: `/api/live` and `store.live()` (see `casa24-live-view`).
 - **No test talks to Discord or a real database.**
@@ -146,7 +156,7 @@ Set in Vercel → casa24-wordle → Settings → Environment Variables, for Prod
 - **Add an admin:** owner finds their Discord user ID (Discord → Settings → Advanced → Developer Mode, then right-click own name → Copy User ID), adds it to `ADMIN_DISCORD_IDS` in Vercel (comma-separated for more), redeploys.
 - **Hide a user:** as admin, "Ocultar" on `/leaderboard`. **Unhide:** there is no button (hidden users aren't listed). Either POST `/admin/hide` with `discord_id=<id>&hidden=0` while logged in as admin, or in the Neon SQL editor: `UPDATE wordle_players SET hidden = false WHERE discord_id = '<id>';`.
 - **Change points:** edit `points()` in `webapp/leaderboard.py` and `test_points`. Results already stored keep their old points (they are saved per game); to recompute, run an `UPDATE wordle_results SET points = …` only with the owner's OK.
-- **Add another language to the leaderboard** (now es/en only): add it to `LB_LANGS` and `LB_TABS` in `app.py`, add a tab in `leaderboard.html`, add the `lb_*` text keys to that language's `language_config.json`, show the Discord area / guest toggle for its card in `index.html`/`index.js` (they currently assume es/en), add a Discord-free test, and check `casa24-text-and-languages` for its accent rules.
+- **Add another language to the leaderboard:** automatic. Any language folder in `webapp/data/languages/` is in `LB_LANGS`, gets a tab, a menu card that follows the leaderboard mode, `/lb/<code>`, `/api/guess` and `/api/live`. Only do by hand: add the `lb_*` / `lb_live_*` text keys to its `language_config.json` (missing ones fall back to English), check its Unicode form (NFC or NFD lists, `lb_normalize`), its lowercase rules (like Turkish I/İ) and its accent rule (`casa24-text-and-languages`), check whether VT323 can draw its script (else add it to the `:lang()` font rules, `casa24-branding`), and run the every-language tests (they are parametrized over `LB_LANGS`). The owner decided not to add new languages for now (2026-10-28).
 - **Delete someone's data on request:** they can use "Borrar mis datos"; otherwise `DELETE FROM wordle_players WHERE discord_id = '<id>';` (cascades) plus `DELETE FROM wordle_rate WHERE discord_id IN ('<id>', '<id>:live');`.
 
 ## Troubleshooting

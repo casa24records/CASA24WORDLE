@@ -63,7 +63,7 @@
     <div id="app" class="c24-menu-app">
 
         <!-- The Header: 3 columns (about / title / theme + stats), so nothing overlaps -->
-        <header class="c24-header c24-header-menu border-b border-neutral-300">
+        <header class="c24-header c24-header-menu{% if lb_on %} c24-header-menu-lb{% endif %} border-b border-neutral-300">
             <div class="c24-header-side">
                 {% if lb_on %}
                 {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ ui) | urlencode,
@@ -89,7 +89,7 @@
             <h1 class="c24-title c24-header-title uppercase"><a href="/" class="inline-flex items-center gap-2">
                 <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
                 <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
-                <span>Casa 24 Wordle</span></a></h1>
+                <span>Casa 24<span class="c24-title-extra"> Wordle</span></span></a></h1>
             <div class="c24-header-side c24-header-end">
                 <!-- light / dark switch -->
                 <button type="button" class="c24-icon-btn c24-theme-button" onclick="casa24ToggleTheme()" aria-label="Modo oscuro / Dark mode" title="Modo oscuro / Dark mode">
@@ -127,7 +127,7 @@
             </section>
 
             {% if lb_on %}
-            <!-- Discord (es/en only), server-rendered so it shows at once. Text in ONE language:
+            <!-- Discord (every language), server-rendered so it shows at once. Text in ONE language:
                  data-l="es|en" follows <html lang> (index.js sets it to the player's language). -->
             {% if not me %}
             <section class="c24-dc-area" data-dc-area data-lb-menu v-pre>
@@ -147,19 +147,23 @@
             {% endif %}
             {% endif %}
 
-            <!-- Español / English: the player's language first -->
-            <section class="c24-primary" aria-label="Español / English">
-                <a v-for="(lang, i) in primaryLanguages" :key="lang.language_code"
+            <!-- All 10 languages as big cards: Español / English first (the player's one
+                 first), then the other 8, then the Developer view card last. Every card
+                 follows the guest / leaderboard mode (playHref). -->
+            <section class="c24-primary" aria-label="Idiomas / Languages">
+                <a v-for="(lang, i) in menuLanguages" :key="lang.language_code"
                     :href="playHref(lang.language_code)" :lang="lang.language_code"
                     :data-lang="lang.language_code"
+                    :dir="lang.right_to_left === 'true' ? 'rtl' : null"
                     class="c24-play" :class="i === 0 ? 'c24-play-main' : 'c24-play-alt'">
                     <span class="c24-play-name">[[ lang.language_name_native ]]</span>
-                    <span v-if="mode === 'lb'" class="c24-play-status" data-lb-status>
-                        {{ dc.trophy('c24-trophy c24-trophy-inline') }} [[ lang.language_code === 'es' ? 'Jugar' : 'Play' ]] →
+                    <span v-if="mode === 'lb'" class="c24-play-status" data-lb-status
+                        :lang="labelLang(lang.language_code)" dir="ltr">
+                        {{ dc.trophy('c24-trophy c24-trophy-inline') }} [[ label(lang.language_code, 'play') ]] →
                     </span>
-                    <span v-else class="c24-play-status">
-                        <span v-if="status[lang.language_code].played_today">✓ [[ lang.language_code === 'es' ? 'Jugada hoy' : 'Played today' ]]</span>
-                        <span v-else>[[ lang.language_code === 'es' ? 'Jugar' : 'Play' ]] →</span>
+                    <span v-else class="c24-play-status" :lang="labelLang(lang.language_code)" dir="ltr">
+                        <span v-if="status[lang.language_code].played_today">✓ [[ label(lang.language_code, 'played') ]]</span>
+                        <span v-else>[[ label(lang.language_code, 'play') ]] →</span>
                         <span v-if="status[lang.language_code].streak > 0" class="ml-2">🔥 [[ status[lang.language_code].streak ]]</span>
                     </span>
                 </a>
@@ -172,23 +176,6 @@
                     </span>
                 </div>
                 {% endif %}
-            </section>
-
-
-            <!-- The other 8 languages, smaller -->
-            <section aria-labelledby="more-languages">
-                <h2 id="more-languages" class="c24-section-title">
-                    <span lang="es">Más idiomas</span> · <span lang="en">More languages</span>
-                </h2>
-                <div class="c24-chips">
-                    {% for code in language_codes if code not in ("es", "en") %}
-                    <a href="/{{ code }}" lang="{{ code }}" data-lang="{{ code }}" class="c24-chip"
-                        {% if languages[code].right_to_left == "true" %}dir="rtl"{% endif %}>
-                        <span class="font-bold">{{ languages[code].language_name_native }}</span>
-                        <span class="text-xs text-neutral-500" lang="en">{{ languages[code].language_name }}</span>
-                    </a>
-                    {% endfor %}
-                </div>
             </section>
 
             <footer class="text-center text-xs text-neutral-500 pt-2">

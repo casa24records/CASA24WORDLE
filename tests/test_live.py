@@ -61,7 +61,7 @@ def test_live_needs_login_and_lang(lb_env, client, discord, mem):
     r = _live(client)
     assert r.status_code == 401 and r.get_json() == {"error": "login"}
     login(client, discord)
-    for bad in ("fr", "", "ES", "all"):
+    for bad in ("xx", "", "ES", "all"):
         r = _live(client, bad)
         assert r.status_code == 400 and r.get_json() == {"error": "bad_lang"}
     assert client.get("/api/live").get_json() == {"error": "bad_lang"}
@@ -282,3 +282,23 @@ def test_avatar_url_helper():
         assert app.lb_avatar_url(P2, bad) == \
             f"https://cdn.discordapp.com/embed/avatars/{(int(P2) >> 22) % 6}.png"
     assert json.dumps(app.lb_avatar_url("0", None)).endswith('/0.png"')
+
+
+@pytest.mark.parametrize("lang", ("ko", "de", "ar", "tr"))
+def test_live_other_languages(lb_env, client, discord, mem, lang):
+    words = wrong_words(lang, 3)
+    ans = answer(lang)
+    _seed(mem, P2, "playing", words[:2], lang=lang, ago=30, avatar=HASH)
+    _seed(mem, P3, "winner", [words[2], ans], lang=lang, ago=10, finish=True)
+    _seed(mem, P4, "spanish", _words("es", 1), lang="es", ago=1)
+    login(client, discord, next_path=f"/lb/{lang}")
+    r = _live(client, lang)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert [p["username"] for p in body["players"]] == ["winner", "playing"]
+    playing = body["players"][1]
+    assert playing["rows"] == [lb.color_guess(w, ans) for w in words[:2]]
+    assert body["players"][0]["won"] is True and body["players"][0]["rows"][-1] == ["correct"] * 5
+    text = r.get_data(as_text=True)
+    letters = set("".join(words) + ans) - set(STRUCTURE)
+    assert not any(ch in text for ch in letters if not ch.isascii())

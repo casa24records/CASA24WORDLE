@@ -7,7 +7,7 @@ const KOLO_WIN = ["car.webp", "chill.webp", "dj.webp", "face.webp", "hoodie.webp
     "prod.webp", "rap-battle.webp", "ross.webp", "young.webp", "young-cropped.webp"];
 const KOLO_LOSE = ["baby.webp", "toilet.webp"];
 
-// Leaderboard game (/lb/es|en): today's guesses so far, sent by the server.
+// Leaderboard game (/lb/<lang>, any language): today's guesses so far, sent by the server.
 // The answer is not in the page; the server colors each guess (POST /api/guess).
 let LB_STATE = null;
 try { LB_STATE = JSON.parse(document.getElementById("c24-lb-state").textContent); } catch (e) { }
@@ -36,13 +36,16 @@ function liveCells(rows) {
     return cells;
 }
 
-function livePlayer(p) {
+function livePlayer(p, rtl) {
+    // rtl (Arabic): each mini-board row reads right to left, like the big board
+    var rows = Array.isArray(p.rows) ? p.rows : [];
+    if (rtl) { rows = rows.map((r) => Array.isArray(r) ? r.slice(0, 5).reverse() : r); }
     var avatar = typeof p.avatar_url === "string" && LIVE_AVATAR_RE.test(p.avatar_url)
         ? p.avatar_url : "https://cdn.discordapp.com/embed/avatars/0.png";
     return {
         username: String(p.username || "").slice(0, 32),
         avatar_url: avatar,
-        cells: liveCells(p.rows),
+        cells: liveCells(rows),
         done: p.done === true,
         won: p.won === true,
         live: p.live === true,
@@ -667,7 +670,7 @@ const app = Vue.createApp({
             }
         },
         applyLive(data) {
-            var players = data.players.filter((p) => p && typeof p === "object").slice(0, 50).map(livePlayer);
+            var players = data.players.filter((p) => p && typeof p === "object").slice(0, 50).map((p) => livePlayer(p, this.right_to_left));
             this.live_players = players;
             this.live_count = Number.isInteger(data.count) && data.count >= 0 ? data.count : players.length;
             this.live_loaded = true;

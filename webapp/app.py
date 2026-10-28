@@ -584,7 +584,7 @@ def language(lang_code):
     return response
 
 ###############################################################################
-# DISCORD LEADERBOARD (es/en only)
+# DISCORD LEADERBOARD (every language; owner decision 2026-10-28)
 ###############################################################################
 # Storage: webapp/store.py (Postgres tables wordle_players, wordle_results,
 # wordle_games, wordle_rate; an in-memory copy for tests and local dev).
@@ -606,8 +606,9 @@ import re
 import secrets
 import unicodedata
 
-LB_LANGS = ("es", "en")
-LB_TABS = ("es", "en", "all")
+LB_LANGS = tuple(language_codes)  # all loaded languages, menu order (es, en first)
+LB_TABS = LB_LANGS + ("all",)      # "all" = combined, sums every language
+LB_TEXT_FALLBACK = ("es", "en")    # texts always passed to leaderboard.html
 LB_COOKIE = "c24_lb"
 LB_COOKIE_AGE = 30 * 24 * 3600
 OAUTH_COOKIE = "c24_oauth"
@@ -752,6 +753,7 @@ def lb_answer(lang, idx):
 
 
 _lb_word_cache = {}
+_lb_form_cache = {}
 
 
 def _lb_words(lang):
@@ -760,6 +762,29 @@ def _lb_words(lang):
         sup = language_codes_5words_supplements[lang]
         _lb_word_cache[lang] = (set(main), set(sup), lbrules.build_fold_map(main, sup))
     return _lb_word_cache[lang]
+
+
+def _lb_norm_form(lang):
+    """Unicode form of this language's word lists. Korean lists are decomposed
+    jamo (NFD: the board has one tile per jamo); every other list is NFC. NFC on
+    a Korean guess would merge the jamo into syllables and break it."""
+    if lang not in _lb_form_cache:
+        main, sup, _ = _lb_words(lang)
+        words = list(main) + list(sup)
+        nfd_only = bool(words) and not all(unicodedata.is_normalized("NFC", w) for w in words) \
+            and all(unicodedata.is_normalized("NFD", w) for w in words)
+        _lb_form_cache[lang] = "NFD" if nfd_only else "NFC"
+    return _lb_form_cache[lang]
+
+
+def lb_normalize(lang, typed):
+    """The guess as the word lists store it: same Unicode form, lowercase.
+    Turkish/Azeri lowercase like game.js normalizeKey (toLocaleLowerCase):
+    "I" -> "ı", "İ" -> "i" (Python's lower() would give "i" and "i̇")."""
+    word = unicodedata.normalize("NFC", typed).strip()
+    if lang in ("tr", "az"):
+        word = word.replace("I", "ı").replace("İ", "i")
+    return unicodedata.normalize(_lb_norm_form(lang), word.lower())
 
 
 def _accent_insensitive(lang):
@@ -929,7 +954,7 @@ def api_guess():
 def _apply_guess(st, pid, lang, typed):
     day, idx = lb_today()
     answer = lb_answer(lang, idx)
-    word = unicodedata.normalize("NFC", typed).strip().lower()
+    word = lb_normalize(lang, typed)
     main, sup, fold_map = _lb_words(lang)
     word = lbrules.resolve_accents(word, answer, main, sup, _accent_insensitive(lang), fold_map)
     if len(word) != 5 or not (word in main or word in sup or word == answer):
@@ -1029,6 +1054,13 @@ def _lb_rows(st, ranked, tab, today_idx, me_id):
     return rows
 
 
+def lb_tabs():
+    """Tabs for leaderboard.html: every language (menu order), then "all"
+    (name_native None: the template labels it with lb_tab_all)."""
+    return [{"code": code, "name_native": language_configs[code]["name_native"]}
+            for code in LB_LANGS] + [{"code": "all", "name_native": None}]
+
+
 @app.route("/leaderboard")
 def leaderboard_page():
     if not lb_enabled():
@@ -1046,10 +1078,12 @@ def leaderboard_page():
         mine = st.standing(me_id, tab)
         if mine:
             me_row = _lb_rows(st, [mine], tab, today_idx, me_id)[0]
+    text_langs = LB_TEXT_FALLBACK + ((tab,) if tab in LB_LANGS and tab not in LB_TEXT_FALLBACK else ())
     response = make_response(render_template(
         "leaderboard.html", tab=tab, rows=rows, me_row=me_row,
         is_admin=bool(me_id and me_id in lb_admin_ids()), lb_user=user,
-        texts={lang: language_configs[lang]["text"] for lang in DEMO_LANGS}))
+        lb_tabs=lb_tabs(), lb_langs=LB_LANGS,
+        texts={lang: language_configs[lang]["text"] for lang in text_langs}))
     response.headers["Cache-Control"] = "no-store"
     return response
 

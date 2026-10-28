@@ -105,8 +105,8 @@ def test_menu_logged_out_shows_discord_button():
     assert "no vemos tu contraseña" not in main_view(html)
     assert "Discord handles your login" not in main_view(html)
     assert "/auth/logout" not in main_view(html) and "data-dc-toggle" not in main_view(html)  # logged out
-    # the other 8 languages stay guest links
-    assert 'href="/de"' in html and "/lb/de" not in html
+    # all 10 languages are big cards (Vue); the old "Más idiomas" chips are gone
+    assert "c24-chip" not in html and "Más idiomas" not in html and "more-languages" not in html
 
 
 def test_menu_logged_in_shows_avatar_menu_and_guest_toggle():
@@ -161,7 +161,9 @@ def test_guest_end_window_hint_only_when_enabled():
     out = render_game("es", lb_enabled=True, lb_user=None)
     assert "/auth/discord/login?next=" in out and "c24-dc-btn" in out and DISCORD_PATH in out
     assert 'href="/lb/en"' in render_game("en", lb_enabled=True, lb_user=ME)
-    assert "data-lb-hint" not in render_game("de", lb_enabled=True, lb_user=None)  # es/en only
+    # every language has the leaderboard now
+    assert "data-lb-hint" in render_game("de", lb_enabled=True, lb_user=None)
+    assert 'href="/lb/ko"' in render_game("ko", lb_enabled=True, lb_user=ME)
     assert "data-lb-hint" not in render_game("es", demo=True, lb_enabled=True, lb_user=None)
 
 
@@ -181,6 +183,51 @@ def test_leaderboard_page_table_and_me():
     assert 'action="/auth/logout"' in html
     assert 'action="/admin/hide"' not in html
     assert "no vemos tu contraseña" in html
+
+
+# what app.py hands the page (lb_tabs): every language in menu order, then "all"
+LB_TABS_ALL = [{"code": c, "name_native": app.languages[c]["language_name_native"]} for c in app.language_codes] \
+    + [{"code": "all", "name_native": None}]
+
+
+def test_leaderboard_page_tabs_for_every_language():
+    html = render("leaderboard.html", "/leaderboard?tab=de", tab="de", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
+                  is_admin=False, lb_user=None, lb_enabled=True)
+    tabs = re.findall(r'data-tab="([a-z]+)"', html)
+    assert tabs == list(app.language_codes) + ["all"] and len(tabs) == 11
+    assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="de"', html)
+    assert 'href="/leaderboard?tab=ko"' in html and "Deutsch" in html and "العربية" in html
+    assert "next=/leaderboard%3Ftab%3Dde" in html  # sign-in comes back to this tab
+    # page text: the tab's language when its texts are passed, else Spanish/English
+    de = render("leaderboard.html", "/leaderboard?tab=de", tab="de", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
+                is_admin=False, lb_user=None, lb_enabled=True,
+                texts={"de": {"lb_title": "Bestenliste"}, "en": {}, "es": {}})
+    assert '<html lang="de">' in de and "Bestenliste" in de
+    ar = render("leaderboard.html", "/leaderboard?tab=ar", tab="ar", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
+                is_admin=False, lb_user=None, lb_enabled=True, texts={"ar": {"lb_title": "x"}})
+    assert '<html lang="ar" dir="rtl">' in ar
+    # unknown tab → Combinado; no `tabs` from the backend → es/en/all
+    bad = render("leaderboard.html", "/leaderboard?tab=xx", tab="xx", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
+                 is_admin=False, lb_user=None, lb_enabled=True)
+    assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="all"', bad)
+    old = render("leaderboard.html", "/leaderboard?tab=de", tab="de", rows=[], me_row=None,
+                 is_admin=False, lb_user=None, lb_enabled=True)
+    assert re.findall(r'data-tab="([a-z]+)"', old) == ["es", "en", "all"]
+    # a list without "all" still gets the Combinado tab
+    no_all = render("leaderboard.html", "/leaderboard", tab="all", tabs=LB_TABS_ALL[:-1], rows=[], me_row=None,
+                    is_admin=False, lb_user=None, lb_enabled=True)
+    assert re.findall(r'data-tab="([a-z]+)"', no_all)[-1] == "all" and "Combinado" in no_all
+
+
+@pytest.mark.parametrize("lang", ["de", "ko", "ar"])
+def test_leaderboard_game_page_any_language(lang):
+    html = render_game(lang, lb=True, lb_state=None, lb_enabled=True, lb_user=ME)
+    assert "const LB = true;" in html and 'const todays_word = "";' in html
+    assert 'id="c24-live"' in html and "data-live-open" in html and "data-live-faces" in html
+    assert "c24-badge c24-badge-lb" in html and "c24-trophy-badge" in html
+    assert f"/leaderboard?tab={lang}" in html and "data-lb-end" in html
+    assert "data-dc-toggle" in html and 'var ME = "100000000000000001";' in html  # avatar + its script
+    assert "data-lb-hint" not in html  # the hint is only for guest games
 
 
 def test_leaderboard_page_admin_empty_and_outside_top():
@@ -281,6 +328,56 @@ def test_menu_logged_in_cards_and_guest_toggle(server, page):
     assert page.is_checked("[data-guest-toggle]")
 
 
+OTHER_LANGS = [c for c in app.language_codes if c not in ("es", "en")]
+
+
+def card_info(page):
+    return page.eval_on_selector_all(".c24-primary > .c24-play", """els => els.map(e => ({
+        lang: e.dataset.lang || null, href: e.getAttribute('href'), cls: e.className, dir: e.getAttribute('dir'),
+        status: (e.querySelector('.c24-play-status') || {}).textContent || '', h: e.getBoundingClientRect().height,
+        trophy: !!e.querySelector('[data-lb-status] .c24-trophy')}))""")
+
+
+def test_menu_ten_big_cards_then_developer_view(server, page):
+    page.set_viewport_size({"width": 390, "height": 844})
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None, demo_enabled=True))
+    cards = card_info(page)
+    assert [c["lang"] for c in cards[:10]][:2] in (["es", "en"], ["en", "es"])
+    assert [c["lang"] for c in cards[2:10]] == OTHER_LANGS
+    assert cards[-1]["lang"] is None and "c24-play-demo" in cards[-1]["cls"]  # Developer view last
+    assert len(cards) == 11 and page.locator(".c24-chips, .c24-chip").count() == 0
+    # every language card is the same big card (same height), guest links when logged out
+    heights = {round(c["h"]) for c in cards[:10]}
+    assert max(heights) - min(heights) <= 2, heights
+    assert all(c["href"] == "/" + c["lang"] for c in cards[:10])
+    assert next(c for c in cards if c["lang"] == "ar")["dir"] == "rtl"
+    # other cards speak the menu's language (first primary card)
+    ui = cards[0]["lang"]
+    de = next(c for c in cards if c["lang"] == "de")
+    assert ("Jugar" if ui == "es" else "Play") in de["status"]
+    assert page.evaluate("document.documentElement.scrollWidth") <= 390
+
+
+def test_menu_logged_in_every_card_goes_to_leaderboard(server, page):
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
+    cards = card_info(page)
+    assert len(cards) == 10
+    for c in cards:
+        assert c["href"] == "/lb/" + c["lang"] and c["trophy"], c
+    page.click(".c24-guest-toggle")
+    assert page.get_attribute("a.c24-play[data-lang=de]", "href") == "/de"
+    assert page.get_attribute("a.c24-play[data-lang=ar]", "href") == "/ar"
+
+
+def test_menu_sign_in_goes_to_last_language_played(server, page):
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None))
+    page.evaluate("localStorage.setItem('casa24_lang', 'ko')")
+    page.reload()
+    page.wait_for_function("window.Vue && document.querySelector('[data-lang=ko]')")
+    assert page.get_attribute("[data-dc-area] .c24-dc-btn", "href") == "/auth/discord/login?next=%2Flb%2Fko"
+    assert page.get_attribute("a.c24-play[data-lang=ko]", "href") == "/ko"  # logged out: guest
+
+
 def test_menu_avatar_from_fragment_menu_and_logout(server, page):
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -336,7 +433,7 @@ HEADER_BOXES = """() => [...document.querySelectorAll('header.c24-header > .c24-
     .map(e => { const r = e.getBoundingClientRect(); return {x: r.x, y: r.y, width: r.width, height: r.height, n: e.className}; })"""
 
 
-@pytest.mark.parametrize("width,height", [(320, 568), (390, 844)])
+@pytest.mark.parametrize("width,height", [(320, 568), (390, 844), (430, 932), (768, 1024)])
 @pytest.mark.parametrize("user", [None, ME])
 def test_menu_layout_no_overlap(server, page, width, height, user):
     page.set_viewport_size({"width": width, "height": height})
@@ -348,6 +445,9 @@ def test_menu_layout_no_overlap(server, page, width, height, user):
         assert a["x"] >= 0 and a["x"] + a["width"] <= width + 0.5, a
         for b in boxes[i + 1:]:
             assert not boxes_overlap(a, b), (a, b)
+    # the title's text fits inside its own box (an overflow would run under the icons)
+    assert page.evaluate("(() => { const a = document.querySelector('.c24-header-title a');"
+                         " return a.scrollWidth <= a.clientWidth + 1; })()")
     area = page.locator("[data-dc-area]").bounding_box()
     card = page.locator("a.c24-play").first.bounding_box()
     assert area["y"] + area["height"] <= card["y"]
@@ -651,3 +751,70 @@ def test_live_layout_fits_without_overlap(server, page, width, height):
         assert sheet["x"] >= 0 and sheet["x"] + sheet["width"] <= width + 0.5
         page.keyboard.press("Escape")
     assert errors == []
+
+
+def open_lb_mobile(browser, server, players=LIVE_PLAYERS, lang="es", width=390, height=844):
+    ctx = browser.new_context(viewport={"width": width, "height": height}, is_mobile=True, has_touch=True,
+                              device_scale_factor=2)
+    page = ctx.new_page()
+    html = render_game(lang, lb=True, lb_state=None, lb_enabled=True, lb_user=ME)
+    page.route("https://cdn.discordapp.com/**", lambda r: r.fulfill(status=200, content_type="image/png", body=PNG_1PX))
+    page.route(server + "/lb/" + lang, lambda r: r.fulfill(body=html, content_type="text/html"))
+    page.route(server + "/api/live?**", lambda r: r.fulfill(
+        status=200, content_type="application/json", body=json.dumps({"players": players, "count": len(players)})))
+    page.goto(server + "/lb/" + lang)
+    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('.key')")
+    return ctx, page
+
+
+def test_live_facepile_on_phone_opens_sheet_with_loaded_avatars(browser, server):
+    ctx, page = open_lb_mobile(browser, server)
+    try:
+        page.wait_for_selector("[data-live-faces] img")
+        faces = page.locator("[data-live-faces] img")
+        assert faces.count() == 3  # up to 3 faces + the count
+        assert page.inner_text("[data-live-open] .c24-live-badge") == str(len(LIVE_PLAYERS))
+        btn = page.locator("[data-live-open]").bounding_box()
+        assert btn["height"] >= 44 and btn["width"] >= 44
+        page.wait_for_function("[...document.querySelectorAll('[data-live-faces] img')].every(i => i.complete && i.naturalWidth > 0)")
+        page.locator("[data-live-faces]").tap()
+        assert page.is_visible("#c24-live")
+        page.wait_for_function("[...document.querySelectorAll('#c24-live .c24-live-avatar')].length > 0")
+        # the sheet's avatars actually load (images in view; lazy ones further down may wait)
+        page.wait_for_function("""[...document.querySelectorAll('#c24-live .c24-live-avatar')].slice(0, 4)
+            .every(i => i.complete && i.naturalWidth > 0)""")
+    finally:
+        ctx.close()
+
+
+def test_live_people_icon_when_nobody_plays(browser, server):
+    ctx, page = open_lb_mobile(browser, server, players=[])
+    try:
+        page.wait_for_function("document.querySelector('[data-live-open] svg')")
+        page.wait_for_timeout(200)
+        assert page.locator("[data-live-faces]").count() == 0
+        assert page.locator("[data-live-open] svg").is_visible()
+    finally:
+        ctx.close()
+
+
+@pytest.mark.parametrize("lang", ["es", "ar", "vi"])
+@pytest.mark.parametrize("width,height", [(320, 568), (360, 740), (390, 844)])
+def test_live_facepile_header_fits(browser, server, lang, width, height):
+    ctx, page = open_lb_mobile(browser, server, lang=lang, width=width, height=height)
+    try:
+        page.wait_for_selector("[data-live-faces] img")
+        assert page.evaluate("document.documentElement.scrollWidth") <= width
+        boxes = page.evaluate(HEADER_BOXES)
+        for i, a in enumerate(boxes):
+            assert a["x"] >= 0 and a["x"] + a["width"] <= width + 0.5, a
+            for b in boxes[i + 1:]:
+                assert not boxes_overlap(a, b), (a, b)
+        # Kolo, the language badge and the trophy stay visible inside the title
+        for sel in ("header .c24-logo", "header .c24-badge:not(.c24-badge-lb)", "header .c24-badge-lb"):
+            box = page.locator(sel).bounding_box()
+            assert box and box["width"] > 0, sel
+            title = page.locator("header .c24-header-title").bounding_box()
+            assert box["x"] >= title["x"] - 0.5 and box["x"] + box["width"] <= title["x"] + title["width"] + 0.5, sel
+    finally:
+        ctx.close()

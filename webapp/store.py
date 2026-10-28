@@ -57,7 +57,7 @@ class StoreError(Exception):
 
 
 class Store:
-    """Interface. `tab` is "es", "en" or "all" (every language)."""
+    """Interface. `tab` is a language code ("es", "de", "ko", ...) or "all" (every language)."""
 
     def upsert_player(self, discord_id, username, avatar=None):
         """Create or refresh a player. avatar is kept only if clean_avatar() accepts it."""

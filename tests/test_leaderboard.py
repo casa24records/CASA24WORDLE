@@ -316,7 +316,7 @@ def test_disabled_on_vercel_without_database(monkeypatch, client):
 def test_lb_page_needs_login_and_hides_answer(lb_env, client, discord, rendered):
     r = client.get("/lb/es")
     assert r.status_code == 302 and r.headers["Location"] == "/auth/discord/login?next=/lb/es"
-    assert client.get("/lb/fr").headers["Location"] == "/lb/es"
+    assert client.get("/lb/xx").headers["Location"] == "/lb/es"
     login(client, discord)
     r = client.get("/lb/es")
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
@@ -341,7 +341,8 @@ def test_guess_validation(lb_env, client, discord):
     assert guess(client, "zzzzz").get_json() == {"error": "invalid_word"}
     assert guess(client, "zzzzz").status_code == 400
     assert guess(client, "perr").get_json() == {"error": "invalid_word"}
-    assert guess(client, "perro", lang="fr").get_json() == {"error": "bad_lang"}
+    assert guess(client, "perro", lang="xx").get_json() == {"error": "bad_lang"}
+    assert guess(client, "perro", lang="all").get_json() == {"error": "bad_lang"}
     assert client.post("/api/guess", data="nope").get_json() == {"error": "bad_request"}
     assert client.post("/api/guess", json={"lang": "es", "guess": 5}).status_code == 400
     w = wrong_words("es", 1)[0]
@@ -547,3 +548,144 @@ def test_admin_hide_and_unhide(lb_env, client, discord, mem, rendered):
     assert mem.standing(P2, "es")["rank"] == 1  # 12 points now
     assert client.post("/admin/hide", data={"discord_id": P2, "hidden": "1"},
                        headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+# ---------- every language (owner decision 2026-10-28) ----------
+
+import unicodedata  # noqa: E402
+
+ALL_LANGS = ("en", "es", "ar", "fr", "pt", "ru", "de", "tr", "vi", "ko")
+KEY_LANGS = ("es", "de", "tr", "ko", "ar", "vi", "ru", "fr")
+
+
+def _word_with(lang, pred):
+    ans = answer(lang)
+    return next(w for w in app.language_codes_5words[lang] if w != ans and pred(w))
+
+
+def test_lb_langs_are_every_language():
+    assert set(app.LB_LANGS) == set(ALL_LANGS) and len(app.LB_LANGS) == 10
+    assert app.LB_LANGS == tuple(app.language_codes)  # menu order
+    assert app.LB_TABS == app.LB_LANGS + ("all",)
+    # accents resolved only where the config says so
+    assert {l for l in app.LB_LANGS if app._accent_insensitive(l)} == {"es", "fr", "pt"}
+
+
+@pytest.mark.parametrize("lang", ALL_LANGS)
+def test_lb_page_renders_every_language(lb_env, client, discord, rendered, lang):
+    login(client, discord, next_path=f"/lb/{lang}")
+    r = client.get(f"/lb/{lang}")
+    assert r.status_code == 200, lang
+    name, ctx = rendered[-1]
+    assert name == "game.html" and ctx["lb"] is True
+    assert ctx["language"].language_code == lang and ctx["language"].daily_word == ""
+    assert 'const todays_word = "";' in r.get_data(as_text=True)  # answer never sent
+
+
+@pytest.mark.parametrize("lang", KEY_LANGS)
+def test_guess_colors_and_win_every_language(lb_env, client, discord, mem, rendered, lang):
+    login(client, discord)
+    ans = answer(lang)
+    main = set(app.language_codes_5words[lang]) | set(app.language_codes_5words_supplements[lang])
+    junk = app.language_characters[lang][0] * 5
+    assert junk not in main
+    assert guess(client, junk, lang=lang).get_json() == {"error": "invalid_word"}
+    assert guess(client, "zzzzz", lang=lang).get_json() == {"error": "invalid_word"}
+
+    w = wrong_words(lang, 1)[0]
+    body = guess(client, w, lang=lang).get_json()
+    assert body["word"] == w and body["colors"] == lb.color_guess(w, ans)
+    assert len(body["colors"]) == 5 and body["done"] is False and body["answer"] is None
+    assert guess(client, w, lang=lang).get_json() == {"error": "repeat"}
+
+    body = guess(client, ans, lang=lang).get_json()
+    assert body["won"] and body["colors"] == [C] * 5 and body["answer"] == ans
+    assert body["points"] == 5 and body["rank"] == 1
+    assert guess(client, wrong_words(lang, 2)[1], lang=lang).get_json() == {"error": "finished"}
+    day, _ = app.lb_today()
+    assert app._record_result(mem, P1, lang, day, True, 1) is False  # counted once
+    assert [k for k in mem.results] == [(P1, lang, day)]
+    state = app.lb_game_state(mem, P1, lang)
+    assert [g["word"] for g in state["guesses"]] == [w, ans] and state["points"] == 5
+
+    client.get(f"/leaderboard?tab={lang}")
+    ctx = rendered[-1][1]
+    assert ctx["tab"] == lang
+    assert [(r["username"], r["points"], r["wins"]) for r in ctx["rows"]] == [("kolo_fan", 5, 1)]
+    other = "es" if lang != "es" else "de"
+    client.get(f"/leaderboard?tab={other}")
+    assert rendered[-1][1]["rows"] == []
+
+
+def test_combined_sums_every_language(lb_env, client, discord, mem, rendered):
+    login(client, discord)
+    for lang in ALL_LANGS:
+        assert guess(client, answer(lang), lang=lang).get_json()["points"] == 6, lang
+    client.get("/leaderboard?tab=all")
+    row = rendered[-1][1]["rows"][0]
+    assert (row["points"], row["wins"], row["played"]) == (60, 10, 10)
+    assert (row["current_streak"], row["best_streak"]) == (1, 1)  # one day, counted once
+    for lang in ALL_LANGS:
+        assert row_of(mem, P1, lang)["points"] == 6
+
+
+def test_leaderboard_tabs_and_texts(lb_env, client, rendered):
+    client.get("/leaderboard")
+    ctx = rendered[-1][1]
+    assert ctx["tab"] == "all"
+    assert [t["code"] for t in ctx["lb_tabs"]] == list(app.LB_LANGS) + ["all"]
+    assert ctx["lb_tabs"][-1]["name_native"] is None
+    names = {t["code"]: t["name_native"] for t in ctx["lb_tabs"][:-1]}
+    assert names == {l: app.language_configs[l]["name_native"] for l in ALL_LANGS}
+    assert set(ctx["texts"]) == {"es", "en"}
+    for lang in ("ko", "ar", "tr"):
+        client.get(f"/leaderboard?tab={lang}")
+        ctx = rendered[-1][1]
+        assert ctx["tab"] == lang and set(ctx["texts"]) == {"es", "en", lang}
+        assert ctx["texts"][lang] is app.language_configs[lang]["text"]
+    client.get("/leaderboard?tab=xx")
+    assert rendered[-1][1]["tab"] == "all"
+
+
+def test_korean_guess_matches_jamo_lists(lb_env, client, discord):
+    # ko lists are decomposed jamo (one tile per jamo), not syllables
+    ans = answer("ko")
+    assert len(ans) == 5 and unicodedata.is_normalized("NFD", ans)
+    assert not unicodedata.is_normalized("NFC", ans)
+    login(client, discord)
+    w = wrong_words("ko", 1)[0]
+    # NFC on the server would merge jamo into syllables: both forms must work
+    body = guess(client, unicodedata.normalize("NFC", w), lang="ko").get_json()
+    assert body["word"] == w and body["colors"] == lb.color_guess(w, ans)
+    body = guess(client, ans, lang="ko").get_json()  # jamo, as game.js tiles send it
+    assert body["won"] and body["colors"] == [C] * 5
+
+
+def test_turkish_dotted_and_dotless_i(lb_env, client, discord):
+    login(client, discord)
+    assert app.lb_normalize("tr", "KIŞIN") == "kışın"
+    assert app.lb_normalize("tr", "İZMİR") == "izmir"
+    assert app.lb_normalize("de", "BÖRDE") == "börde"
+    w = _word_with("tr", lambda x: "ı" in x and "i" in x)
+    upper = "".join({"i": "İ", "ı": "I"}.get(c, c.upper()) for c in w)
+    body = guess(client, upper, lang="tr").get_json()
+    assert body["word"] == w
+    assert body["colors"] == lb.color_guess(w, answer("tr"))
+    # dotted and dotless i are different letters
+    assert lb.color_guess("ı", "i") == [I]
+
+
+@pytest.mark.parametrize("lang", ("vi", "ar", "ru", "de"))
+def test_decomposed_input_matches_nfc_lists(lb_env, client, discord, lang):
+    w = _word_with(lang, lambda x: not unicodedata.is_normalized("NFD", x))
+    login(client, discord)
+    body = guess(client, unicodedata.normalize("NFD", w), lang=lang).get_json()
+    assert body["word"] == w and len(body["colors"]) == 5
+
+
+def test_no_accent_folding_outside_es_fr_pt(lb_env, client, discord):
+    login(client, discord)
+    w = _word_with("de", lambda x: "ö" in x and x.replace("ö", "o") not in app.language_codes_5words["de"])
+    assert guess(client, w.replace("ö", "o"), lang="de").get_json() == {"error": "invalid_word"}
+    w = _word_with("vi", lambda x: not x.isascii() and lb.fold_accents(x) not in app.language_codes_5words["vi"])
+    assert guess(client, lb.fold_accents(w), lang="vi").get_json() == {"error": "invalid_word"}

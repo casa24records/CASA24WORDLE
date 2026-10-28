@@ -1,16 +1,21 @@
-{#- Public leaderboard (/leaderboard?tab=es|en|all).
-    Page language: Spanish on the "es" tab, English on "en", the browser's
-    choice on "all". Text comes from the es/en language_config.json "text"
-    when app.py passes `texts` (like demo_login.html); the inline strings are
-    the fallback. -#}
-{% set tab = tab if tab in ('es', 'en', 'all') else 'all' %}
-{% set ui = tab if tab in ('es', 'en') else (request.accept_languages.best_match(['es', 'en']) or 'es') %}
+{#- Public leaderboard (/leaderboard?tab=<lang>|all), one tab per language + "Combinado".
+    app.py passes `lb_tabs` (or `tabs`) = [{code, name_native}] in order, with
+    {"code": "all"} for Combinado, and `tab`; without it: es, en, all. Page language: the tab's language when its texts were passed
+    (`texts[code]` from that language's language_config.json "text"; missing keys
+    fall back to English), else Spanish/English from the browser (also on "all").
+    The inline strings are the es/en fallback. -#}
+{% set all_tabs = lb_tabs if (lb_tabs is defined and lb_tabs) else (tabs if (tabs is defined and tabs) else [{'code': 'es', 'name_native': 'Español'}, {'code': 'en', 'name_native': 'English'}]) %}
+{% if not (all_tabs | selectattr('code', 'equalto', 'all') | list) %}{% set all_tabs = all_tabs + [{'code': 'all', 'name_native': none}] %}{% endif %}
+{% set tab_codes = all_tabs | map(attribute='code') | list %}
+{% set tab = tab if (tab is defined and tab in tab_codes) else 'all' %}
+{% set has_texts = texts is defined and texts %}
+{% set ui = tab if (tab != 'all' and (tab in ('es', 'en') or (has_texts and texts.get(tab)))) else (request.accept_languages.best_match(['es', 'en']) or 'es') %}
 {% import '_discord.html' as dc %}
 {% set me = lb_user if (lb_user is defined and lb_user) else none %}
 {% set login_href = '/auth/discord/login?next=' ~ ('/leaderboard?tab=' ~ tab) | urlencode %}
-{% macro L(key, es, en) %}{% if texts is defined and texts and texts.get(ui) %}{{ texts[ui].get(key, es if ui == 'es' else en) }}{% else %}{{ es if ui == 'es' else en }}{% endif %}{% endmacro %}
+{% macro L(key, es, en) %}{% if has_texts and texts.get(ui) %}{{ texts[ui].get(key, es if ui == 'es' else en) }}{% else %}{{ es if ui == 'es' else en }}{% endif %}{% endmacro %}
 <!DOCTYPE html>
-<html lang="{{ ui }}">
+<html lang="{{ ui }}"{% if ui in ('ar',) %} dir="rtl"{% endif %}>
 
 <head>
     <meta charset="UTF-8">
@@ -57,12 +62,25 @@
     <main class="c24-lb">
         <h2 class="c24-title c24-lb-title">{{ dc.trophy('c24-trophy c24-trophy-title') }} {{ L('lb_title', 'Leaderboard', 'Leaderboard') }}</h2>
 
-        <nav class="c24-lb-tabs" aria-label="{{ L('lb_title', 'Leaderboard', 'Leaderboard') }}">
-            {% for code, label in (('es', L('lb_tab_es', 'Español', 'Español')), ('en', L('lb_tab_en', 'English', 'English')), ('all', L('lb_tab_all', 'Combinado', 'Combined'))) %}
-            <a href="/leaderboard?tab={{ code }}" class="c24-lb-tab{% if code == tab %} is-active{% endif %}"
-                {% if code == tab %}aria-current="page"{% endif %} data-tab="{{ code }}">{{ label }}</a>
+        {#- 11 tabs (10 languages + Combinado): one row that scrolls sideways (snap), the active tab scrolled into view -#}
+        <nav class="c24-lb-tabs" aria-label="{{ L('lb_title', 'Leaderboard', 'Leaderboard') }}" data-lb-tabs>
+            {% for t in all_tabs %}
+            <a href="/leaderboard?tab={{ t.code }}" class="c24-lb-tab{% if t.code == tab %} is-active{% endif %}"
+                {% if t.code == tab %}aria-current="page"{% endif %} data-tab="{{ t.code }}"{% if t.code != 'all' %} lang="{{ t.code }}" dir="auto"{% endif %}>
+                {%- if t.code == 'all' %}{{ L('lb_tab_all', 'Combinado', 'Combined') }}{% else %}{{ t.name_native }}{% endif -%}
+            </a>
             {% endfor %}
         </nav>
+        <script>
+            (function () {
+                var nav = document.querySelector("[data-lb-tabs]");
+                var on = nav && nav.querySelector(".is-active");
+                if (!on || nav.scrollWidth <= nav.clientWidth) return;
+                // center the active tab without scrolling the page itself
+                var r = on.getBoundingClientRect(), n = nav.getBoundingClientRect();
+                nav.scrollLeft += (r.left + r.width / 2) - (n.left + n.width / 2);
+            })();
+        </script>
 
         {% if rows %}
         <table class="c24-lb-table">
@@ -81,7 +99,7 @@
                 {% for row in rows %}
                 <tr{% if row.is_me %} class="is-me" aria-current="true"{% endif %}>
                     <td class="c24-lb-n">{{ row.rank }}</td>
-                    <td class="c24-lb-name">{% if row.is_me and me %}{{ dc.avatar(me, 20, 'c24-dc-avatar c24-dc-avatar-row') }}{% endif %}<span class="c24-lb-user">@{{ row.username }}</span>{% if row.is_me %} <span class="c24-lb-you">{{ L('lb_you', 'Tú', 'You') }}</span>{% endif %}</td>
+                    <td class="c24-lb-name">{% if row.is_me and me %}{{ dc.avatar(me, 20, 'c24-dc-avatar c24-dc-avatar-row') }}{% endif %}<span class="c24-lb-user" dir="ltr">@{{ row.username }}</span>{% if row.is_me %} <span class="c24-lb-you">{{ L('lb_you', 'Tú', 'You') }}</span>{% endif %}</td>
                     <td class="c24-lb-num c24-lb-pts">{{ row.points }}</td>
                     <td class="c24-lb-num c24-lb-opt1">{{ row.wins }}</td>
                     <td class="c24-lb-num c24-lb-opt2">{% if row.current_streak %}🔥 {% endif %}{{ row.current_streak }}</td>
@@ -112,7 +130,7 @@
 
         <section class="c24-lb-account">
             {% if me %}
-            <p class="c24-dc-signed" data-dc-signed>{{ dc.avatar(me, 32) }}<span><b>@{{ me.username }}</b></span>{{ dc.logo('c24-dc-mark') }}</p>
+            <p class="c24-dc-signed" data-dc-signed>{{ dc.avatar(me, 32) }}<span dir="ltr"><b>@{{ me.username }}</b></span>{{ dc.logo('c24-dc-mark') }}</p>
             {% elif lb_enabled %}
             {{ dc.button(login_href, L('lb_signin', 'Entrar con Discord', 'Sign in with Discord'), 'c24-lb-login') }}
             {% endif %}

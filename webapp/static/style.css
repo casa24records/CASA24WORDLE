@@ -164,26 +164,12 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 .c24-play-alt { background: transparent; color: var(--c24-text); }
 .c24-play-name { font-family: var(--c24-font-display); font-size: 2rem; line-height: 1; text-transform: uppercase; letter-spacing: 0.04em; }
 .c24-play-status { font-size: 0.8rem; font-weight: 600; opacity: 0.9; }
-.c24-section-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--c24-subtle);
-    margin-bottom: 0.5rem;
-    text-align: center;
-}
-.c24-chip {
-    display: flex;
-    flex-direction: column;
-    padding: 0.45rem 0.7rem;
-    border-radius: 10px;
-    border: 1px solid var(--c24-line);
-    background: var(--c24-surface);
-    line-height: 1.2;
-}
-.c24-chip > span { display: block; }
-.c24-chip > span:first-child::first-letter { text-transform: uppercase; }
+/* cards whose names VT323 can't draw (Arabic, Korean, Cyrillic, Vietnamese) use the
+   body font; no letter-spacing so Arabic letters stay joined */
+.c24-play-name:is(:lang(ar), :lang(ko), :lang(ru), :lang(vi)) { font-family: inherit; font-weight: 800; font-size: 1.6rem; line-height: 2rem; letter-spacing: 0; }
+.c24-play-status { white-space: nowrap; flex-shrink: 0; }
+.c24-play { gap: 0.75rem; }
+.c24-play-name { min-width: 0; overflow-wrap: anywhere; }
 
 /* ---------- board and keyboard ---------- */
 .key {
@@ -469,7 +455,6 @@ main .grid-cols-5 > div {
     gap: 1.25rem;
 }
 .c24-primary { display: grid; gap: 0.75rem; }
-.c24-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
 @media (max-height: 700px) {
     .c24-start { padding-top: 1rem; gap: 1rem; }
     .c24-menu-app { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
@@ -477,13 +462,11 @@ main .grid-cols-5 > div {
 @media (min-width: 640px) {
     .c24-start { max-width: 40rem; }
     .c24-primary { grid-template-columns: 1fr 1fr; }
-    .c24-chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 /* ---------- hover only with a real mouse (no "stuck" hover after a tap) ---------- */
 @media (hover: hover) and (pointer: fine) {
     .c24-play:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15); }
-    .c24-chip:hover { background: var(--c24-hover); border-color: var(--c24-orange); }
     .c24-icon-btn:hover, .c24-close:hover { background: var(--c24-hover); }
     .hover\:bg-neutral-200:hover { background-color: var(--c24-hover) !important; }
     .c24-keyboard .key:hover { filter: brightness(0.93); }
@@ -574,7 +557,7 @@ main .grid-cols-5 > div {
 }
 @media (hover: hover) and (pointer: fine) { .c24-demo-langs a:hover { background: var(--c24-hover); } }
 
-/* ---------- leaderboard (es/en only; Discord login) ---------- */
+/* ---------- leaderboard (every language; Discord login) ---------- */
 /* menu: Discord area, notices, links */
 .c24-lb-tab:focus-visible, .c24-lb-btn:focus-visible, .c24-notice-close:focus-visible {
     outline: 2px solid var(--c24-orange);
@@ -639,17 +622,35 @@ main .grid-cols-5 > div {
     gap: 1rem;
 }
 .c24-lb-title { font-size: 2.25rem; text-align: center; }
+/* titles VT323 can't draw (Arabic, Korean, Cyrillic, Vietnamese): body font, no letter-spacing (keeps Arabic joined) */
+.c24-lb-title:is(:lang(ar), :lang(ko), :lang(ru), :lang(vi)) { font-family: inherit; font-weight: 800; font-size: 1.8rem; letter-spacing: 0; }
+/* 11 tabs (Combinado + 10 languages): one row that scrolls sideways with snap,
+   never wraps; the edges fade to hint there is more. leaderboard.html centers
+   the active tab on load. */
 .c24-lb-tabs {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
     gap: 4px;
     padding: 4px;
     border-radius: 14px;
     border: 1px solid var(--c24-line);
     background: var(--c24-surface);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 24px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
 }
+.c24-lb-tabs::-webkit-scrollbar { display: none; }
 .c24-lb-tab {
+    flex: none;
+    scroll-snap-align: center;
     min-height: 44px;
+    min-width: 44px;
+    padding: 0 0.85rem;
+    white-space: nowrap;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -658,6 +659,18 @@ main .grid-cols-5 > div {
     font-size: 0.9rem;
     color: var(--c24-subtle);
     text-decoration: none;
+}
+.c24-lb-tab:focus-visible { outline-offset: -2px; }
+/* wide enough: a tidy 6-column grid (2 rows), no sideways scrolling with a mouse */
+@media (min-width: 600px) {
+    .c24-lb-tabs {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        overflow: visible;
+        -webkit-mask-image: none;
+        mask-image: none;
+    }
+    .c24-lb-tab { padding: 0 0.4rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 }
 .c24-lb-tab.is-active { background: var(--c24-correct-bg); color: #fff; }
 .c24-lb-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
@@ -1007,6 +1020,27 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     text-align: center;
     pointer-events: none;
 }
+/* facepile: up to 3 overlapping avatars inside the people button (phones/tablets) */
+.c24-live-btn.has-faces { width: auto; min-width: 44px; padding: 0 8px 0 4px; }
+.c24-facepile { display: inline-flex; align-items: center; }
+.c24-face {
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    object-fit: cover;
+    background: var(--c24-line);
+    box-shadow: 0 0 0 2px var(--c24-bg);
+}
+.c24-face + .c24-face { margin-inline-start: -8px; }
+.c24-live-btn.has-faces .c24-live-badge { top: 2px; inset-inline-end: -2px; }
+/* the facepile makes the right side wider than the left: the side columns are never
+   narrower than their icons (the title moves a little off-center instead of overlapping) */
+.c24-header-lb { grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); }
+/* very narrow phones: 2 faces, so Kolo + language badge + trophy keep their room */
+@media (max-width: 359px) {
+    .c24-face:nth-child(n+3) { display: none; }
+    .c24-live-btn.has-faces { padding: 0 6px 0 2px; }
+}
 .c24-live-backdrop {
     position: fixed;
     inset: 0;
@@ -1176,6 +1210,10 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
    the info button steps aside so the title keeps its room */
 @media (max-width: 419px) {
     .c24-header .c24-hide-narrow { display: none; }
+}
+/* phones with the leaderboard on: the Discord slot + trophy (+ info from 420px) leave room for "Casa 24" only */
+@media (max-width: 479px) {
+    .c24-header-menu-lb .c24-title-extra { display: none; }
 }
 @media (hover: hover) and (pointer: fine) {
     .c24-dc-btn:hover { background: #4752C4; }

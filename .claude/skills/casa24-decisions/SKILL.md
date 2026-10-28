@@ -10,7 +10,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 ## Scope and working style
 - The owner is the admin at Casa 24 Records (Panama City). They are a beginner developer and watch token usage. Explain in plain language, keep changes small, commit after each step, and don't paste long outputs.
 - **Keep the full game with its 10 languages.** An early two-language-only rewrite was rejected (stashed, see `git stash list`) because it cut languages.
-- **Start screen redesigned** (owner asked for "a better starting screen"): Kolo hero, today's puzzle number and countdown, big Español/English buttons, the other 8 languages as small chips. The original game's **External Links** section (1,264 links to other Wordle sites, which looked like "extra modes that change the colors"), the search box and the `/stats` page were **removed**. Don't bring them back.
+- **Start screen redesigned** (owner asked for "a better starting screen"): Kolo hero, today's puzzle number and countdown, big Español/English buttons, the other 8 languages as small chips (**superseded 2026-10-28:** all 10 are now the same big cards, see "All languages" below). The original game's **External Links** section (1,264 links to other Wordle sites, which looked like "extra modes that change the colors"), the search box and the `/stats` page were **removed**. Don't bring them back.
 - **Languages:** the 10 most spoken that the original game had: en, es, ar, fr, pt, ru, de, tr, vi, ko. English and Spanish are required.
 - **Name:** "Casa 24 Wordle".
 
@@ -42,7 +42,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Guest mode + Discord leaderboard (decided 2026-10-26)
 How it works: `casa24-leaderboard`.
-- **Two modes for es/en:** guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest); when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch. Other languages stay guest only.
+- **Two modes** (es/en at first; **every language since 2026-10-28**): guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest); when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch. (The old "other languages stay guest only" rule was **superseded 2026-10-28**.)
 - **Discord login, scope `identify` only, no bot.** Discord app "Casa 24 Wordle". We never see passwords or email.
 - **Minimal data:** Discord ID, username, Discord avatar hash (since 2026-10-27, see "Live view"), a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), per-minute counters. **Never** tokens, email or IPs. Privacy text in a small "ⓘ Privacidad" popover (see below), plus "Borrar mis datos".
 - **Database: Neon Postgres** through the Vercel Marketplace, a new separate database `casa24-wordle-db`. Not Upstash (the first plan, dropped by the owner), and not GitHub-as-a-database. The kanban project has its own Neon and Upstash: **never share or reuse them**.
@@ -74,6 +74,16 @@ How it works: `casa24-live-view`.
 - **Privacy text updated** (`lb_privacy`, `lb_avatar_note`): we store ID, username, profile picture and results for the ranking and "who is playing today"; others see only your colors.
 - **The avatar URL exposes the player's Discord ID** (`cdn.discordapp.com/avatars/<id>/<hash>.png`). Accepted: Discord IDs are public inside Discord. If this ever matters, proxy the images through our domain.
 - Live = polling every 8 s (no WebSockets on Vercel serverless). Desktop sidebar from 1024px; a header people button + bottom sheet elsewhere. Below 420px the leaderboard game header hides the "Casa 24" title text to fit the extra button (the owner may revisit).
+
+## All languages on the menu and the leaderboard (decided 2026-10-28)
+How it works: `casa24-leaderboard` ("Every language"), `casa24-live-view`, `casa24-responsive`, `casa24-text-and-languages`.
+- **Menu:** the other 8 languages are the **same big cards as Español/English**, below them (es/en first, the player's one first), with the **Developer view card last**. The small "Más idiomas" chips section was **removed**; don't bring it back.
+- **Leaderboard for all 10 existing languages** (no new languages): `/lb/<any code>`, `/api/guess` and `/api/live` for all of them; every menu card follows the guest/leaderboard mode. `/leaderboard` has **10 language tabs + Combinado** (one scrollable row on phones, a 6-column grid from 600px). Combinado sums every language.
+- **All `lb_*` / `lb_live_*` texts (and the other game texts) are translated into all 10 languages.** `demo_*` stays es/en only (Developer view is es/en only).
+- **Mobile live view:** a **facepile** of up to 3 avatars (2 under 360px) + the count in the leaderboard game header opens the sheet; the people icon only when nobody else is playing.
+- Discord sign-in from the menu lands on the **last language played** (any of the 10), else the preferred es/en.
+- Non-Latin scripts: VT323 can't draw Arabic, Korean, Cyrillic or Vietnamese, so those card names and the `/leaderboard` title use the body font. Arabic is RTL on its card, on `/leaderboard?tab=ar` and in the live mini boards.
+- Menu title shortens to "Casa 24" under 480px when the leaderboard is on (room for the Discord slot and trophy).
 
 ## Privacy
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.

@@ -1,5 +1,7 @@
 // Casa 24 Wordle start screen.
-// Shows Español/English first (last language played, else the browser language),
+// Big cards for all 10 languages: Español/English first (last of the two played,
+// else the browser language), then the other 8; every card follows the guest /
+// leaderboard mode. Also
 // today's puzzle number with a countdown to midnight Panama time, and stats.
 
 function panamaDay(date) {
@@ -50,6 +52,27 @@ const app = Vue.createApp({
             var second = first === "es" ? "en" : "es";
             return [this.languages[first], this.languages[second]];
         },
+        otherLanguages() {
+            // every language except es/en, in the server's order (alphabetical by code)
+            var out = [];
+            for (var code in this.languages) {
+                if (code !== "es" && code !== "en") out.push(this.languages[code]);
+            }
+            return out;
+        },
+        menuLanguages() {
+            return this.primaryLanguages.concat(this.otherLanguages);
+        },
+        uiLang() {
+            // words on the cards of the other 8 languages: the first primary language
+            return this.preferredLanguage;
+        },
+        loginLanguage() {
+            // where the Discord sign-in lands: the last language played (any of the 10),
+            // else the preferred es/en
+            var saved = readStorage("casa24_lang");
+            return saved && this.languages[saved] ? saved : this.preferredLanguage;
+        },
         status() {
             // per language: played today? current streak?
             var today = panamaDay(new Date());
@@ -79,7 +102,7 @@ const app = Vue.createApp({
         window.addEventListener('keydown', this.keyDown);
         // the Discord sign-in links (server-rendered, v-pre) go to the player's language
         if (this.lb.enabled && !this.lb.user) {
-            var href = "/auth/discord/login?next=" + encodeURIComponent("/lb/" + this.preferredLanguage);
+            var href = "/auth/discord/login?next=" + encodeURIComponent("/lb/" + this.loginLanguage);
             var links = document.querySelectorAll("[data-dc-login]");
             for (var i = 0; i < links.length; i++) links[i].setAttribute("href", href);
         }
@@ -89,8 +112,17 @@ const app = Vue.createApp({
             this.mode = mode === "lb" && this.lb.user ? "lb" : "guest";
             writeStorage("casa24_mode", this.mode);
         },
+        labelLang(code) {
+            // es/en cards speak their own language; the others use the menu's language
+            return code === "es" || code === "en" ? code : this.uiLang;
+        },
+        label(code, key) {
+            var es = this.labelLang(code) === "es";
+            if (key === "played") return es ? "Jugada hoy" : "Played today";
+            return es ? "Jugar" : "Play";
+        },
         playHref(code) {
-            // guest: /es; leaderboard (signed in): /lb/es
+            // guest: /de; leaderboard (signed in, any language): /lb/de
             if (this.mode !== "lb" || !this.lb.enabled || !this.lb.user) return "/" + code;
             return "/lb/" + code;
         },

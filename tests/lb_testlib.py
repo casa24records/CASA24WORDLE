@@ -133,14 +133,14 @@ def answer(lang="es"):
 
 
 def wrong_words(lang, n, avoid=()):
+    """n valid non-answer words; ASCII ones first (Korean, Arabic, Russian...
+    have none, so their own letters are used)."""
     ans = answer(lang)
-    out = []
-    for w in app.language_codes_5words[lang]:
-        if w != ans and w not in avoid and w.isascii():
-            out.append(w)
-        if len(out) == n:
-            return out
-    raise AssertionError("not enough words")
+    words = [w for w in app.language_codes_5words[lang] if w != ans and w not in avoid]
+    out = ([w for w in words if w.isascii()] + [w for w in words if not w.isascii()])[:n]
+    if len(out) < n:
+        raise AssertionError("not enough words")
+    return out
 
 
 def guess(client, word, lang="es", **extra):
