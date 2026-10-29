@@ -18,6 +18,7 @@ Casa 24 files start with a `#` comment line. Words are sorted, one per line.
 
 ## Rules (enforced by `scripts/validate_words.py`)
 - Exactly 5 letters, lowercase, NFC-normalized, letters only: a-z, ñ, á é í ó ú ü.
+- Only **es** and **en** exist (since 2026-10-29). Spanish words keep their accents in the files (the board shows them), but players type them **without** accents: the Spanish keyboard is QWERTY + Ñ with no accent keys, and colors treat o = ó (ñ stays its own letter). If two accented words share one plain spelling and no plain word exists, the first in the list wins when typed plain, so check new accented answers with `tests/test_accents.py` (`test_every_accented_answer_wins_typed_plain`). Details: `casa24-text-and-languages`.
 - A word lives in only one Casa 24 tier per language.
 - es and en main lists and supplements are non-empty, and each has Casa 24 answers.
 

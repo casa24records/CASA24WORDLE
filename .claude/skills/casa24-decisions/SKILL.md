@@ -9,9 +9,9 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Scope and working style
 - The owner is the admin at Casa 24 Records (Panama City). They are a beginner developer and watch token usage. Explain in plain language, keep changes small, commit after each step, and don't paste long outputs.
-- **Keep the full game with its 10 languages.** An early two-language-only rewrite was rejected (stashed, see `git stash list`) because it cut languages.
-- **Start screen redesigned** (owner asked for "a better starting screen"): Kolo hero, today's puzzle number and countdown, big Español/English buttons, the other 8 languages as small chips (**superseded 2026-10-28:** all 10 are now the same big cards, see "All languages" below). The original game's **External Links** section (1,264 links to other Wordle sites, which looked like "extra modes that change the colors"), the search box and the `/stats` page were **removed**. Don't bring them back.
-- **Languages:** the 10 most spoken that the original game had: en, es, ar, fr, pt, ru, de, tr, vi, ko. English and Spanish are required.
+- ~~Keep the full game with its 10 languages~~ — **superseded 2026-10-29:** the owner chose **Spanish and English only** (see "Spanish and English only" below). The old rejected 2-language stash was not reused.
+- **Start screen redesigned** (owner asked for "a better starting screen"): Kolo hero, today's puzzle number and countdown, big Español/English cards (the other-language chips/cards are gone since 2026-10-29). The original game's **External Links** section (1,264 links to other Wordle sites, which looked like "extra modes that change the colors"), the search box and the `/stats` page were **removed**. Don't bring them back.
+- **Languages: es and en only** (since 2026-10-29; before that the 10 of the original game).
 - **Name:** "Casa 24 Wordle".
 
 ## Words
@@ -24,12 +24,12 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Text and accents
 - Spanish was rewritten in natural tú-form Latin American Spanish.
-- Accents are **optional when typing**, and the board shows the accented word. ñ stays a separate letter.
-- **Colors respect accents** (decided 2026-10-26): a plain "a" never counts for an "á" in the answer, and only the exact letter's key is colored. Typing today's answer without accents still wins.
-- Optional accents are **on for es, fr, pt** and **off on purpose** for the rest, because there the marks make different letters or words: de (alter/älter, ß), tr (akşam/aksam), vi (tones change meaning), ru (й would become и), ar (hamza forms are their own letters). en and ko have nothing to remove. Details in `casa24-text-and-languages`.
+- Accents are **optional when typing**, and the board shows the accented word after Enter. ñ stays a separate letter.
+- **Flexible vowels (decided 2026-10-29):** for colors, a vowel matches with or without accent, both ways (o = ó), on tiles and keys; ü counts as u; **Ñ is always its own letter** (sonar ≠ soñar). This **reverses** the 2026-10-26 "colors follow the exact accented letter" rule. Details in `casa24-text-and-languages`.
+- **Spanish keyboard (2026-10-29): QWERTY + Ñ (after L), no accent keys.** The "Alfabético" layout stays in Settings (owner asked), also without accents, ñ after n. English unchanged.
 - **A word can't be guessed twice in one game** (2026-10-26): it shows "Ya probaste esa palabra" and costs no turn.
-- **The end screen has a title**, "¡Ganaste!" / "Perdiste", above the Kolo. This text and the repeated-word message are translated in all 10 languages.
-- The Spanish help says: "Puedes escribir con o sin tildes, pero los colores sí las cuentan: una «a» no vale por una «á»."
+- **The end screen has a title**, "¡Ganaste!" / "Perdiste", above the Kolo. This text and the repeated-word message are in es and en.
+- The Spanish help says (2026-10-29): "Puedes escribir sin tildes: la «o» vale por «ó» y al revés. La ñ es su propia letra." (help key `text_1_2`)
 
 ## Developer view for the team (decided 2026-10-26)
 - Players see it as **"Developer view" / "Vista de desarrollador"**. Internally it is still "demo": routes `/demo` and `/demo/<lang>`, env `DEMO_PASSWORD`, `demo_*` text keys, `.c24-demo*` classes, `data-demo` attributes. Don't rename those.
@@ -42,7 +42,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Guest mode + Discord leaderboard (decided 2026-10-26)
 How it works: `casa24-leaderboard`.
-- **Two modes** (es/en at first; **every language since 2026-10-28**): guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest); when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch. (The old "other languages stay guest only" rule was **superseded 2026-10-28**.)
+- **Two modes** (es/en; all 10 languages 2026-10-28 → back to es/en 2026-10-29): guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest); when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch. (The old "other languages stay guest only" rule was **superseded 2026-10-28**.)
 - **Discord login, scope `identify` only, no bot.** Discord app "Casa 24 Wordle". We never see passwords or email.
 - **Minimal data:** Discord ID, username, Discord avatar hash (since 2026-10-27, see "Live view"), a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), per-minute counters. **Never** tokens, email or IPs. Privacy text in a small "ⓘ Privacidad" popover (see below), plus "Borrar mis datos".
 - **Database: Neon Postgres** through the Vercel Marketplace, a new separate database `casa24-wordle-db`. Not Upstash (the first plan, dropped by the owner), and not GitHub-as-a-database. The kanban project has its own Neon and Upstash: **never share or reuse them**.
@@ -73,17 +73,23 @@ How it works: `casa24-live-view`.
 - **Discord avatars are shown, so the avatar hash is now stored** (`wordle_players.avatar`, Discord's format only, refreshed at login, removed by "Borrar mis datos"). This replaces the earlier "we never store your photo" rule.
 - **Privacy text updated** (`lb_privacy`, `lb_avatar_note`): we store ID, username, profile picture and results for the ranking and "who is playing today"; others see only your colors.
 - **The avatar URL exposes the player's Discord ID** (`cdn.discordapp.com/avatars/<id>/<hash>.png`). Accepted: Discord IDs are public inside Discord. If this ever matters, proxy the images through our domain.
-- Live = polling every 8 s (no WebSockets on Vercel serverless). Desktop sidebar from 1024px; a header people button + bottom sheet elsewhere. Below 420px the leaderboard game header hides the "Casa 24" title text to fit the extra button (the owner may revisit).
+- Live = polling every 8 s (no WebSockets on Vercel serverless). Desktop: a fixed left rail of cards from 1024px (860px in Discord desktop); a header people button/facepile + bottom sheet elsewhere. The "Casa 24" header text hides on narrow screens to fit the buttons.
+- **Presence (owner, 2026-10-29):** players appear as soon as they open today's leaderboard game, even with 0 guesses (shown while seen in the last 5 minutes). Presence never creates a result.
 
-## All languages on the menu and the leaderboard (decided 2026-10-28)
-How it works: `casa24-leaderboard` ("Every language"), `casa24-live-view`, `casa24-responsive`, `casa24-text-and-languages`.
-- **Menu:** the other 8 languages are the **same big cards as Español/English**, below them (es/en first, the player's one first), with the **Developer view card last**. The small "Más idiomas" chips section was **removed**; don't bring it back.
-- **Leaderboard for all 10 existing languages** (no new languages): `/lb/<any code>`, `/api/guess` and `/api/live` for all of them; every menu card follows the guest/leaderboard mode. `/leaderboard` has **10 language tabs + Combinado** (one scrollable row on phones, a 6-column grid from 600px). Combinado sums every language.
-- **All `lb_*` / `lb_live_*` texts (and the other game texts) are translated into all 10 languages.** `demo_*` stays es/en only (Developer view is es/en only).
-- **Mobile live view:** a **facepile** of up to 3 avatars (2 under 360px) + the count in the leaderboard game header opens the sheet; the people icon only when nobody else is playing.
-- Discord sign-in from the menu lands on the **last language played** (any of the 10), else the preferred es/en.
-- Non-Latin scripts: VT323 can't draw Arabic, Korean, Cyrillic or Vietnamese, so those card names and the `/leaderboard` title use the body font. Arabic is RTL on its card, on `/leaderboard?tab=ar` and in the live mini boards.
-- Menu title shortens to "Casa 24" under 480px when the leaderboard is on (room for the Discord slot and trophy).
+## ~~All languages on the menu and the leaderboard~~ (2026-10-28, superseded 2026-10-29)
+History only: for one day all 10 languages had big menu cards, leaderboards and translated `lb_*` texts. Replaced by "Spanish and English only" below. Still valid from that day: the **mobile facepile** (up to 3 avatars, 2 under 400px since 2026-10-29, + count; the people icon only when nobody else plays), the **Developer view card last** on the menu, and the menu title shortening to "Casa 24" under 480px when the leaderboard is on.
+
+## Spanish and English only (decided 2026-10-29)
+How it works: `casa24-text-and-languages`, `casa24-leaderboard`; plan and research: `docs/plan-layout-es-en.md`.
+- **Only es and en.** ar, de, fr, ko, pt, ru, tr, vi were removed everywhere (data folders, right-to-left code, generated keyboards, tests). `SUPPORTED_LANGS = ("es", "en")` in `app.py` defines the product (not the folder list).
+- **Old links keep working:** `/<old code>` and `/lb/<old code>` redirect (302, query kept) to es or en by the browser's language (default es); `/leaderboard?tab=<old>` shows Combinado; the APIs answer 400 `bad_lang` / `bad_tab`.
+- **Leaderboard tabs: Combinado, ES, EN.** Ranking, streaks and live view only count es/en rows.
+- **Delete the old languages' rows from Neon** (owner said yes): `scripts/purge_languages.py`, dry run by default. **Checked on production 2026-10-29 (owner said "hazlo directo"): the dry run found 0 rows in other languages (only es/en existed), so nothing was deleted.** The script stays for reference.
+- Discord sign-in from the menu lands on the last language played (es/en), else the browser's preferred one.
+
+## Game layout (decided 2026-10-29)
+How it works: `casa24-responsive`, `casa24-branding`.
+- **NYT Wordle structure, Casa 24 look:** a slim 2-area header (brand left, icons right), a capped centered board, the keyboard right under it, and the live view as a **left rail of cards that never shrinks or moves the board**. Same `game.html` / `style.css` for the website and the Discord Activity. Must fit with no vertical scroll from Discord PIP (240×180) to 1920×1080.
 
 ## Discord Activity and sync (decided 2026-10-28)
 How it works: `casa24-discord-activity`; owner's Portal guide: `docs/discord-activity-manual.md`.
@@ -98,7 +104,9 @@ How it works: `casa24-discord-activity`; owner's Portal guide: `docs/discord-act
 - **No new env vars** for the Activity.
 - Turning it off is a Portal action (untick Enable Activities), no code.
 - **Shell + iframe architecture (decided 2026-10-29), per Discord's own recommendation** for apps that are not single-page apps (docs "how-activities-work" + official sample `nested-messages`): a small shell page (`/`, `/activity`) builds the Discord SDK **once per launch** and the unchanged game page runs in a same-origin iframe (`/lb/<lang>?embed=1`). Why: the old multi-page version redirected `/` → `/lb/es`; after any in-frame navigation the SDK's handshake goes to the wrong origin (`document.referrer`) and the Activity hung on "No pudimos conectar". **The shell must never navigate**; don't go back to redirects or per-page SDKs. Rejected alternatives: swapping the page's HTML in place (CSP nonces, fragile) and a full SPA rewrite (only if the website ever becomes an SPA too).
-- **Language inside Discord (decided 2026-10-29): picker on first launch, then direct.** The first launch shows a 10-language picker (Discord's own language highlighted); the choice is remembered on the device and later launches open it directly. Changing it later: the game header button **"Casa 24 ES ▾"** opens a language window; the game swaps in place and the Discord connection stays. (Replaced the earlier "start in Spanish, Settings select" approach.)
+- ~~Language inside Discord: picker on first launch~~ (2026-10-29 morning, **superseded the same day**).
+- **Language inside Discord (decided 2026-10-29):** the language saved on the device wins; else **Discord's own language** (`es…` → Español, anything else → English); a 2-option picker shows only if Discord doesn't answer (error or more than 3 s). Changing it: the header button **"Casa 24 ES ▾"** opens a language window; the game swaps in place and the Discord connection stays.
+- **"Invite friends" card (owner, 2026-10-29):** first card of the live rail, **inside Discord only**; opens Discord's own invite window (no new permission).
 - **Developer Portal:** Bot page toggles all off, **Public Bot off** for now (on later only if going for Discovery), never Reset Token. The "<>" dev badge / "Use Activity URL Override" only go away with App Verification + Discovery, which is not planned yet (would need Terms and Privacy URLs).
 
 ## Privacy

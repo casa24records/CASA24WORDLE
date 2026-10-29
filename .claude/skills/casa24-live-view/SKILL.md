@@ -1,6 +1,6 @@
 ---
 name: casa24-live-view
-description: Casa 24 Wordle's live view in leaderboard mode — who else is playing today's word, in all 10 languages, shown as a desktop sidebar or a header facepile/"people" button + bottom sheet, with Discord avatar, @username, live dot, ✓/✗ and a 6×5 mini board of colors only. Covers who appears and who can see it, privacy (never words or the answer), the GET /api/live contract, polling and backoff, the DB index and avatar column, files, tests and common tasks. Use for any live view, who is playing, jugando hoy, sidebar, mini boards, polling or /api/live question.
+description: Casa 24 Wordle's live view in leaderboard mode — who else has today's word open (Spanish or English), shown as an NYT-style left rail of cards on desktop (plus an "Invite friends" card inside Discord) or a header facepile/"people" button + bottom sheet, with Discord avatar, @username, live dot, ✓/✗ and a 6×5 mini board of colors only. Covers who appears (presence from opening the game, 0-guess players for 5 minutes) and who can see it, privacy (never words or the answer), the GET /api/live contract, polling and backoff, the DB index and avatar column, files, tests and common tasks. Use for any live view, who is playing, jugando hoy, sidebar, mini boards, polling or /api/live question.
 ---
 
 # Live view: "Jugando hoy" / "Playing today"
@@ -9,17 +9,18 @@ Built 2026-10-27 on branch `live-view`, like NYT Wordle's Discord activity. Owne
 
 ## What players see
 - **Where:**
-  - **≥1024px wide and >500px tall** (`@media (min-width: 1024px) and (min-height: 501px)`): an always-visible fixed **left sidebar** (240px; 280px from 1280px), next to the centered game. No button and no sheet.
-  - **Everywhere else** (phones, tablets, landscape phones): a header button in the leaderboard game (right side, before stats) with an orange count badge (`99+` max). **With players (owner, 2026-10-28): a facepile** of the first **3** avatars (22px, overlapping by 8px, `.c24-facepile` / `.c24-face`, `data-live-faces`; only **2 under 360px**) so it's visible without hunting; **with nobody yet: the "people" SVG icon**. The button grows (`.c24-live-btn.has-faces`, min 44px). It opens a **bottom sheet** (max 500px wide, max 70% of the height) over a backdrop. Esc, the × button, a tap on the backdrop, or the button again closes it.
-- **Each card:** round avatar (34px, `loading=lazy`, `referrerpolicy=no-referrer`), `@username` (ellipsis), a green **"en vivo" / "live" dot** when the last guess was ≤5 minutes ago, **✓** (won) or **✗** (lost) once the player is done, and a **6×5 mini grid of colored squares** using the tile color tokens. **Nothing is written in the squares.**
+  - **≥1024px wide and >500px tall** on the web (`@media (min-width: 1024px) and (min-height: 501px)`), and **≥860px in Discord desktop** (`:root.c24-embed:not(.c24-plat-mobile)`): an always-visible fixed **left rail of NYT-style cards** in the left gutter (2026-10-29). Width `--c24-rail-w: clamp(160px, (100vw - 500px) / 2 - 24px, 280px)` (Discord: `clamp(150px, … - 16px, 280px)`), starting under the 60px header. It **never shrinks or moves the centered board/keyboard** (the old body padding is gone; `test_rail_never_moves_or_shrinks_the_board`). No button and no sheet.
+  - **Inside Discord only, the first card is "Invitar amigos / Invite friends"** (`.c24-live-invite`, `data-live-invite`, text `activity_invite`): `inviteFriends()` in `game.js` → `C24Activity.invite()` → the shell opens Discord's invite window (see `casa24-discord-activity`).
+  - **Everywhere else** (phones, tablets, landscape phones): a header button in the leaderboard game (first of the right-hand actions, before help) with an orange count badge (`99+` max). **With players (owner, 2026-10-28): a facepile** of the first **3** avatars (22px, overlapping by 8px, `.c24-facepile` / `.c24-face`, `data-live-faces`; only **2 under 400px**) so it's visible without hunting; **with nobody yet: the "people" SVG icon**. The button grows (`.c24-live-btn.has-faces`, min 44px). It opens a **bottom sheet** (max 500px wide, max 70% of the height) over a backdrop. Esc, the × button, a tap on the backdrop, or the button again closes it.
+- **Each card:** round avatar (34px in the sheet; in the rail a rounded card with a 56px avatar next to the mini board, name and status below, via `@container (max-width: 300px)`; `loading=lazy`, `referrerpolicy=no-referrer`), `@username` (ellipsis), a green **"en vivo" / "live" dot** when the last guess or visit was ≤5 minutes ago, **✓** (won) or **✗** (lost) once the player is done, and a **6×5 mini grid of colored squares** using the tile color tokens. **Nothing is written in the squares.**
 - **Empty state:** "Nadie más está jugando ahora" / "No one else is playing right now" (`lb_live_empty`), shown after the first answer.
 - Title "Jugando hoy" with the count.
 
 ## Who appears
-Leaderboard players with a game **today** (Panama date) in the **same language** (any of the 10 since 2026-10-28):
+Leaderboard players with a game **today** (Panama date) in the **same language** (es or en):
 - not hidden (admin hide also hides them here);
 - not yourself;
-- with **at least 1 guess**;
+- **presence (owner, 2026-10-29):** a player shows up **as soon as they open today's leaderboard game**, before any guess. `GET /api/state` or `/api/live` calls `_lb_presence()` → `store.touch()`, which upserts the `wordle_games` row with no guesses (`[]`) or bumps `updated_at`, at most every 20 s (`PRESENCE_MIN_SECONDS`). Players with **0 guesses** are listed only while seen in the last **5 minutes** (`LIVE_RECENT_SECONDS`); players with guesses stay all day. Presence never creates a result, points or streak, stores nothing new, and a store error there never breaks the request. Guest and Developer view pages create no rows;
 - **most recent activity first** (`wordle_games.updated_at DESC`);
 - **up to 30** (`LIVE_LIMIT`).
 
@@ -36,7 +37,7 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
 - Players who logged in before this feature show the default avatar until their next login.
 - The privacy texts (`lb_privacy`, `lb_avatar_note`) say this: ID, username, profile picture and results are stored; others see only your colors.
 
-## API: `GET /api/live?lang=<lang>` (any code in `LB_LANGS`)
+## API: `GET /api/live?lang=<lang>` (es or en, `LB_LANGS`)
 - 200 JSON: `{"players": [{"username", "avatar_url", "rows": [[5 colors], ...], "done", "won", "live"}], "count": N}`. Colors are `correct`, `semicorrect`, `incorrect`.
 - Errors, JSON `{"error": code}`:
   - `disabled` 404 (leaderboard off)
@@ -54,7 +55,6 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
 - **Paused while the tab is hidden** (`visibilitychange`); it asks again right away when the tab is visible again.
 - **429, 5xx or a network error:** the wait doubles, up to **60 s** (`LIVE_MAX`). It goes back to 8 s after a success.
 - **401, 404 or 400:** polling stops for this page.
-- **Arabic (RTL):** `livePlayer(p, rtl)` reverses each mini-board row so it reads right to left like the big board (`applyLive` passes `this.right_to_left`).
 - The client also checks the data: `avatar_url` must match a Discord CDN pattern (else default avatar), username is cut to 32 characters, and unknown colors become empty cells.
 - Why polling: Vercel serverless has no WebSockets, and one indexed query every 8 s is cheap.
 
@@ -62,15 +62,15 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
 - `CREATE INDEX IF NOT EXISTS wordle_games_lang_day ON wordle_games (lang, day, updated_at DESC)`.
 - `ALTER TABLE wordle_players ADD COLUMN IF NOT EXISTS avatar text`.
 - Both are in `SQL_SCHEMA` and run automatically on first use (existing Neon databases get them with no manual step).
-- Query: `SQL_LIVE` (games JOIN players LEFT JOIN results, parameterized). `MemoryStore.live()` mirrors it.
+- Query: `SQL_LIVE` (games JOIN players LEFT JOIN results, parameterized; also `lang = ANY(langs)` so rows of removed languages never show, and 0-guess rows only when `updated_at` is recent). `MemoryStore.live()` mirrors it. Presence: `SQL_GAME_TOUCH` / `touch()` in both stores.
 
 ## Files
 - `webapp/app.py`: `/api/live` and the constants `LIVE_RATE_LIMIT_PER_MINUTE`, `LIVE_LIMIT`, `LIVE_RECENT_SECONDS`.
 - `webapp/store.py`: `live()`, `clean_avatar`, `AVATAR_HASH_RE`, rate buckets (`RATE_BUCKETS`, `_rate_key`), `SQL_LIVE`, schema.
-- `webapp/templates/game.html`: people button (`.c24-live-btn`, `data-live-open`, facepile `data-live-faces` / people icon `v-else`) and `<aside id="c24-live" class="c24-live">`, only `{% if lb %}`.
-- `webapp/static/game.js`: `LIVE_*` constants, `liveCells`, `livePlayer`, methods `liveFetch`, `liveSchedule`, `liveVisibility`, `applyLive`, `toggleLive`, `closeLive`.
+- `webapp/templates/game.html`: invite card (`data-live-invite`, Activity only), people button (`.c24-live-btn`, `data-live-open`, facepile `data-live-faces` / people icon `v-else`) and `<aside id="c24-live" class="c24-live">`, only `{% if lb %}`.
+- `webapp/static/game.js`: `LIVE_*` constants, `liveCells`, `livePlayer`, methods `liveFetch`, `liveSchedule`, `liveVisibility`, `applyLive`, `toggleLive`, `closeLive`, `inviteFriends`.
 - `webapp/static/style.css`: section "live view" plus the `--c24-live` token.
-- Texts: `lb_live_title`, `lb_live_empty`, `lb_live_now`, `lb_live_open` in all 10 `language_config.json` files.
+- Texts: `lb_live_title`, `lb_live_empty`, `lb_live_now`, `lb_live_open`, `activity_invite` in the es and en `language_config.json`.
 
 ## Tests
 - `tests/test_live.py` (backend):
@@ -79,7 +79,8 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
   - live flag, order and limit
   - separate rate bucket
   - 503 on store error
-  - `test_live_other_languages`: works for the non-es/en languages
+  - `test_live_other_languages`: es and en are separate lists
+  - presence (`test_presence_*`): opening the game shows an empty board, ends after 5 minutes without guesses, throttled (memory and Postgres fake), hidden players never appear, guest/demo pages create no rows, never a played game, store errors never break `/api/state`, delete my data removes it
   - delete removes the avatar and the live counter
   - cookie only has the ID
   - avatar rule, `MemoryStore.live`, `PostgresStore` against a fake connection
@@ -89,18 +90,19 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
   - text keys exist in es and en
   - Playwright with a faked `/api/live`: desktop sidebar, phone sheet, empty state, polling pauses and backs off
   - layout fits with no overlap at several sizes
-  - facepile (2026-10-28): `test_live_facepile_on_phone_opens_sheet_with_loaded_avatars`, `test_live_people_icon_when_nobody_plays`, `test_live_facepile_header_fits` (several languages and sizes; helper `open_lb_mobile`)
-- Run: `.venv/bin/python -m pytest -q tests/test_live.py tests/test_leaderboard_ui.py`.
+  - rail and invite card: `tests/test_layout.py` (`test_rail_never_moves_or_shrinks_the_board`, `test_rail_shows_cards_even_with_nobody_playing`, `test_activity_phone_keeps_bottom_sheet`)
+  - facepile (2026-10-28): `test_live_facepile_on_phone_opens_sheet_with_loaded_avatars`, `test_live_people_icon_when_nobody_plays`, `test_live_facepile_header_fits` (es/en at several sizes; helper `open_lb_mobile`)
+- Run: `.venv/bin/python -m pytest -q tests/test_live.py tests/test_leaderboard_ui.py tests/test_layout.py`.
 
 ## Common tasks
 - **Change the poll interval:** `LIVE_EVERY` (and `LIVE_MAX`) in `game.js`. Keep `LIVE_RATE_LIMIT_PER_MINUTE` in `app.py` above 60 s ÷ interval, with room for tab refreshes.
 - **Change how many players show:** `LIVE_LIMIT` in `app.py`. The client also caps the list at 50 in `applyLive`.
 - **Change the "en vivo" window:** `LIVE_RECENT_SECONDS` in `app.py` (5 minutes).
 - **Hide a player from the live view:** use admin hide (`casa24-leaderboard`). It hides them from the rankings and the live view together. There is no live-only hide.
-- **Change the facepile:** markup in `game.html` (`live_players.slice(0, 3)`), styles `.c24-facepile`, `.c24-face`, `.c24-live-btn.has-faces` and the `max-width: 359px` rule (2 faces) in the live section of `style.css`. Re-run `test_live_facepile_header_fits`.
-- **Change breakpoints:** the `min-width: 1024px and min-height: 501px` media query in the style.css live section. Then re-run the layout tests (see `casa24-responsive`).
+- **Change the facepile:** markup in `game.html` (`live_players.slice(0, 3)`), styles `.c24-facepile`, `.c24-face`, `.c24-live-btn.has-faces` and the `max-width: 399px` rule (2 faces) next to the header-bar rules in `style.css`. Re-run `test_live_facepile_header_fits`.
+- **Change breakpoints:** the `min-width: 1024px and min-height: 501px` media query in the style.css live section (and the Discord `min-width: 860px` block near the end of the Activity section). Then re-run the layout tests (see `casa24-responsive`).
 
-## 320px header change (owner may revisit)
-On the leaderboard game, the header has 2 icons on the left and 3 on the right (people/facepile, stats, settings). Its side columns are `minmax(max-content, 1fr)`, so they are never narrower than their icons (with a wide facepile the title moves a little off-center instead of overlapping). So **below 420px wide**, the "Casa 24" title text is hidden: `.c24-header-lb .c24-title-text { display: none }`. Kolo's face, the language badge and the trophy stay, and the logo's `alt` keeps the name. Guest games keep the text. The owner hasn't confirmed this yet. Other options: a smaller logo, or moving an icon into a menu.
+## Header at narrow widths (2026-10-29)
+The leaderboard game uses the 2-area header (brand left, actions right: people/facepile, help, trophy, stats, settings, avatar; see `casa24-responsive`). Where the actions need the room, only the "Casa 24" text hides (`.c24-title-text`; on `/lb/` pages at ≤480px, inside the Activity at ≤419px); Kolo, the badge and all buttons stay. Re-run `test_live_facepile_header_fits` and `tests/test_layout.py` after changes.
 
 - **Your own avatar comes from the server (fixed 2026-10-27):** `lb_current_user()` adds `avatar_url` (from `store.get_avatar`) and `has_avatar`; `_discord.html` renders it directly, and the `c24_dc_avatar` localStorage copy only overrides it when present. Players who signed in before avatars were stored get **one silent pass through Discord** (`lb_avatar_refresh()` on `/lb/<lang>`: redirect to `/auth/discord/login?next=…` with `prompt=none`), guarded by a 1-day `c24_avr` cookie so it never loops (e.g. users with no Discord picture). Tests: `test_avatar_refresh_once_when_no_picture_saved`, `test_no_avatar_refresh_when_picture_saved`; `lb_testlib.login()` sets `c24_avr` to skip it elsewhere.

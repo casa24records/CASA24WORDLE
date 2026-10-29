@@ -10,7 +10,7 @@ description: How Casa 24 Wordle picks the daily word — same word for everyone,
 - **New word at 00:00 Panama time** (UTC-5, no daylight saving). The countdown in the game counts to that moment.
 - **No randomness per visit.** The word is computed from the date only. There is no server state.
 - **Casa 24 days:** about 1 day in 5 (separately for es and en), the word comes from `<lang>_5words_casa24_answers.txt`. Other days it comes from `<lang>_5words.txt`.
-- The other 8 languages have no Casa 24 words and always use their main list.
+- Only es and en exist (since 2026-10-29); removing the other 8 languages did **not** change any es/en daily word (`test_daily_words_unchanged` in `tests/test_languages.py`).
 
 ## Code: `webapp/daily.py`
 1. `panama_today(now)` → today's date in Panama.
@@ -18,7 +18,7 @@ description: How Casa 24 Wordle picks the daily word — same word for everyone,
 3. `is_casa24_day(lang, idx)` → `sha256("casa24:{lang}:{idx}") % CASA24_EVERY_N_DAYS == 0`.
 4. `pick_daily_word(lang, idx, base_answers, casa24_answers)` → on Casa 24 days, picks from the sorted Casa 24 list with the same hash. Otherwise picks `base_answers[idx % len]`.
 
-`app.py` loads `base_answers` by reading `<lang>_5words.txt` and shuffling it with a fixed seed. Languages load in sorted order, so the shuffle is the same on every machine.
+`app.py` loads `base_answers` by reading `<lang>_5words.txt` and shuffling it with a fixed seed (`random.seed(42)`). Languages load in the order of `SUPPORTED_LANGS` (es, then en), so the shuffle is the same on every machine. **Don't reorder `SUPPORTED_LANGS` or add a language before es/en**: it would change the shuffle and so future words.
 
 `game.js` `get_time_until_next_day()` uses UTC-5 for the countdown. If the timezone changes, change both files.
 

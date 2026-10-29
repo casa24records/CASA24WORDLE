@@ -29,7 +29,7 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 - **`asset(path)`** in `webapp/app.py` (available in every template) returns `/static/<path>?v=<first 10 characters of the file's SHA-1>`. When a file changes, its URL changes, so visitors get the new copy at once even with year-long caching. Fallbacks if a file can't be read: the deploy's git commit (`VERCEL_GIT_COMMIT_SHA`), then a hash of all of `static/`, then the start time. `asset_version(folder)` hashes a whole folder (used for `ASSET_V`, which `game.js` adds to each Kolo picture URL).
   - **Rule:** every static link in a template must use `{{ asset('…') }}`, never `url_for('static', …)` or a hand-written `/static/…` (exceptions: the `KOLO_BASE` folder prefix, and the SDK `modulepreload` links in `activity.html`, which must match the SDK's own un-versioned import URLs). `test_vercel_ready.py` fails otherwise. An unversioned URL would either never be cached long, or, if someone widened the rule, keep an old copy for a year.
   - `og:image` uses `request.url_root.rstrip('/')` + `asset('images/kolo/kolo-hero.png')`.
-- `json_script()` in `app.py` puts the word lists into the page as raw UTF-8 JSON (much smaller Arabic/Korean pages). The HTML itself is never cached long, because it holds the daily word.
+- `json_script()` in `app.py` puts the word lists into the page as raw UTF-8 JSON (smaller than `\uXXXX` escapes for the accented Spanish words). The HTML itself is never cached long, because it holds the daily word.
 - **No CDNs since `d229fcf` (2026-10-28):** everything is served from our own origin (required inside the Discord Activity, whose CSP blocks other hosts; also faster). Sources and SHA-256 in `CREDITS.md`.
   - **Vue 3.5.13**: `webapp/static/vendor/vue.global.prod.js` (deferred, via `asset()`).
   - **Discord Embedded App SDK 2.5.0**: `webapp/static/vendor/discord-embedded-app-sdk-2.5.0/` (ESM, ~70 `.mjs` importing each other **without `?v=`**: the folder name carries the version; a new version = a new folder, never overwrite). Loaded only by the Activity shell (`casa24-discord-activity`). **`webapp/preload.py`** `sdk_modulepreloads()` walks its import graph (69 modules) so `activity.html` can `modulepreload` them all in parallel; `SDK_VERSION` there must match the folder (`test_sdk_modulepreloads`).
@@ -93,7 +93,7 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 | Visitors keep an old CSS/JS/picture after a deploy | its URL's `?v=` didn't change with the file (for example a hand-written `?v=`). Link it with `asset()` |
 | No Developer view card / `/demo` is 404 on Vercel | `DEMO_PASSWORD` isn't set for that environment (Production vs Preview), or no redeploy since it was added |
 | Developer view keeps asking for the password | password changed (derived cookie key), or cookies blocked |
-| Different daily word than local | language load order changed. The sort in `app.py` must stay |
+| Different daily word than local | language load order changed. `SUPPORTED_LANGS = ("es", "en")` in `app.py` must keep that order |
 | Discord: "Invalid OAuth2 redirect_uri" | that domain's `/auth/discord/callback` is missing from the Discord app's Redirects |
 | Leaderboard 404 / no mode switch on one environment | a leaderboard env var (or `DATABASE_URL`) missing for that environment, or not redeployed. More: `casa24-leaderboard` |
 | Pushed to `main` and production changed | expected: GitHub auto-deploys `main` |
