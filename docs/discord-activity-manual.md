@@ -1,7 +1,7 @@
 # Manual: encender Casa 24 Wordle dentro de Discord (Activity)
 
 > Escrito el **2026-10-28** para el dueño. Un paso a la vez, en orden.
-> Detalle técnico y fuentes: `docs/discord-activity-checklist.md` y `docs/discord-activity-plan.md`.
+> Detalle técnico y fuentes: `docs/discord-activity-checklist.md` y la skill `casa24-discord-activity`.
 > Los nombres de botones están en **inglés**, como aparecen en el Discord Developer Portal y en Vercel. Si tu Discord está en español, el nombre puede variar un poco (por ejemplo "Configuración de usuario" en vez de "User Settings").
 
 Datos fijos:

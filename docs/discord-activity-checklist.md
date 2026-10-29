@@ -1,7 +1,7 @@
 # Checklist: Casa 24 Wordle como Discord Activity
 
 > Revisado el **2026-10-28** contra la documentación oficial de Discord (`docs.discord.com/developers/...`), el código del SDK `@discord/embedded-app-sdk` 2.5.0 (npm) y los ejemplos oficiales.
-> Complementa a `docs/discord-activity-plan.md`. Contexto fijo: Flask en Vercel, una sola app "Casa 24 Wordle", `main` = producción, solo `identify`, Guild Install, sin modo invitado dentro de Discord, **login automático** (sin botón), el servidor manda en la partida.
+> Complementa a la skill `casa24-discord-activity` (el plan original ya está implementado y se borró). Contexto fijo: Flask en Vercel, una sola app "Casa 24 Wordle", `main` = producción, solo `identify`, Guild Install, sin modo invitado dentro de Discord, **login automático** (sin botón), el servidor manda en la partida.
 >
 > Leyenda: **[DOC]** = dicho por la documentación. **[SDK]** = leído en el código del SDK 2.5.0. **[OBS]** = observado hoy en servidores reales de Discord, no documentado. **[NO VERIFICADO]** = hay que comprobarlo en Discord real.
 

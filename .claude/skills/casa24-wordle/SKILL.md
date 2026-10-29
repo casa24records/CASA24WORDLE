@@ -92,7 +92,7 @@ webapp/static/           game.js, index.js, theme.js, style.css, tailwind.css (c
                          vendor/ (vue.global.prod.js, discord-embedded-app-sdk-2.5.0/), activity-shell.js (Activity shell: SDK, login, picker, iframe), discord-activity.js (game-side bridge in the iframe), discord.js, leaderboard.js,
                          images/kolo/ (WebP), fonts/, favicon/
 scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py, build_css.py (Tailwind), casa24/ (seed word CSVs)
-docs/                    discord-activity-plan.md, discord-activity-checklist.md, discord-activity-manual.md (owner's Portal guide)
+docs/                    discord-activity-checklist.md, discord-activity-manual.md (owner's Portal guide), discord-publish-guide.md (verification/Discovery)
 tests/                   pytest + Playwright
 vercel.json              year-long caching for /static/ URLs with ?v= and for the versioned SDK folder (see casa24-deploy)
 pyproject.toml, .vercelignore, .python-version   Vercel setup
