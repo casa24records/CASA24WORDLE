@@ -131,3 +131,6 @@ How it works: `casa24-discord-activity`; owner's Portal guide: `docs/discord-act
 - Git history keeps every Casa 24 commit, but the first commit (the imported original code) is now authored by Casa 24, so Hugo doesn't show as a GitHub contributor. His name stays only where the law needs it: `LICENSE`. The old link to the original repo's history was cut, because that history was never downloaded and GitHub refused the push. `main` on GitHub was force-pushed once for this (2026-10-26); don't rewrite published history again without asking.
 - The sitemap stays and uses the site's own address, so it works on any domain.
 - Puzzle numbers are Casa 24's own: **#1 = 2026-10-26** (`START_DATE` in `daily.py`, owner's decision that day; the old "#1955"-style numbering from the original game was dropped before launch). Never change it after launch.
+
+## Going public (2026-10-29)
+- Owner chose to make the Activity public: Terms/Privacy pages (contact casa24records@gmail.com, operator Casa 24 Records, Ciudad de Panamá), App Verification done and approved, Public Bot on (required for verified apps), Discovery being completed (Community support server, summary, description, locales). Details and status: `casa24-discord-activity`, `docs/discord-publish-guide.md`.

@@ -277,3 +277,12 @@ Fuentes: Discord **Developer Terms of Service** y **Developer Policy** (`support
   - Developer Terms of Service: https://support-dev.discord.com/hc/en-us/articles/8562894815383
   - Developer Policy: https://support-dev.discord.com/hc/en-us/articles/8563934450327
   - Age Assurance (developers): https://support-dev.discord.com/hc/en-us/articles/38338398970263
+
+---
+
+## Estado al 2026-10-29
+- **App Verification: aprobada.** El `<>` y "Use Activity URL Override" que ve el dueño salen por ser del Team con Developer Mode; comprobar con Developer Mode apagado o con una cuenta que no sea del Team.
+- **Discovery Status — falta:** servidor de soporte **Community** (Server Settings → Enable Community, luego elegirlo como Support Server), **Summary**, **descripción larga**, al menos un **locale** (Spanish, English US) y la **Description** de General Information.
+- **Textos sugeridos:**
+  - Resumen: "El Wordle diario de Casa 24 Records: adivina la palabra del día en 6 intentos, en 10 idiomas, y compite en el ranking con tus amigos."
+  - Descripción larga: juego diario (misma palabra para todos, 6 intentos, verde/naranja/gris), ranking con la cuenta de Discord (menos intentos = más puntos, rachas, puesto), quién juega hoy en vivo (solo colores, sin spoilers), 10 idiomas, misma partida en Discord y en casa-24-wordle.vercel.app, enlace a /privacy.

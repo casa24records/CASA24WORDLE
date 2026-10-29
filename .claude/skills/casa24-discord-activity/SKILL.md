@@ -134,3 +134,11 @@ Known small issue: if a header button keeps focus after closing its window with 
 
 ## Going public (2026-10-29)
 See `docs/discord-publish-guide.md`. Unverified Activities: only the team, App Testers (≤50) and servers under 25 members. App Verification (team owner identity via Stripe + Terms/Privacy URLs + description/icon) lets anyone play; Discovery (art assets, tags, support server) is optional on top. Inside the Activity, Settings has Terms/Privacy (opened with the SDK `openExternalLink` through the shell — never navigate) and "Borrar mis datos" (Bearer DELETE → shell shows "datos borrados" + "Volver a jugar", which signs in again on the same SDK instance), as Discord's Developer Policy requires easy access to the privacy policy and deletion.
+
+## Status 2026-10-29: verified, Discovery in progress
+- The owner confirmed in Discord that the Activity works (language picker, guesses, sync web↔Discord).
+- **App Verification: approved** (General Information shows "Verified apps can change their name once every 6 months"). Team members with Developer Mode still see the "<>" badge and "Use Activity URL Override" — that is the developer view; check with Developer Mode off or a non-team account.
+- **Discovery Status checklist** (done: slash commands/Entry Point, verified, 2FA, ≥1 tag). Pending for the owner:
+  1. Support server must be a **Community** server (Server Settings → Enable Community), then pick it as Support Server.
+  2. **Summary** (short), 3. **expanded description**, 4. at least one **locale** (Spanish, English US) in Discovery Settings; also fill General Information → Description (was empty).
+  Suggested texts are in `docs/discord-publish-guide.md`. After all green: enable Discovery (up to 24 h to appear).
