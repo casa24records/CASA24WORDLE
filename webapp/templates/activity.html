@@ -38,7 +38,7 @@
         <h1 id="c24-picker-title" class="c24-picker-title"><span lang="es">{{ pick.es }}</span> <span lang="en">{{ pick.en }}</span></h1>
         <div class="c24-picker-list">
             {% for l in shell.langs %}
-            <button type="button" class="c24-picker-btn" data-pick-lang="{{ l.code }}" lang="{{ l.code }}"{% if l.rtl %} dir="rtl"{% endif %}>{{ l.name }}</button>
+            <button type="button" class="c24-picker-btn" data-pick-lang="{{ l.code }}" lang="{{ l.code }}">{{ l.name }}</button>
             {% endfor %}
         </div>
     </section>

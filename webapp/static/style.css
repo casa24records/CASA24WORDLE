@@ -174,9 +174,6 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 .c24-play-alt { background: transparent; color: var(--c24-text); }
 .c24-play-name { font-family: var(--c24-font-display); font-size: 2rem; line-height: 1; text-transform: uppercase; letter-spacing: 0.04em; }
 .c24-play-status { font-size: 0.8rem; font-weight: 600; opacity: 0.9; }
-/* cards whose names VT323 can't draw (Arabic, Korean, Cyrillic, Vietnamese) use the
-   body font; no letter-spacing so Arabic letters stay joined */
-.c24-play-name:is(:lang(ar), :lang(ko), :lang(ru), :lang(vi)) { font-family: inherit; font-weight: 800; font-size: 1.6rem; line-height: 2rem; letter-spacing: 0; }
 .c24-play-status { white-space: nowrap; flex-shrink: 0; }
 .c24-play { gap: 0.75rem; }
 .c24-play-name { min-width: 0; overflow-wrap: anywhere; }
@@ -287,10 +284,86 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     .c24-header .c24-logo { width: 28px; height: 28px; }
     .c24-header-title a { gap: 0.35rem; }
 }
+/* The game header (game.html, web and Discord): an NYT-style bar. Brand on the left
+   (Kolo + "Casa 24" + language badge; in Discord the "Casa 24 ES ▾" language button),
+   actions on the right (people, help, trophy, stats, settings, Discord avatar).
+   52px tall (48px on phones) + the top safe area; 44px tap targets. Where the actions
+   need the room, only the "Casa 24" text steps aside (Kolo + badge stay; the logo's
+   alt / the button's aria-label keep the name). */
+.c24-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    padding: var(--c24-safe-top) 2px 0 6px;
+}
+.c24-header-bar .c24-header-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 1.75rem;
+    text-align: start;
+}
+.c24-header-bar .c24-header-title > a,
+.c24-header-bar .c24-lang-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 4px;
+    border-radius: 10px;
+    color: inherit;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.c24-header-bar .c24-header-title > a:focus-visible,
+.c24-header-bar .c24-lang-btn:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: -2px; }
+.c24-header-bar .c24-badge { font-size: 0.8em; }
+.c24-header-bar .c24-header-end { flex: none; }
+.c24-header-bar .c24-dc-menu { flex: none; }
+/* the avatar sits at the right end: its menu opens to the left */
+.c24-header-bar .c24-dc-pop { inset-inline-start: auto; inset-inline-end: 0; }
+@media (max-width: 480px) {
+    .c24-header-bar { height: calc(48px + var(--c24-safe-top)); }
+    .c24-header-bar .c24-header-title { font-size: 1.5rem; }
+    .c24-header-bar .c24-logo { width: 32px; height: 32px; }
+    .c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.4rem; }
+}
+@media (min-width: 768px) {
+    .c24-game .c24-header-bar {
+        width: 100vw;
+        margin-inline: calc(50% - 50vw);
+        height: calc(60px + var(--c24-safe-top));
+        padding: var(--c24-safe-top) max(12px, var(--c24-safe-right)) 0 max(16px, var(--c24-safe-left));
+        box-sizing: border-box;
+    }
+    .c24-header-bar .c24-header-title { font-size: 2rem; }
+    .c24-header-bar .c24-logo { width: 40px; height: 40px; }
+    .c24-header-bar .c24-header-end { gap: 4px; }
+}
+/* very narrow phones: 40px-wide icon buttons (still 44px tall) so 6 actions fit at 320 */
+@media (max-width: 359px) {
+    .c24-header-bar .c24-icon-btn { width: 40px; }
+    .c24-header-bar .c24-logo { width: 28px; height: 28px; }
+    .c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.3rem; padding: 0 2px; }
+}
+/* when "Casa 24" steps aside (by the number of actions on the right):
+   leaderboard game on the web 6, inside Discord 5, guest game 4 (3 without the leaderboard) */
+@media (max-width: 480px) { .c24-header-lb:not(.c24-header-act) .c24-title-text { display: none; } }
+@media (max-width: 419px) { .c24-header-act .c24-title-text { display: none; } }
+@media (max-width: 359px) { .c24-header-bar:not(.c24-header-lb):not(.c24-header-guest) .c24-title-text { display: none; } }
+@media (max-width: 339px) { .c24-header-guest .c24-title-text { display: none; } }
+/* phones under 400px: the facepile shows 2 faces, so the actions keep their 44px */
+@media (max-width: 399px) {
+    .c24-header-bar .c24-face:nth-child(n+3) { display: none; }
+}
+/* Discord desktop from 860px: the rail replaces the people button, one action less */
+@media (min-width: 860px) {
+    :root.c24-embed:not(.c24-plat-mobile) .c24-header-act .c24-title-text { display: inline; }
+}
 
 /* ---------- game page: header, board, keyboard in one column ---------- */
 .c24-game {
-    --kgap: clamp(3px, 1vw, 6px);
+    --kgap: 6px;
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -312,7 +385,7 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 }
 .c24-board {
     --g: 5px;
-    --w: min(420px, 100cqw - 20px, (100cqh - 20px - 5 * var(--g)) / 1.2 + 4 * var(--g));
+    --w: min(var(--cap), 100cqw - 20px, (100cqh - var(--bpad, 20px) - 5 * var(--g)) / 1.2 + 4 * var(--g));
     width: var(--w);
     height: calc((var(--w) - 4 * var(--g)) * 1.2 + 5 * var(--g));
     display: grid;
@@ -320,6 +393,20 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     gap: var(--g);
 }
 .c24-board > .grid-cols-5 { gap: var(--g); }
+/* board width cap (NYT-like): 350px, 330px on phones */
+.c24-game { --cap: 350px; }
+@media (max-width: 480px) { .c24-game { --cap: 330px; } }
+/* wider than a phone (tablets, desktops, Discord desktop): the keyboard sits right
+   under the board and the pair is centered below the header (NYT). Phones keep the
+   keyboard at the bottom, where thumbs are. The area still shrinks on short screens. */
+@media (min-width: 481px) {
+    .c24-board-area {
+        flex: 0 1 auto;
+        height: calc((var(--cap) - 20px) * 1.2 + 45px);
+        margin-top: auto;
+    }
+    .c24-game .c24-keyboard { margin-bottom: auto; }
+}
 /* board tiles: font follows the tile size (beats the text-2xl class set in game.js) */
 main .grid-cols-5 > div {
     width: 100%;
@@ -332,12 +419,19 @@ main .grid-cols-5 > div {
 .c24-example > div { aspect-ratio: 1; font-size: 1.75rem; line-height: 1; }
 
 /* ---------- keyboard ---------- */
-/* --rows is set per keyboard in game.html, so big keyboards (vi 9 rows, ko 7)
-   get shorter keys instead of pushing the board off the screen. */
+/* Keys are clamp(44px, 7dvh, 58px) tall (NYT), but never more than the keyboard's share
+   of a short screen (--kfit: all rows in a third of the height; --rows comes from
+   game.html), and never under 26px. Enter and ⌫ are 1.5x wide. */
 .c24-keyboard {
-    --rows: 4;
-    --kh: clamp(24px, min(var(--vh) * 7, (var(--vh) * 42 - (var(--rows) - 1) * var(--kgap)) / var(--rows)), 58px);
+    --rows: 3;
+    --kfit: calc((var(--vh) * var(--kshare, 33) - (var(--rows) - 1) * var(--kgap)) / var(--rows));
+    --kh-stack: max(26px, min(clamp(44px, var(--vh) * 7, 58px), var(--kfit)));
+    --kh: var(--kh-stack);
     flex: none;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: var(--kgap);
@@ -360,13 +454,18 @@ main .grid-cols-5 > div {
 .c24-keyboard .key[data-char="⇨"],
 .c24-keyboard .key[data-char="⌫"] { flex-grow: 1.5; font-size: 1.35rem; }
 .c24-keyboard .key:active { filter: brightness(0.85); }
+/* focus ring: Casa 24 orange, with a thin text-colored ring inside it so it also
+   stands out on the cream background (orange alone is 2.3:1 there) */
 .key:focus-visible,
 .c24-icon-btn:focus-visible,
 .c24-close:focus-visible {
-    outline: 2px solid var(--c24-orange);
+    outline: 3px solid var(--c24-orange);
     outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--c24-text);
 }
-@media (max-width: 360px) {
+.c24-keyboard .key:focus-visible { position: relative; z-index: 1; }
+@media (max-width: 359px) {
+    .c24-game { --kgap: 4px; }
     .c24-keyboard { padding-left: 4px; padding-right: 4px; }
 }
 
@@ -374,19 +473,22 @@ main .grid-cols-5 > div {
 @media (orientation: landscape) and (max-height: 500px) {
     .c24-game {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         grid-template-rows: auto minmax(0, 1fr);
         max-width: 900px;
         column-gap: 8px;
     }
     .c24-game .c24-header {
         grid-column: 1 / -1;
+        width: auto;
+        margin-inline: 0;
         height: calc(40px + var(--c24-safe-top));
     }
     .c24-game .c24-header-title { font-size: 1.5rem; }
     .c24-game .c24-logo { width: 26px; height: 26px; }
     .c24-game .c24-icon-btn { height: 40px; }
-    .c24-board-area { grid-column: 1; grid-row: 2; }
+    .c24-game .c24-board-area { grid-column: 1; grid-row: 2; height: auto; margin: 0; }
+    .c24-game .c24-keyboard { margin: 0; }
     .c24-keyboard {
         grid-column: 2;
         grid-row: 2;
@@ -601,7 +703,6 @@ main .grid-cols-5 > div {
 }
 
 /* game page */
-.c24-badge-lb { margin-inline-start: 0.25em; background: transparent; padding: 0; }
 .c24-lb-end { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; text-align: center; }
 .c24-lb-hint {
     position: relative;
@@ -632,11 +733,7 @@ main .grid-cols-5 > div {
     gap: 1rem;
 }
 .c24-lb-title { font-size: 2.25rem; text-align: center; }
-/* titles VT323 can't draw (Arabic, Korean, Cyrillic, Vietnamese): body font, no letter-spacing (keeps Arabic joined) */
-.c24-lb-title:is(:lang(ar), :lang(ko), :lang(ru), :lang(vi)) { font-family: inherit; font-weight: 800; font-size: 1.8rem; letter-spacing: 0; }
-/* 11 tabs (Combinado + 10 languages): one row that scrolls sideways with snap,
-   never wraps; the edges fade to hint there is more. leaderboard.html centers
-   the active tab on load. */
+/* 3 tabs (Combinado, Español, English): one row of equal buttons, no scrolling */
 .c24-lb-tabs {
     display: flex;
     gap: 4px;
@@ -644,23 +741,14 @@ main .grid-cols-5 > div {
     border-radius: 14px;
     border: 1px solid var(--c24-line);
     background: var(--c24-surface);
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    scroll-padding-inline: 24px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
 }
-.c24-lb-tabs::-webkit-scrollbar { display: none; }
 .c24-lb-tab {
-    flex: none;
-    scroll-snap-align: center;
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 44px;
-    min-width: 44px;
-    padding: 0 0.85rem;
+    padding: 0 0.5rem;
     white-space: nowrap;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -670,18 +758,7 @@ main .grid-cols-5 > div {
     color: var(--c24-subtle);
     text-decoration: none;
 }
-.c24-lb-tab:focus-visible { outline-offset: -2px; }
-/* wide enough: a tidy 6-column grid (2 rows), no sideways scrolling with a mouse */
-@media (min-width: 600px) {
-    .c24-lb-tabs {
-        display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        overflow: visible;
-        -webkit-mask-image: none;
-        mask-image: none;
-    }
-    .c24-lb-tab { padding: 0 0.4rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-}
+.c24-lb-tab:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: -2px; }
 .c24-lb-tab.is-active { background: var(--c24-correct-bg); color: #fff; }
 .c24-lb-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .c24-lb-table th {
@@ -981,8 +1058,9 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 .c24-dc-me .c24-dc-avatar-head { width: 30px; height: 30px; box-shadow: 0 0 0 2px var(--c24-surface), 0 0 0 3px #5865F2; }
 .c24-dc-icon .c24-dc-mark { width: 24px; height: 24px; }
 .c24-dc-me:focus-visible, .c24-dc-icon:focus-visible, .c24-dc-pop-item:focus-visible, .c24-header .c24-icon-btn:focus-visible {
-    outline: 2px solid var(--c24-orange);
-    outline-offset: 1px;
+    outline: 3px solid var(--c24-orange);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--c24-text);
 }
 .c24-dc-pop {
     position: absolute;
@@ -1075,13 +1153,10 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 }
 .c24-face + .c24-face { margin-inline-start: -8px; }
 .c24-live-btn.has-faces .c24-live-badge { top: 2px; inset-inline-end: -2px; }
-/* the facepile makes the right side wider than the left: the side columns are never
-   narrower than their icons (the title moves a little off-center instead of overlapping) */
-.c24-header-lb { grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); }
 /* very narrow phones: 2 faces, so Kolo + language badge + trophy keep their room */
 @media (max-width: 359px) {
     .c24-face:nth-child(n+3) { display: none; }
-    .c24-live-btn.has-faces { padding: 0 6px 0 2px; }
+    .c24-header-bar .c24-live-btn.has-faces { width: auto; padding: 0 4px 0 2px; }
 }
 .c24-live-backdrop {
     position: fixed;
@@ -1210,40 +1285,98 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     :root:not([data-theme="light"]) .c24-live-grid > .is-incorrect { border-color: var(--c24-line-strong); }
 }
 .c24-live-close:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
-/* narrow phones: the leaderboard game header holds 2 icons on the left and 3 on the
-   right (people, stats, settings), so the side columns size to their icons and the
-   title keeps Kolo's face + badges ("Casa 24" text steps aside; the logo's alt keeps the name) */
-@media (max-width: 419px) {
-    .c24-header-lb { grid-template-columns: auto minmax(0, 1fr) auto; }
-    .c24-header-lb .c24-title-text { display: none; }
+/* "Invite friends" (Discord only): the first card, a round green icon + label */
+.c24-live-invite {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    margin: 0 8px 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--c24-line);
+    border-radius: 12px;
+    background: var(--c24-surface);
+    color: var(--c24-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
-/* wide screens: always-visible sidebar, no button, no sheet */
+.c24-live-invite-icon {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    background: var(--c24-correct-bg);
+    color: var(--c24-correct-fg);
+}
+.c24-live-invite-text { min-width: 0; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.c24-live-invite:focus-visible, .c24-live-card:focus-visible { outline: 3px solid var(--c24-orange); outline-offset: 2px; }
+/* wide screens: an always-visible rail of cards in the left gutter (no button, no sheet).
+   Its width comes from the gutter, so the game column never moves or shrinks
+   (at 1024px the rail is 238px and ends 12px left of the column); it starts under
+   the full-width header. */
 @media (min-width: 1024px) and (min-height: 501px) {
+    :root {
+        --c24-rail-w: clamp(160px, (100vw - 500px) / 2 - 24px, 280px);
+        --c24-rail-x: 12px;
+        --c24-rail-top: calc(60px + var(--c24-rail-x));
+    }
     .c24-live, .c24-live.is-open {
         display: flex;
         flex-direction: column;
         position: fixed;
         z-index: 30;
-        top: 0;
-        bottom: 0;
-        left: 0;
+        top: calc(var(--c24-rail-top) + var(--c24-safe-top));
+        bottom: calc(var(--c24-rail-x) + var(--c24-safe-bottom));
+        left: calc(var(--c24-rail-x) + var(--c24-safe-left));
         right: auto;
-        width: 240px;
+        width: var(--c24-rail-w);
         max-height: none;
         margin: 0;
-        padding: var(--c24-safe-top) 0 var(--c24-safe-bottom) var(--c24-safe-left);
-        background: var(--c24-bg);
+        padding: 0;
+        background: transparent;
         border: 0;
-        border-inline-end: 1px solid var(--c24-line);
         border-radius: 0;
         box-shadow: none;
     }
-    .c24-live-head { padding-right: 12px; }
+    .c24-live-head { min-height: 40px; padding: 0 4px; }
+    .c24-live-invite { margin: 0 0 8px; }
+    .c24-live-empty { padding: 0.5rem 4px; }
     .c24-live-btn, .c24-live-close, .c24-live-backdrop { display: none !important; }
 }
-@media (min-width: 1280px) and (min-height: 501px) {
-    .c24-live, .c24-live.is-open { width: 280px; }
-    .c24-live-grid { --s: 11px; }
+/* NYT-style player cards wherever the list is rail-narrow (≤ 300px; the phone sheet is
+   wider): rounded card, big round avatar next to the 6 x 5 mini board, name and
+   status under them. */
+.c24-live-list { container-type: inline-size; }
+@container (max-width: 300px) {
+    .c24-live-list > .c24-live-card {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-areas: "avatar grid" "info info";
+        align-items: center;
+        gap: 8px 12px;
+        margin-bottom: 8px;
+        padding: 12px;
+        border: 1px solid var(--c24-line);
+        border-radius: 14px;
+        background: var(--c24-surface);
+    }
+    .c24-live-card .c24-live-avatar { grid-area: avatar; width: 56px; height: 56px; }
+    .c24-live-card .c24-live-grid { grid-area: grid; justify-self: end; --s: 12px; }
+    .c24-live-card .c24-live-info { grid-area: info; }
+    .c24-live-card .c24-live-name { font-size: 0.95rem; }
+    .c24-live-card .c24-live-status { font-size: 0.8rem; }
+}
+@container (max-width: 190px) {
+    .c24-live-card .c24-live-avatar { width: 44px; height: 44px; }
+    .c24-live-card .c24-live-grid { --s: 10px; }
+    .c24-live-list > .c24-live-card { padding: 10px; gap: 8px; }
 }
 @media (hover: hover) and (pointer: fine) {
     .c24-live-card:hover { background: var(--c24-hover); }
@@ -1350,7 +1483,7 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
 }
 .c24-shell-frame[hidden], .c24-picker[hidden] { display: none; }
 
-/* first launch: the language picker (10 big buttons, es/en first) */
+/* first launch: the language picker (big buttons: Español, English) */
 .c24-picker {
     position: fixed;
     inset: 0;
@@ -1410,51 +1543,70 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
    until it arrives the page counts as desktop. Mobile keeps the web rules
    (portrait lock). The website (no c24-embed) is unchanged. */
 :root.c24-embed:not(.c24-plat-mobile) .c24-game {
-    --kgap: clamp(3px, min(1vw, var(--vh) * 1), 6px);
+    --kgap: clamp(4px, var(--vh) * 1.5, 6px);
     display: flex;
     flex-direction: column;
     max-width: 500px;
 }
+/* board and keyboard together, centered under the header (the area shrinks on short panels) */
+:root.c24-embed:not(.c24-plat-mobile) .c24-board-area {
+    flex: 0 1 auto;
+    height: calc((var(--cap) - 20px) * 1.2 + 45px);
+    margin: auto 0 0;
+}
 :root.c24-embed:not(.c24-plat-mobile) .c24-keyboard {
-    --kh: clamp(26px, min(var(--vh) * 7, (var(--vh) * 42 - (var(--rows) - 1) * var(--kgap)) / var(--rows)), 58px);
+    --kh: var(--kh-stack);
+    margin: 0 auto auto;
     align-self: stretch;
     padding: 0 8px max(8px, var(--c24-safe-bottom));
 }
 /* short panels: the compact 40px header of the landscape rule, without its grid */
 @media (max-height: 500px) {
-    :root.c24-embed:not(.c24-plat-mobile) .c24-keyboard { padding-bottom: 6px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-keyboard { padding-bottom: 6px; --kshare: 28; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-board { --bpad: 8px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-board-area { height: calc((var(--cap) - 20px) * 1.2 + 33px); }
 }
 @media (min-width: 860px) {
-    :root.c24-embed:not(.c24-plat-mobile) { --c24-live-w: 240px; }
+    :root.c24-embed:not(.c24-plat-mobile) {
+        --c24-rail-w: clamp(150px, (100vw - 500px) / 2 - 16px, 280px);
+        --c24-rail-x: 8px;
+        --c24-rail-top: var(--c24-rail-x);
+    }
     :root.c24-embed:not(.c24-plat-mobile) .c24-live,
     :root.c24-embed:not(.c24-plat-mobile) .c24-live.is-open {
         display: flex;
         flex-direction: column;
         position: fixed;
         z-index: 30;
-        top: 0;
-        bottom: 0;
-        left: 0;
+        top: var(--c24-rail-top);
+        bottom: var(--c24-rail-x);
+        left: var(--c24-rail-x);
         right: auto;
-        width: var(--c24-live-w);
+        width: var(--c24-rail-w);
         max-height: none;
         margin: 0;
         padding: 0;
-        background: var(--c24-bg);
+        background: transparent;
         border: 0;
-        border-inline-end: 1px solid var(--c24-line);
         border-radius: 0;
         box-shadow: none;
     }
-    :root.c24-embed:not(.c24-plat-mobile) .c24-live-head { padding-right: 12px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-head { min-height: 40px; padding: 0 4px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-invite { margin: 0 0 8px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-empty { padding: 0.5rem 4px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-list { padding: 0 0 4px; }
     :root.c24-embed:not(.c24-plat-mobile) .c24-live-btn,
     :root.c24-embed:not(.c24-plat-mobile) .c24-live-close,
     :root.c24-embed:not(.c24-plat-mobile) .c24-live-backdrop { display: none !important; }
-    /* the game column centered in the space right of the sidebar */
-    :root.c24-embed:not(.c24-plat-mobile):not(.c24-pip) body { padding-left: var(--c24-live-w); }
 }
-@media (min-width: 1280px) {
-    :root.c24-embed:not(.c24-plat-mobile) { --c24-live-w: 280px; }
+/* the full-width header shows from 768px wide when taller than 500px: the rail starts under it */
+@media (min-width: 860px) and (min-height: 501px) {
+    :root.c24-embed:not(.c24-plat-mobile) { --c24-rail-top: calc(60px + var(--c24-rail-x)); }
+}
+/* very narrow panels: the web's 4px key gaps and side padding (10-key rows ≥ 26px) */
+@media (max-width: 359px) {
+    :root.c24-embed:not(.c24-plat-mobile) .c24-game { --kgap: 4px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-keyboard { padding-left: 4px; padding-right: 4px; }
 }
 
 /* the game's header title inside the Activity: opens the language window ("ES ▾") */

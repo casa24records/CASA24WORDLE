@@ -13,7 +13,9 @@ on Vercel, else None (the leaderboard is then off in production).
 Kept per player: Discord ID, username, Discord avatar hash (only when it has
 Discord's format, else NULL; refreshed at every login), a hidden flag, and per
 finished game the language, day, won, attempts and points; today's guesses for
-2 days; per-minute request counters. Never stored: tokens, email, IP addresses.
+2 days (the row is created as soon as the player opens today's leaderboard game,
+with no guesses, so the live view can show who is there: presence); per-minute
+request counters. Never stored: tokens, email, IP addresses.
 
 Days are datetime.date values (the Panama date from daily.py).
 """
@@ -23,6 +25,11 @@ import datetime
 import os
 import re
 import threading
+
+# Only these languages ever count (rankings, streaks), even if older rows with
+# removed languages are still in the tables (scripts/purge_languages.py deletes
+# them). Same tuple as app.SUPPORTED_LANGS (a test checks).
+SUPPORTED_LANGS = ("es", "en")
 
 GAME_KEEP_DAYS = 2   # wordle_games rows older than this are deleted
 RATE_KEEP_MINUTES = 2
@@ -61,7 +68,7 @@ class StoreError(Exception):
 
 
 class Store:
-    """Interface. `tab` is a language code ("es", "de", "ko", ...) or "all" (every language)."""
+    """Interface. `tab` is a language code ("es" or "en") or "all" (both together)."""
 
     def upsert_player(self, discord_id, username, avatar=None):
         """Create or refresh a player. avatar is kept only if clean_avatar() accepts it."""
@@ -92,10 +99,18 @@ class Store:
         """Insert a finished game once; False if that day was already recorded."""
         raise NotImplementedError
 
-    def live(self, lang, day, exclude_id, limit=30):
-        """Today's games with at least one guess, newest activity first, hidden
-        players and exclude_id left out: [{id, username, avatar, guesses,
-        updated_at (aware UTC datetime), finished, won}]."""
+    def touch(self, discord_id, lang, day, min_seconds=20):
+        """Presence: the player has today's game open. Creates the game row with no
+        guesses if missing, else bumps updated_at, but only when it is older than
+        min_seconds (polling doesn't write every time). True if something was written.
+        Never creates a result: a presence row is not a played game."""
+        raise NotImplementedError
+
+    def live(self, lang, day, exclude_id, limit=30, present_since=None):
+        """Today's games, newest activity first, hidden players and exclude_id left
+        out: [{id, username, avatar, guesses, updated_at (aware UTC datetime),
+        finished, won}]. Games with at least one guess always; games with no guesses
+        (presence only) just while updated_at >= present_since (None: never)."""
         raise NotImplementedError
 
     def leaderboard(self, tab, limit):
@@ -141,9 +156,7 @@ class _MemoryGame:
 
     def save(self, guesses):
         self._st.games[self._key] = {"guesses": list(guesses), "updated_at": _utcnow()}
-        oldest = self._key[2] - datetime.timedelta(days=GAME_KEEP_DAYS)
-        for k in [k for k in self._st.games if k[2] < oldest]:
-            del self._st.games[k]
+        self._st._cleanup_games(self._key[2])
 
     def record(self, won, attempts, points):
         return self._st.record_result(*self._key, won, attempts, points)
@@ -189,6 +202,27 @@ class MemoryStore(Store):
                 del self.rate[k]
             return self.rate[key]
 
+    def _cleanup_games(self, day):
+        oldest = day - datetime.timedelta(days=GAME_KEEP_DAYS)
+        for k in [k for k in self.games if k[2] < oldest]:
+            del self.games[k]
+
+    def touch(self, discord_id, lang, day, min_seconds=20):
+        with self._lock:
+            if discord_id not in self.players:
+                raise StoreError("unknown player")  # like the foreign key in Postgres
+            key = (discord_id, lang, day)
+            now = _utcnow()
+            g = self.games.get(key)
+            if g is None:
+                self.games[key] = {"guesses": [], "updated_at": now}
+                self._cleanup_games(day)
+                return True
+            if (now - g["updated_at"]).total_seconds() < min_seconds:
+                return False
+            g["updated_at"] = now
+            return True
+
     def get_game(self, discord_id, lang, day):
         with self._lock:
             g = _MemoryGame(self, (discord_id, lang, day))
@@ -215,7 +249,8 @@ class MemoryStore(Store):
         agg = {}
         for (pid, lang, day), r in self.results.items():
             player = self.players.get(pid)
-            if not player or player["hidden"] or (tab != "all" and lang != tab):
+            if (not player or player["hidden"] or lang not in SUPPORTED_LANGS
+                    or (tab != "all" and lang != tab)):
                 continue
             a = agg.setdefault(pid, {"id": pid, "username": player["username"], "points": 0,
                                      "wins": 0, "played": 0, "_point_days": [], "_days": []})
@@ -234,13 +269,14 @@ class MemoryStore(Store):
         return [{"rank": i + 1, **{k: v for k, v in r.items() if k != "reached"}}
                 for i, r in enumerate(rows)]
 
-    def live(self, lang, day, exclude_id, limit=30):
+    def live(self, lang, day, exclude_id, limit=30, present_since=None):
         with self._lock:
             out = []
             for (pid, g_lang, g_day), g in self.games.items():
                 player = self.players.get(pid)
-                if (g_lang != lang or g_day != day or pid == exclude_id or not player
-                        or player["hidden"] or not g["guesses"]):
+                present = present_since is not None and g["updated_at"] >= present_since
+                if (g_lang != lang or g_lang not in SUPPORTED_LANGS or g_day != day or pid == exclude_id or not player
+                        or player["hidden"] or not (g["guesses"] or present)):
                     continue
                 result = self.results.get((pid, g_lang, g_day))
                 out.append({"id": pid, "username": player["username"],
@@ -262,7 +298,7 @@ class MemoryStore(Store):
         with self._lock:
             out = {pid: [] for pid in discord_ids}
             for (pid, lang, day), r in sorted(self.results.items(), key=lambda kv: kv[0][2]):
-                if pid in out and (tab == "all" or lang == tab):
+                if pid in out and lang in SUPPORTED_LANGS and (tab == "all" or lang == tab):
                     out[pid].append((day, r["won"]))
             return out
 
@@ -355,8 +391,20 @@ SQL_GAME_SAVE = """
 
 SQL_GAME_CLEANUP = "DELETE FROM wordle_games WHERE day < %s"
 
-# Live view: everyone else's game today in one language (params: lang, day,
-# exclude_id, limit). Words are read here but app.py only sends colors.
+# Presence (params: id, lang, day, min_seconds): the player opened today's game.
+# Creates the row with no guesses, or bumps updated_at only when it is older than
+# min_seconds, so polling every 8 s writes at most every ~20 s. Returns a row
+# only when it wrote; "inserted" is true for a new row (xmax = 0).
+SQL_GAME_TOUCH = """
+    INSERT INTO wordle_games (discord_id, lang, day) VALUES (%s, %s, %s)
+    ON CONFLICT (discord_id, lang, day) DO UPDATE SET updated_at = now()
+    WHERE wordle_games.updated_at < now() - make_interval(secs => %s)
+    RETURNING (xmax = 0) AS inserted"""
+
+# Live view: everyone else's game today in one language (params: lang, langs,
+# day, exclude_id, present_since, limit). Words are read here but app.py only
+# sends colors. Games with no guesses (presence only) show only while
+# updated_at >= present_since (a NULL present_since never matches).
 SQL_LIVE = """
     SELECT g.discord_id, p.username, p.avatar, g.guesses, g.updated_at,
            (r.discord_id IS NOT NULL) AS finished, COALESCE(r.won, false) AS won
@@ -364,8 +412,8 @@ SQL_LIVE = """
     JOIN wordle_players p ON p.discord_id = g.discord_id
     LEFT JOIN wordle_results r
            ON r.discord_id = g.discord_id AND r.lang = g.lang AND r.day = g.day
-    WHERE g.lang = %s AND g.day = %s AND NOT p.hidden AND g.discord_id <> %s
-      AND jsonb_array_length(g.guesses) > 0
+    WHERE g.lang = %s AND g.lang = ANY(%s) AND g.day = %s AND NOT p.hidden AND g.discord_id <> %s
+      AND (jsonb_array_length(g.guesses) > 0 OR g.updated_at >= %s)
     ORDER BY g.updated_at DESC
     LIMIT %s"""
 
@@ -389,7 +437,8 @@ SQL_RANKED = """
                COUNT(*)::int AS played,
                COALESCE(MAX(r.day) FILTER (WHERE r.points > 0), MIN(r.day)) AS reached
         FROM wordle_results r JOIN wordle_players p ON p.discord_id = r.discord_id
-        WHERE NOT p.hidden AND (%(tab)s::text = 'all' OR r.lang = %(tab)s::text)
+        WHERE NOT p.hidden AND r.lang = ANY(%(langs)s)
+          AND (%(tab)s::text = 'all' OR r.lang = %(tab)s::text)
         GROUP BY r.discord_id, p.username
     ), ranked AS (
         SELECT agg.*, ROW_NUMBER() OVER (
@@ -407,7 +456,8 @@ SQL_STANDING = SQL_RANKED + """
 
 SQL_HISTORIES = """
     SELECT discord_id, day, won FROM wordle_results
-    WHERE discord_id = ANY(%(ids)s) AND (%(tab)s::text = 'all' OR lang = %(tab)s::text)
+    WHERE discord_id = ANY(%(ids)s) AND lang = ANY(%(langs)s)
+      AND (%(tab)s::text = 'all' OR lang = %(tab)s::text)
     ORDER BY day"""
 
 SQL_DELETE_PLAYER = "DELETE FROM wordle_players WHERE discord_id = %s"  # cascades
@@ -541,9 +591,17 @@ class PostgresStore(Store):
             cur.execute(SQL_RESULT_INSERT, (discord_id, lang, day, bool(won), int(attempts), int(points)))
             return cur.fetchone() is not None
 
-    def live(self, lang, day, exclude_id, limit=30):
+    def touch(self, discord_id, lang, day, min_seconds=20):
         with self._tx() as cur:
-            cur.execute(SQL_LIVE, (lang, day, exclude_id, int(limit)))
+            cur.execute(SQL_GAME_TOUCH, (discord_id, lang, day, float(min_seconds)))
+            row = cur.fetchone()
+            if row and row[0]:  # a new row: also drop games older than GAME_KEEP_DAYS
+                cur.execute(SQL_GAME_CLEANUP, (day - datetime.timedelta(days=GAME_KEEP_DAYS),))
+        return row is not None
+
+    def live(self, lang, day, exclude_id, limit=30, present_since=None):
+        with self._tx() as cur:
+            cur.execute(SQL_LIVE, (lang, list(SUPPORTED_LANGS), day, exclude_id, present_since, int(limit)))
             rows = cur.fetchall()
         return [{"id": r[0], "username": r[1], "avatar": clean_avatar(r[2]),
                  "guesses": list(r[3]) if isinstance(r[3], list) else [],
@@ -551,12 +609,12 @@ class PostgresStore(Store):
 
     def leaderboard(self, tab, limit):
         with self._tx() as cur:
-            cur.execute(SQL_LEADERBOARD, {"tab": tab, "limit": int(limit)})
+            cur.execute(SQL_LEADERBOARD, {"tab": tab, "limit": int(limit), "langs": list(SUPPORTED_LANGS)})
             return [_row(r) for r in cur.fetchall()]
 
     def standing(self, discord_id, tab):
         with self._tx() as cur:
-            cur.execute(SQL_STANDING, {"tab": tab, "id": discord_id})
+            cur.execute(SQL_STANDING, {"tab": tab, "id": discord_id, "langs": list(SUPPORTED_LANGS)})
             r = cur.fetchone()
         return _row(r) if r else None
 
@@ -565,7 +623,7 @@ class PostgresStore(Store):
         if not out:
             return out
         with self._tx() as cur:
-            cur.execute(SQL_HISTORIES, {"ids": list(out), "tab": tab})
+            cur.execute(SQL_HISTORIES, {"ids": list(out), "tab": tab, "langs": list(SUPPORTED_LANGS)})
             for pid, day, won in cur.fetchall():
                 out[pid].append((day, bool(won)))
         return out

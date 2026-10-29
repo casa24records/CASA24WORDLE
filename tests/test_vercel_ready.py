@@ -132,7 +132,7 @@ def test_every_static_url_is_versioned():
     sys.path.insert(0, ROOT)
     app = importlib.import_module("webapp.app").app
     c = app.test_client()
-    for path in ["/", "/es", "/en", "/ar", "/ko"]:
+    for path in ["/", "/es", "/en"]:
         html = c.get(path).get_data(as_text=True)
         urls = re.findall(r"""/static/[^"'\s)]*""", html)
         assert urls, path

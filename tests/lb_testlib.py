@@ -133,8 +133,7 @@ def answer(lang="es"):
 
 
 def wrong_words(lang, n, avoid=()):
-    """n valid non-answer words; ASCII ones first (Korean, Arabic, Russian...
-    have none, so their own letters are used)."""
+    """n valid non-answer words; ASCII ones first (then words with ñ/accents)."""
     ans = answer(lang)
     words = [w for w in app.language_codes_5words[lang] if w != ans and w not in avoid]
     out = ([w for w in words if w.isascii()] + [w for w in words if not w.isascii()])[:n]

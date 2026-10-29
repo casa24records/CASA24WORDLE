@@ -102,7 +102,7 @@ def test_start_screen(server, page):
     page.wait_for_function("document.querySelector('.c24-play')")
     links = page.locator("a[data-lang]")
     codes = [links.nth(i).get_attribute("data-lang") for i in range(links.count())]
-    assert len(codes) == 10 and set(codes[:2]) == {"es", "en"}
+    assert len(codes) == 2 and set(codes) == {"es", "en"}
     hrefs = [links.nth(i).get_attribute("href") for i in range(links.count())]
     assert all(h.startswith("/") for h in hrefs)  # nothing points to other sites
     assert page.evaluate("document.body.scrollHeight") < 2000
@@ -130,9 +130,9 @@ def test_stats_page_removed(server, page):
 
 
 def pick_accent_case(lang="es"):
-    """An answer with an accented vowel, plus a valid guess that has the plain
-    vowel in that same spot (and nowhere else), shares an exact letter with the
-    answer, and does not fold-match it (so resolveAccents leaves it alone)."""
+    """An answer with an accented vowel, plus a valid plain (ASCII) guess that has
+    the plain vowel in that same spot and does not fold-match the answer (so
+    resolveAccents leaves it alone)."""
     answers = app.language_codes_5words[lang]
     valid = set(answers) | set(app.language_codes_5words_supplements[lang])
     for answer in answers:
@@ -140,21 +140,19 @@ def pick_accent_case(lang="es"):
             plain = fold(ch)
             if plain == ch or not plain.isascii():
                 continue
-            if plain in answer:  # answer must not also have the plain vowel
-                continue
             for guess in sorted(valid):
-                if (
-                    guess.isascii()
-                    and guess[i] == plain
-                    and guess.count(plain) == 1
-                    and fold(guess) != fold(answer)
-                    and any(g == a for g, a in zip(guess, answer))
-                ):
+                if guess.isascii() and guess[i] == plain and fold(guess) != fold(answer):
                     return answer, guess, i, ch, plain
     raise AssertionError(f"no accent test case found for {lang}")
 
 
-def test_spanish_colors_respect_accents(server, page):
+def press_key(page, key):
+    # page.keyboard.press doesn't know "ñ"; a keydown event is what the game reads
+    page.evaluate("k => window.dispatchEvent(new KeyboardEvent('keydown', {key: k}))", key)
+
+
+def test_plain_vowel_greens_accented_answer(server, page):
+    """2026-10-29 rule: a plain "o" counts for "ó" (and back); the plain key gets the color."""
     answer, guess, i, accented, plain = pick_accent_case("es")
     page.goto(f"{server}/es")
     page.wait_for_function("document.querySelector('#app') && window.Vue")
@@ -167,37 +165,33 @@ def test_spanish_colors_respect_accents(server, page):
 
     row = page.locator("main .grid-cols-5").first.locator("> div")
     assert row.nth(i).inner_text().strip().lower() == plain  # resolveAccents kept the guess
-    assert "incorrect" in row.nth(i).get_attribute("class")  # plain "a" never counts for "á"
-    exact = [j for j in range(5) if guess[j] == answer[j]]
-    assert any(" correct" in " " + row.nth(j).get_attribute("class") for j in exact)
-
-    def key_class(c):
-        return page.locator(f'button.key[data-char="{c}"]').get_attribute("class")
-
-    assert "incorrect" in key_class(plain)
-    accented_cls = key_class(accented)
-    assert not any(k in accented_cls.split() for k in ("correct", "semicorrect", "incorrect"))
-    assert key_class(plain) != accented_cls
+    assert " correct" in " " + row.nth(i).get_attribute("class")  # plain vowel = accented one
+    key = page.locator(f'button.key[data-char="{plain}"]').get_attribute("class")
+    assert "correct" in key.split()
+    assert page.locator(f'button.key[data-char="{accented}"]').count() == 0  # no accent keys
 
 
-@pytest.mark.parametrize("lang", ["fr", "pt"])
-def test_accents_optional(server, page, lang):
-    words = app.language_codes_5words[lang]
-    valid = set(words) | set(app.language_codes_5words_supplements[lang])
-    today = app.Language(lang, words).daily_word
-    accented = next(
-        w for w in words
-        if not w.isascii() and fold(w).isascii() and fold(w) != fold(today)
-        and fold(w) not in valid
-        and fold(w) not in {fold(x) for x in valid if x != w}
-    )
-    page.goto(f"{server}/{lang}")
+def test_enye_word_typed_plain_wins_and_shares_colors_only(server, page):
+    """An answer with ñ and an accent, typed on a physical keyboard without the accent:
+    it wins, the board shows the real spelling, and the share text has no letters."""
+    words = app.language_codes_5words["es"]
+    answer = next((w for w in words if "ñ" in w and fold(w) != w), None) or next(w for w in words if "ñ" in w)
+    page.goto(f"{server}/es")
     page.wait_for_function("document.querySelector('#app') && window.Vue")
-    type_word(page, fold(accented))
-    wait_reveal(page)
-    board = page.locator("main .grid-cols-5").first.inner_text()
-    letter = next(c for c in accented if not c.isascii())
-    assert letter.upper() in board, (accented, board)
+    vm = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
+    page.evaluate(f"w => {{ {vm}.todays_word = w; }}", answer)
+    for c in fold(answer):
+        press_key(page, c.upper())  # Shift/Caps Lock, Ñ included
+    press_key(page, "Enter")
+    page.wait_for_function(
+        "JSON.parse(localStorage.getItem('game_results') || '{}').es?.slice(-1)[0]?.won === true",
+        timeout=5000,
+    )
+    assert page.evaluate(f"{vm}.tiles[0].join('')") == answer
+    saved = page.evaluate("JSON.parse(localStorage.getItem('es')).tiles[0].join('')")
+    assert saved == answer
+    board = page.evaluate(f"{vm}.getEmojiBoard()")
+    assert board.startswith("🟩🟩🟩🟩🟩") and set(board) <= set("🟩🟧⬜\n"), board
 
 
 KOLO_IMG = "img.c24-kolo"

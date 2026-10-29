@@ -14,7 +14,6 @@
         "notification-not-valid": "Word is not valid",
         "notification-share-unsupported": "Sorry, your browser doesn't support sharing. Please copy the text and share it yourself.",
         "settings": "Settings",
-        "right_to_left": "Right to left",
         "keyboard_layout": "Keyboard layout",
         "easy_mode": "Allow any word (easy mode)",
         "stats_games": "Games",
@@ -80,9 +79,16 @@
         "activity_lang_button": "Change language",
         "legal_terms": "Terms",
         "legal_privacy": "Privacy",
-        "lb_cancel": "Cancel"
+        "lb_cancel": "Cancel",
+        "key_enter": "Enter",
+        "key_backspace": "Backspace",
+        "activity_invite": "Invite friends",
+        "help_label": "How to play",
+        "stats_label": "Statistics",
+        "board_label": "Game board",
+        "board_row": "Row",
+        "keyboard_label": "Keyboard"
     },
-    "right_to_left": "false",
     "help": {
         "title": "How to Play",
         "title_2": "Examples",

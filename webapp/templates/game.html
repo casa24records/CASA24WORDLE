@@ -30,6 +30,8 @@
     <meta property="twitter:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/kolo/kolo-hero.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('favicon/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ asset('favicon/site.webmanifest') }}">
+    {% if hreflang_links is defined and hreflang_links %}{% for l in hreflang_links %}<link rel="alternate" hreflang="{{ l.lang }}" href="{{ l.href }}">
+    {% endfor %}{% endif %}
 
     <!-- Vue 3.5.13 production build with the template compiler, served from our origin (templates compile in the browser).
          defer: runs after parsing, in order, before game.js -->
@@ -49,7 +51,7 @@
 
     <!-- backend data: raw UTF-8 JSON (see json_script in app.py). JSON only, no inline code:
          the Discord Activity's CSP runs only files from our origin. game.js reads both blocks. -->
-    <script type="application/json" id="c24-data">{{ json_script({"word_list": language.word_list, "word_list_supplement": language.word_list_supplement, "characters": language.characters, "config": language.config}) }}</script>
+    <script type="application/json" id="c24-data">{{ json_script({"word_list": language.word_list, "word_list_supplement": language.word_list_supplement, "characters": language.characters, "input_characters": (language.input_characters if language.input_characters is defined else language.characters), "config": language.config}) }}</script>
     <!-- page settings: todays_word is "" in the leaderboard game (the server colors guesses);
          demo = Developer view; lb = leaderboard game (/lb/<lang>); activity = inside Discord -->
     <script type="application/json" id="c24-page">{{ json_script({"todays_idx": language.todays_idx | string, "todays_word": language.daily_word, "kolo_base": url_for('static', filename='images/kolo/'), "asset_v": asset_version('images/kolo/'), "demo": (demo is defined and demo) and true or false, "lb": (lb is defined and lb) and true or false, "lb_enabled": (lb_enabled is defined and lb_enabled) and true or false, "activity": in_activity and true or false}) }}</script>
@@ -66,32 +68,10 @@
     <div id="app" data-public-origin="{{ public_url }}">
         <!-- Header, board and keyboard: one centered column that fills the screen (style.css "game layout") -->
         <div class="c24-game{% if demo %} c24-demo{% endif %}">
-            <!-- The Header: 3 columns (help / title / stats + settings), so nothing overlaps -->
-            <header class="c24-header{% if lb %} c24-header-lb{% endif %} border-b border-neutral-300">
-                <div class="c24-header-side">
-                    {% if in_activity %}
-                    <!-- inside Discord: the leaderboard opens in a window (no login menu, no page change) -->
-                    <button type="button" class="c24-icon-btn" data-activity-board-open
-                        aria-label="{{ t('lb_view', 'View leaderboard') }}" title="{{ t('lb_view', 'View leaderboard') }}"
-                        v-on:click="openBoard">{{ dc.trophy() }}</button>
-                    {% elif lb %}
-                    {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
-                        t('lb_account', 'Your Discord account'), t('lb_signin', 'Sign in with Discord'),
-                        t('lb_view', 'View leaderboard'), t('lb_logout', 'Log out')) }}
-                    {% endif %}
-                    <button type="button" class="c24-icon-btn" aria-label="instructions"
-                        v-on:click="showHelpModal = !showHelpModal">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <circle cx="12" cy="12" r="9"></circle>
-                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                            <polyline points="11 12 12 12 12 16 13 16"></polyline>
-                        </svg>
-                    </button>
-                </div>{% if in_activity %}
-                <!-- inside Discord: the title opens the language window (never a page change:
+            <!-- The Header (NYT-style bar): brand on the left, actions on the right, so nothing
+                 overlaps. Focus order: brand, actions, board, keyboard. -->
+            <header class="c24-header c24-header-bar{% if lb %} c24-header-lb{% endif %}{% if in_activity %} c24-header-act{% elif not lb and not (lb_enabled and not demo) %} c24-header-guest{% endif %} border-b border-neutral-300">{% if in_activity %}
+                <!-- inside Discord: the brand opens the language window (never a page change:
                      the Activity shell swaps the game, its Discord connection stays) -->
                 <h1 class="c24-title c24-header-title uppercase"><button type="button" class="c24-lang-btn inline-flex items-center gap-2"
                         data-activity-lang-open aria-haspopup="dialog" v-on:click="openLang"
@@ -103,7 +83,7 @@
                         <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
                         <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
                         <span class="c24-title-text">Casa 24</span>
-                        <span class="c24-badge">{{ language.config.language_code }}</span>{% if lb %}<span class="c24-badge c24-badge-lb" title="{{ t('lb_title', 'Leaderboard') }}" role="img" aria-label="{{ t('lb_title', 'Leaderboard') }}">{{ dc.trophy('c24-trophy c24-trophy-badge') }}</span>{% endif %}</a></h1>{% endif %}
+                        <span class="c24-badge">{{ language.config.language_code }}</span></a></h1>{% endif %}
                 <div class="c24-header-side c24-header-end">
                     {% if lb %}
                     <!-- who else is playing today: opens the live sheet (hidden where the sidebar shows).
@@ -129,7 +109,28 @@
                         <span v-if="live_count > 0" class="c24-live-badge" aria-hidden="true" v-cloak>[[ live_count > 99 ? '99+' : live_count ]]</span>
                     </button>
                     {% endif %}
-                    <button type="button" class="c24-icon-btn" aria-label="stats"
+                    <button type="button" class="c24-icon-btn" data-help-open aria-label="{{ t('help_label', 'How to play') }}"
+                        title="{{ language.config.help.title }}"
+                        v-on:click="showHelpModal = !showHelpModal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            <polyline points="11 12 12 12 12 16 13 16"></polyline>
+                        </svg>
+                    </button>
+                    {% if in_activity %}
+                    <!-- inside Discord: the leaderboard opens in a window (no login menu, no page change) -->
+                    <button type="button" class="c24-icon-btn" data-activity-board-open
+                        aria-label="{{ t('lb_view', 'View leaderboard') }}" title="{{ t('lb_view', 'View leaderboard') }}"
+                        v-on:click="openBoard">{{ dc.trophy() }}</button>
+                    {% elif lb or (lb_enabled and not demo) %}
+                    <a href="/leaderboard?tab={{ language.config.language_code }}" class="c24-icon-btn" data-lb-trophy
+                        aria-label="{{ t('lb_view', 'View leaderboard') }}" title="{{ t('lb_view', 'View leaderboard') }}">{{ dc.trophy() }}</a>
+                    {% endif %}
+                    <button type="button" class="c24-icon-btn" data-stats-open aria-label="{{ t('stats_label', 'Statistics') }}" title="{{ t('stats_label', 'Statistics') }}"
                         v-on:click="show_stats_modal = !show_stats_modal">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24"
                             height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
@@ -153,6 +154,11 @@
                             <circle cx="12" cy="12" r="3"></circle>
                         </svg>
                     </button>
+                    {% if lb and not in_activity %}
+                    {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
+                        t('lb_account', 'Your Discord account'), t('lb_signin', 'Sign in with Discord'),
+                        t('lb_view', 'View leaderboard'), t('lb_logout', 'Log out')) }}
+                    {% endif %}
                 </div>
             </header>
             {% if demo %}
@@ -163,11 +169,11 @@
             {% endif %}
             <!-- The game board: sized from the space left between header and keyboard -->
             <main class="c24-board-area">
-                <div class="c24-board">
+                <div class="c24-board" role="grid" aria-label="{{ t('board_label', 'Game board') }}">
                     {% for i in range(6) %}
-                    <div class="grid grid-cols-5">
+                    <div class="grid grid-cols-5" role="row" aria-label="{{ t('board_row', 'Row') }} {{ i + 1 }}">
                         {% for j in range(5) %}
-                        <div class="justify-center items-center inline-flex"
+                        <div class="justify-center items-center inline-flex" role="gridcell"
                             v-html="[[ tiles_visual[{{i}}][{{j}}] ]]"
                             v-bind:class="[[ tile_classes_visual[{{i}}][{{j}}] ]]">
                         </div>
@@ -176,13 +182,13 @@
                     {% endfor %}
                 </div>
             </main>
-            <!-- The keyboard: --rows lets style.css make keys shorter when there are many rows -->
-            <div class="c24-keyboard" style="--rows: {{ language.keyboard | length }}">
+            <!-- The keyboard, right under the board: --rows lets style.css make keys shorter on short screens -->
+            <div class="c24-keyboard" role="group" aria-label="{{ t('keyboard_label', 'Keyboard') }}" style="--rows: {{ language.keyboard | length }}">
                 {% for row in language.keyboard %}
                 <div class="c24-key-row">
                     {% for c in row %}
                     <button type="button" class="rounded uppercase font-bold key"
-                        data-char="{{ c }}" aria-label="{{ c }}" v-on:click="keyClick('{{ c }}')"
+                        data-char="{{ c }}" aria-label="{% if c == '⇨' %}{{ t('key_enter', 'Enter') }}{% elif c == '⌫' %}{{ t('key_backspace', 'Backspace') }}{% else %}{{ c }}{% endif %}" v-on:click="keyClick('{{ c }}')"
                         v-bind:class="[[ key_classes['{{ c }}'] ]]">{{ c }}</button>
                     {% endfor %}
                 </div>
@@ -192,8 +198,9 @@
 
         {% if lb %}
         <!-- Live view: other players' boards today, colors only (never letters; GET /api/live).
-             ≥1024px wide: a sidebar next to the game. Narrower or landscape phones: a bottom sheet
-             opened from the people button in the header. -->
+             ≥1024px wide (Discord desktop ≥860px): a rail of cards in the left gutter, the game
+             column stays centered. Narrower or landscape phones: a bottom sheet opened from
+             the people button in the header. -->
         <div v-show="live_open" class="c24-live-backdrop" v-on:click="closeLive" v-cloak></div>
         <aside id="c24-live" class="c24-live" data-live v-bind:class="{ 'is-open': live_open }"
             aria-labelledby="c24-live-title">
@@ -203,6 +210,15 @@
                 <button type="button" class="c24-close c24-live-close" data-live-close
                     aria-label="{{ t('lb_dismiss', 'Close') }}" v-on:click="closeLive">×</button>
             </div>
+            {% if in_activity %}
+            <!-- Discord only: opens Discord's invite window (game.js inviteFriends → the shell's SDK) -->
+            <button type="button" class="c24-live-invite" data-live-invite v-on:click="inviteFriends">
+                <span class="c24-live-invite-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"
+                    viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                    stroke-linejoin="round" focusable="false"><circle cx="9" cy="7" r="4"></circle><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"></path><path d="M19 8v6"></path><path d="M16 11h6"></path></svg></span>
+                <span class="c24-live-invite-text">{{ t('activity_invite', 'Invite friends') }}</span>
+            </button>
+            {% endif %}
             <p v-if="live_loaded && live_players.length === 0" class="c24-live-empty" v-cloak>{{ t('lb_live_empty', 'No one else is playing right now') }}</p>
             <ul class="c24-live-list" v-cloak>
                 <li v-for="(p, n) in live_players" v-bind:key="n + ':' + p.username" class="c24-live-card">
@@ -317,29 +333,8 @@
                 <div class="flex flex-col gap-2">
                     <h3 id="settings-title" class="uppercase font-bold text-xl tracking-wider mb-5">{{ t('settings', 'Settings') }}</h3>
                     <div class="space-y-4">
-                        <!-- toggle button for right_to_left -->
-                        <div class="flex flex-row items-center">
-                            <p class="flex-grow">{{ t('right_to_left', 'Right to left') }}</p>
-                            <!-- toggle at the end -->
-                            <div class="flex flex-row items-center">
-                                <label for="right_to_left" class="flex items-center ml-2 animate-bounce">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="text-neutral-500 mr-4" width="24"
-                                        height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
-                                        fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                        <path
-                                            d="M12 15v3.586a1 1 0 0 1 -1.707 .707l-6.586 -6.586a1 1 0 0 1 0 -1.414l6.586 -6.586a1 1 0 0 1 1.707 .707v3.586h3v6h-3z">
-                                        </path>
-                                        <path d="M21 15v-6"></path>
-                                        <path d="M18 15v-6"></path>
-                                    </svg>
-                                </label>
-                                <input type="checkbox" id="right_to_left" v-model="right_to_left" />
-                            </div>
-                        </div>
-
                         {% if language.keyboard_layouts|length > 1 %}
-                        <div class="border-t-2 border-gray-300"></div>
+                        <!-- keyboard layout (es: QWERTY (Ñ) / Alfabético; en: QWERTY / Dvorak / Alphabetical) -->
                         <form method="get" class="flex flex-row items-center"
                             aria-label="Keyboard layout selector">
                             {% for k, v in activity_params %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
@@ -360,7 +355,7 @@
                         {# inside Discord the language is changed from the header button ("ES ▾") #}
 
                         {% if not lb %}
-                        <div class="border-t-2 border-gray-300"></div>
+                        {% if language.keyboard_layouts|length > 1 %}<div class="border-t-2 border-gray-300"></div>{% endif %}
                         <div class="flex flex-row items-center">
                             <p class="flex-grow">{{ t('easy_mode', 'Allow any word (easy mode)') }}</p>
                             <!-- toggle at the end -->
@@ -368,7 +363,7 @@
                         </div>
                         {% endif %}
 
-                        <div class="border-t-2 border-gray-300"></div>
+                        {% if language.keyboard_layouts|length > 1 or not lb %}<div class="border-t-2 border-gray-300"></div>{% endif %}
                         <div class="flex flex-row items-center">
                             <p id="theme-label" class="flex-grow">{{ t('theme', 'Theme') }}</p>
                             <select id="theme-select" aria-labelledby="theme-label" class="rounded border px-2 py-1"
@@ -561,7 +556,7 @@
                 <div class="c24-lang-list">
                     {% for l in activity_langs %}
                     <button type="button" class="c24-lang-choice{% if l.code == language.language_code %} is-active{% endif %}"
-                        data-lang-choice="{{ l.code }}" lang="{{ l.code }}"{% if l.rtl %} dir="rtl"{% endif %}
+                        data-lang-choice="{{ l.code }}" lang="{{ l.code }}"
                         {% if l.code == language.language_code %}aria-current="true"{% endif %}
                         v-on:click="chooseLang('{{ l.code }}')">{{ l.name_native }}</button>
                     {% endfor %}

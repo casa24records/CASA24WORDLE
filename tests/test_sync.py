@@ -225,7 +225,8 @@ def test_7_panama_day_change_new_empty_game(lb_env, client, discord, mem, today,
     # a client still on yesterday's row 2 is told to repaint (nothing saved)
     r = guess(client, wrong_words("es", 3)[2], attempt=2)
     assert r.status_code == 409 and r.get_json()["state"] == after
-    assert (P1, "es", datetime.date(2026, 11, 4)) not in mem.games
+    # opening the new day's game only marks presence (a row with no guesses)
+    assert mem.games[(P1, "es", datetime.date(2026, 11, 4))]["guesses"] == []
     assert guess(client, wrong_words("es", 1)[0], attempt=0).status_code == 200
     client.get("/lb/es")
     assert rendered[-1][1]["lb_state"]["day"] == "2026-11-04"
@@ -235,7 +236,7 @@ def test_7_panama_day_change_new_empty_game(lb_env, client, discord, mem, today,
 def test_8_guest_web_pages_write_nothing(lb_env, client, discord, mem):
     # (platform=tv is not a Discord Activity: still the guest game; inside the
     # Activity /es redirects to the leaderboard game, see test_activity.py)
-    paths = ["/", "/es", "/en", "/ko", "/es?frame_id=abc&instance_id=i&platform=tv", "/leaderboard"]
+    paths = ["/", "/es", "/en", "/es?frame_id=abc&instance_id=i&platform=tv", "/leaderboard"]
     for path in paths:
         assert client.get(path).status_code == 200, path
     assert client.get("/api/state?lang=es").status_code == 401

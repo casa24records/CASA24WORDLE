@@ -1,7 +1,6 @@
 // Casa 24 Wordle start screen.
-// Big cards for all 10 languages: Español/English first (last of the two played,
-// else the browser language), then the other 8; every card follows the guest /
-// leaderboard mode. Also
+// Two big cards, Español and English (last of the two played first, else the
+// browser language); both follow the guest / leaderboard mode. Also
 // today's puzzle number with a countdown to midnight Panama time, and stats.
 
 function panamaDay(date) {
@@ -59,26 +58,12 @@ const app = Vue.createApp({
             var second = first === "es" ? "en" : "es";
             return [this.languages[first], this.languages[second]];
         },
-        otherLanguages() {
-            // every language except es/en, in the server's order (alphabetical by code)
-            var out = [];
-            for (var code in this.languages) {
-                if (code !== "es" && code !== "en") out.push(this.languages[code]);
-            }
-            return out;
-        },
         menuLanguages() {
-            return this.primaryLanguages.concat(this.otherLanguages);
-        },
-        uiLang() {
-            // words on the cards of the other 8 languages: the first primary language
-            return this.preferredLanguage;
+            return this.primaryLanguages;
         },
         loginLanguage() {
-            // where the Discord sign-in lands: the last language played (any of the 10),
-            // else the preferred es/en
-            var saved = readStorage("casa24_lang");
-            return saved && this.languages[saved] ? saved : this.preferredLanguage;
+            // where the Discord sign-in lands: the last language played, else the browser's
+            return this.preferredLanguage;
         },
         status() {
             // per language: played today? current streak?
@@ -125,17 +110,14 @@ const app = Vue.createApp({
             this.mode = mode === "lb" && this.lb.user ? "lb" : "guest";
             writeStorage("casa24_mode", this.mode);
         },
-        labelLang(code) {
-            // es/en cards speak their own language; the others use the menu's language
-            return code === "es" || code === "en" ? code : this.uiLang;
-        },
         label(code, key) {
-            var es = this.labelLang(code) === "es";
+            // each card speaks its own language
+            var es = code === "es";
             if (key === "played") return es ? "Jugada hoy" : "Played today";
             return es ? "Jugar" : "Play";
         },
         playHref(code) {
-            // guest: /de; leaderboard (signed in, any language): /lb/de
+            // guest: /en; leaderboard (signed in): /lb/en
             if (this.mode !== "lb" || !this.lb.enabled || !this.lb.user) return "/" + code;
             return "/lb/" + code;
         },
@@ -211,7 +193,10 @@ const app = Vue.createApp({
             var n_victories = 0; // total number of victories
             var n_losses = 0; // total number of losses
 
-            var language_keys = Object.keys(this.game_results);
+            // only Spanish and English count (saved results of removed languages are ignored)
+            var language_keys = Object.keys(this.game_results).filter(function (code) {
+                return code === "es" || code === "en";
+            });
 
             // order all games by date and calculate overall streaks
             var all_results = [];

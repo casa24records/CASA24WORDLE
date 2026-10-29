@@ -1,6 +1,6 @@
 # Casa 24 Wordle
 
-Casa 24 Records' daily word game. Spanish and English, plus 8 more languages, with Casa 24's own words added to Spanish and English.
+Casa 24 Records' daily word game in Spanish and English, with Casa 24's own words added to both.
 
 - **Daily word:** one word per language per day, the same for everyone, changing at midnight Panama time (UTC-5). About 1 day in 5 the Spanish or English word comes from the Casa 24 list. Details in `webapp/daily.py` and `.claude/skills/casa24-wordle/SKILL.md`.
 - **Accents:** in Spanish you can type with or without accents (`cancion` finds `canción`); ñ always counts as its own letter.
@@ -17,6 +17,7 @@ cd webapp && ../.venv/bin/flask --app app run
 ```
 
 - **Tests:** `.venv/bin/python -m pytest -q tests`
+- **Remove old-language leaderboard rows:** `scripts/purge_languages.py` (dry run by default; deleting needs the owner's go-ahead).
 - **Add words:** `scripts/merge_words.py`, then `scripts/validate_words.py` and the tests.
 - **Screenshots:** `.venv/bin/python scripts/screenshots.py` (phone size, light and dark).
 

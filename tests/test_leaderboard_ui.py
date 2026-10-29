@@ -105,7 +105,7 @@ def test_menu_logged_out_shows_discord_button():
     assert "no vemos tu contraseña" not in main_view(html)
     assert "Discord handles your login" not in main_view(html)
     assert "/auth/logout" not in main_view(html) and "data-dc-toggle" not in main_view(html)  # logged out
-    # all 10 languages are big cards (Vue); the old "Más idiomas" chips are gone
+    # Español and English are big cards (Vue); the old "Más idiomas" chips are gone
     assert "c24-chip" not in html and "Más idiomas" not in html and "more-languages" not in html
 
 
@@ -161,9 +161,7 @@ def test_guest_end_window_hint_only_when_enabled():
     out = render_game("es", lb_enabled=True, lb_user=None)
     assert "/auth/discord/login?next=" in out and "c24-dc-btn" in out and DISCORD_PATH in out
     assert 'href="/lb/en"' in render_game("en", lb_enabled=True, lb_user=ME)
-    # every language has the leaderboard now
-    assert "data-lb-hint" in render_game("de", lb_enabled=True, lb_user=None)
-    assert 'href="/lb/ko"' in render_game("ko", lb_enabled=True, lb_user=ME)
+    assert "data-lb-hint" in render_game("en", lb_enabled=True, lb_user=None)
     assert "data-lb-hint" not in render_game("es", demo=True, lb_enabled=True, lb_user=None)
 
 
@@ -185,46 +183,44 @@ def test_leaderboard_page_table_and_me():
     assert "no vemos tu contraseña" in html
 
 
-# what app.py hands the page (lb_tabs): every language in menu order, then "all"
-LB_TABS_ALL = [{"code": c, "name_native": app.languages[c]["language_name_native"]} for c in app.language_codes] \
-    + [{"code": "all", "name_native": None}]
+# what app.py hands the page (lb_tabs): "all" (Combinado), then es, en
+LB_TABS_ALL = [{"code": "all", "name_native": None}] + [
+    {"code": c, "name_native": app.languages[c]["language_name_native"]} for c in app.language_codes]
 
 
-def test_leaderboard_page_tabs_for_every_language():
-    html = render("leaderboard.html", "/leaderboard?tab=de", tab="de", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
+def test_leaderboard_page_three_tabs():
+    html = render("leaderboard.html", "/leaderboard?tab=en", tab="en", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
                   is_admin=False, lb_user=None, lb_enabled=True)
     tabs = re.findall(r'data-tab="([a-z]+)"', html)
-    assert tabs == list(app.language_codes) + ["all"] and len(tabs) == 11
-    assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="de"', html)
-    assert 'href="/leaderboard?tab=ko"' in html and "Deutsch" in html and "العربية" in html
-    assert "next=/leaderboard%3Ftab%3Dde" in html  # sign-in comes back to this tab
-    # page text: the tab's language when its texts are passed, else Spanish/English
-    de = render("leaderboard.html", "/leaderboard?tab=de", tab="de", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
-                is_admin=False, lb_user=None, lb_enabled=True,
-                texts={"de": {"lb_title": "Bestenliste"}, "en": {}, "es": {}})
-    assert '<html lang="de">' in de and "Bestenliste" in de
-    ar = render("leaderboard.html", "/leaderboard?tab=ar", tab="ar", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
-                is_admin=False, lb_user=None, lb_enabled=True, texts={"ar": {"lb_title": "x"}})
-    assert '<html lang="ar" dir="rtl">' in ar
-    # unknown tab → Combinado; no `tabs` from the backend → es/en/all
-    bad = render("leaderboard.html", "/leaderboard?tab=xx", tab="xx", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
+    assert tabs == ["all", "es", "en"]
+    assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="en"', html)
+    assert 'href="/leaderboard?tab=es"' in html and "Español" in html and "English" in html
+    assert "next=/leaderboard%3Ftab%3Den" in html  # sign-in comes back to this tab
+    assert '<html lang="en">' in html and 'dir="rtl"' not in html
+    # page text: the tab's language when its texts are passed
+    es = render("leaderboard.html", "/leaderboard?tab=es", tab="es", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
+                is_admin=False, lb_user=None, lb_enabled=True, texts={"es": {"lb_title": "Clasificación"}, "en": {}})
+    assert '<html lang="es">' in es and "Clasificación" in es
+    # unknown or removed tab → Combinado; no `tabs` from the backend → all/es/en
+    for old in ("xx", "de", "ar"):
+        bad = render("leaderboard.html", f"/leaderboard?tab={old}", tab=old, lb_tabs=LB_TABS_ALL, rows=[],
+                     me_row=None, is_admin=False, lb_user=None, lb_enabled=True)
+        assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="all"', bad)
+    old = render("leaderboard.html", "/leaderboard?tab=es", tab="es", rows=[], me_row=None,
                  is_admin=False, lb_user=None, lb_enabled=True)
-    assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="all"', bad)
-    old = render("leaderboard.html", "/leaderboard?tab=de", tab="de", rows=[], me_row=None,
-                 is_admin=False, lb_user=None, lb_enabled=True)
-    assert re.findall(r'data-tab="([a-z]+)"', old) == ["es", "en", "all"]
-    # a list without "all" still gets the Combinado tab
-    no_all = render("leaderboard.html", "/leaderboard", tab="all", tabs=LB_TABS_ALL[:-1], rows=[], me_row=None,
+    assert re.findall(r'data-tab="([a-z]+)"', old) == ["all", "es", "en"]
+    # a list without "all" still gets the Combinado tab, first
+    no_all = render("leaderboard.html", "/leaderboard", tab="all", tabs=LB_TABS_ALL[1:], rows=[], me_row=None,
                     is_admin=False, lb_user=None, lb_enabled=True)
-    assert re.findall(r'data-tab="([a-z]+)"', no_all)[-1] == "all" and "Combinado" in no_all
+    assert re.findall(r'data-tab="([a-z]+)"', no_all)[0] == "all" and "Combinado" in no_all
 
 
-@pytest.mark.parametrize("lang", ["de", "ko", "ar"])
+@pytest.mark.parametrize("lang", ["es", "en"])
 def test_leaderboard_game_page_any_language(lang):
     html = render_game(lang, lb=True, lb_state=None, lb_enabled=True, lb_user=ME)
     assert '"lb":true' in html and '"todays_word":""' in html
     assert 'id="c24-live"' in html and "data-live-open" in html and "data-live-faces" in html
-    assert "c24-badge c24-badge-lb" in html and "c24-trophy-badge" in html
+    assert "data-lb-trophy" in html and "c24-badge-lb" not in html  # trophy is a header action (NYT-style bar)
     assert f"/leaderboard?tab={lang}" in html and "data-lb-end" in html
     assert "data-dc-toggle" in html and '<script type="application/json" id="c24-dc-me">"100000000000000001"</script>' in html  # avatar + its script
     assert "data-lb-hint" not in html  # the hint is only for guest games
@@ -328,9 +324,6 @@ def test_menu_logged_in_cards_and_guest_toggle(server, page):
     assert page.is_checked("[data-guest-toggle]")
 
 
-OTHER_LANGS = [c for c in app.language_codes if c not in ("es", "en")]
-
-
 def card_info(page):
     return page.eval_on_selector_all(".c24-primary > .c24-play", """els => els.map(e => ({
         lang: e.dataset.lang || null, href: e.getAttribute('href'), cls: e.className, dir: e.getAttribute('dir'),
@@ -338,44 +331,45 @@ def card_info(page):
         trophy: !!e.querySelector('[data-lb-status] .c24-trophy')}))""")
 
 
-def test_menu_ten_big_cards_then_developer_view(server, page):
+def test_menu_two_big_cards_then_developer_view(server, page):
     page.set_viewport_size({"width": 390, "height": 844})
     open_menu(server, page, render_menu(lb_enabled=True, lb_user=None, demo_enabled=True))
     cards = card_info(page)
-    assert [c["lang"] for c in cards[:10]][:2] in (["es", "en"], ["en", "es"])
-    assert [c["lang"] for c in cards[2:10]] == OTHER_LANGS
+    assert [c["lang"] for c in cards[:2]] in (["es", "en"], ["en", "es"])
     assert cards[-1]["lang"] is None and "c24-play-demo" in cards[-1]["cls"]  # Developer view last
-    assert len(cards) == 11 and page.locator(".c24-chips, .c24-chip").count() == 0
-    # every language card is the same big card (same height), guest links when logged out
-    heights = {round(c["h"]) for c in cards[:10]}
-    assert max(heights) - min(heights) <= 2, heights
-    assert all(c["href"] == "/" + c["lang"] for c in cards[:10])
-    assert next(c for c in cards if c["lang"] == "ar")["dir"] == "rtl"
-    # other cards speak the menu's language (first primary card)
-    ui = cards[0]["lang"]
-    de = next(c for c in cards if c["lang"] == "de")
-    assert ("Jugar" if ui == "es" else "Play") in de["status"]
+    assert len(cards) == 3 and page.locator(".c24-chips, .c24-chip").count() == 0
+    # both language cards are links to the guest game when logged out, no dir=rtl anywhere
+    assert all(c["href"] == "/" + c["lang"] for c in cards[:2])
+    assert all(c["dir"] is None for c in cards)
+    # each card speaks its own language
+    assert "Jugar" in next(c for c in cards if c["lang"] == "es")["status"]
+    assert "Play" in next(c for c in cards if c["lang"] == "en")["status"]
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
 
 
 def test_menu_logged_in_every_card_goes_to_leaderboard(server, page):
     open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
     cards = card_info(page)
-    assert len(cards) == 10
+    assert len(cards) == 2
     for c in cards:
         assert c["href"] == "/lb/" + c["lang"] and c["trophy"], c
     page.click(".c24-guest-toggle")
-    assert page.get_attribute("a.c24-play[data-lang=de]", "href") == "/de"
-    assert page.get_attribute("a.c24-play[data-lang=ar]", "href") == "/ar"
+    assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/en"
+    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"
 
 
 def test_menu_sign_in_goes_to_last_language_played(server, page):
     open_menu(server, page, render_menu(lb_enabled=True, lb_user=None))
+    page.evaluate("localStorage.setItem('casa24_lang', 'en')")
+    page.reload()
+    page.wait_for_function("window.Vue && document.querySelector('[data-lang=en]')")
+    assert page.get_attribute("[data-dc-area] .c24-dc-btn", "href") == "/auth/discord/login?next=%2Flb%2Fen"
+    assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/en"  # logged out: guest
+    # a removed language saved on the device is ignored
     page.evaluate("localStorage.setItem('casa24_lang', 'ko')")
     page.reload()
-    page.wait_for_function("window.Vue && document.querySelector('[data-lang=ko]')")
-    assert page.get_attribute("[data-dc-area] .c24-dc-btn", "href") == "/auth/discord/login?next=%2Flb%2Fko"
-    assert page.get_attribute("a.c24-play[data-lang=ko]", "href") == "/ko"  # logged out: guest
+    page.wait_for_function("window.Vue && document.querySelector('[data-lang=en]')")
+    assert "%2Flb%2Fko" not in page.get_attribute("[data-dc-area] .c24-dc-btn", "href")
 
 
 def test_menu_avatar_from_fragment_menu_and_logout(server, page):
@@ -798,7 +792,7 @@ def test_live_people_icon_when_nobody_plays(browser, server):
         ctx.close()
 
 
-@pytest.mark.parametrize("lang", ["es", "ar", "vi"])
+@pytest.mark.parametrize("lang", ["es", "en"])
 @pytest.mark.parametrize("width,height", [(320, 568), (360, 740), (390, 844)])
 def test_live_facepile_header_fits(browser, server, lang, width, height):
     ctx, page = open_lb_mobile(browser, server, lang=lang, width=width, height=height)
@@ -810,11 +804,13 @@ def test_live_facepile_header_fits(browser, server, lang, width, height):
             assert a["x"] >= 0 and a["x"] + a["width"] <= width + 0.5, a
             for b in boxes[i + 1:]:
                 assert not boxes_overlap(a, b), (a, b)
-        # Kolo, the language badge and the trophy stay visible inside the title
-        for sel in ("header .c24-logo", "header .c24-badge:not(.c24-badge-lb)", "header .c24-badge-lb"):
+        # Kolo and the language badge stay visible inside the brand (left); the trophy is an action (right)
+        title = page.locator("header .c24-header-title").bounding_box()
+        for sel in ("header .c24-logo", "header .c24-badge"):
             box = page.locator(sel).bounding_box()
             assert box and box["width"] > 0, sel
-            title = page.locator("header .c24-header-title").bounding_box()
             assert box["x"] >= title["x"] - 0.5 and box["x"] + box["width"] <= title["x"] + title["width"] + 0.5, sel
+        trophy = page.locator("header [data-lb-trophy]").bounding_box()
+        assert trophy and trophy["x"] >= title["x"] + title["width"] - 0.5
     finally:
         ctx.close()

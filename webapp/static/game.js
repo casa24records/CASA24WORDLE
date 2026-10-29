@@ -11,6 +11,33 @@ const word_list = c24_data.word_list || [];
 const word_list_supplement = c24_data.word_list_supplement || [];
 const characters = c24_data.characters || [];
 const config = c24_data.config || {};
+
+function foldAccents(text) {
+    // Letters as the game compares them: accents and diaeresis don't count
+    // ("canción" -> "cancion", "ü" -> "u"), but ñ is its own letter. NFC first, so a
+    // decomposed n + U+0303 is ñ too. Same as fold_accents in leaderboard.py.
+    return Array.from(String(text || "").normalize("NFC")).map(function (c) {
+        return (c === "ñ" || c === "Ñ") ? c : c.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }).join("");
+}
+
+function inputCharacters() {
+    // The letters a player can type: the keyboard's letters (from the page data,
+    // else the keys on the page, else the language's characters), folded, no ⇨/⌫.
+    var given = c24_data.input_characters;
+    if (typeof given === "string") { given = Array.from(given); }
+    if (!Array.isArray(given) || !given.length) {
+        given = Array.from(document.querySelectorAll(".c24-keyboard [data-char]")).map((b) => b.getAttribute("data-char"));
+    }
+    if (!given.length) { given = characters; }
+    var out = [];
+    given.forEach(function (c) {
+        var f = foldAccents(String(c).toLowerCase());
+        if (Array.from(f).length === 1 && f !== "⇨" && f !== "⌫" && out.indexOf(f) < 0) { out.push(f); }
+    });
+    return out;
+}
+const INPUT_CHARS = inputCharacters();
 const todays_idx = String(c24_page.todays_idx || "");
 const todays_word = c24_page.todays_word || "";  // "" in the leaderboard game: the server colors guesses
 const KOLO_BASE = c24_page.kolo_base || "/static/images/kolo/";
@@ -74,10 +101,9 @@ function liveCells(rows) {
     return cells;
 }
 
-function livePlayer(p, rtl) {
-    // rtl (Arabic): each mini-board row reads right to left, like the big board
+function livePlayer(p) {
+    // a player who just opened the game (presence, no guesses yet) has rows [] -> an empty 6x5 board
     var rows = Array.isArray(p.rows) ? p.rows : [];
-    if (rtl) { rows = rows.map((r) => Array.isArray(r) ? r.slice(0, 5).reverse() : r); }
     var avatar = typeof p.avatar_url === "string" && LIVE_AVATAR_RE.test(p.avatar_url)
         ? p.avatar_url : "https://cdn.discordapp.com/embed/avatars/0.png";
     return {
@@ -143,7 +169,6 @@ const app = Vue.createApp({
             todays_word: todays_word,
             todays_idx: todays_idx,
             config: config,
-            right_to_left: config.right_to_left == "true",
             allow_any_word: false,
 
 
@@ -175,7 +200,7 @@ const app = Vue.createApp({
                 ["border-2 border-neutral-300", "border-2 border-neutral-300", "border-2 border-neutral-300", "border-2 border-neutral-300", "border-2 border-neutral-300"],
             ],
 
-            // have to split it in two because of right to left text (arabic, hebrew, etc) and this was easiest way to do it
+            // what is drawn: a copy of tiles/tile_classes (the flipping row keeps its own classes)
             tiles_visual: [
                 ["", "", "", "", ""],
                 ["", "", "", "", ""],
@@ -235,26 +260,36 @@ const app = Vue.createApp({
     computed: {
         // computed properties
         key_classes: {
+            // one entry per keyboard letter (folded: "o" also colors for "ó"), plus ⇨ and ⌫
             get() {
                 let keys = {};
-                for (let i = 0; i < characters.length; i++) {
-                    keys[characters[i]] = "";
+                for (let i = 0; i < INPUT_CHARS.length; i++) {
+                    keys[INPUT_CHARS[i]] = "";
                 }
                 keys["⇨"] = "";
                 keys["⌫"] = "";
                 return keys;
             },
-            set(new_key_classes) {
-                // this.key_classes = new_key_classes; // this doesn't work, recursive                
-                // set key classes without recursion
-                for (let i = 0; i < characters.length; i++) {
-                    this.key_classes[characters[i]] = new_key_classes[characters[i]];
+            set(saved) {
+                // a saved game's key colors (this.key_classes = ... would recurse).
+                // Old saves may have accented keys ("á"): they color the plain key.
+                for (let i = 0; i < INPUT_CHARS.length; i++) {
+                    this.key_classes[INPUT_CHARS[i]] = "";
+                }
+                if (!saved || typeof saved !== "object") {
+                    return;
+                }
+                for (var k in saved) {
+                    var f = foldAccents(String(k).toLowerCase());
+                    if (INPUT_CHARS.indexOf(f) >= 0) {
+                        this.colorKey(this.key_classes, f, saved[k]);
+                    }
                 }
             }
-        },        
-        
+        },
+
         acceptable_characters() {
-            return characters.join("");
+            return INPUT_CHARS.join("");
         },
     },
     created() {
@@ -479,12 +514,6 @@ const app = Vue.createApp({
             }
         },
 
-        foldAccents(text) {
-            // "canción" -> "cancion", but ñ stays ñ (it is its own letter)
-            return text.split("").map(function (c) {
-                return c === "ñ" ? c : c.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            }).join("");
-        },
         accentInsensitive() {
             return this.config.accent_insensitive === true || this.config.accent_insensitive === "true";
         },
@@ -494,8 +523,8 @@ const app = Vue.createApp({
             if (!this.accentInsensitive()) {
                 return word;
             }
-            var folded = this.foldAccents(word);
-            if (folded === this.foldAccents(this.todays_word)) {
+            var folded = foldAccents(word);
+            if (folded === foldAccents(this.todays_word)) {
                 return this.todays_word;
             }
             if (this.checkWord(word) && !this.allow_any_word) {
@@ -506,7 +535,7 @@ const app = Vue.createApp({
                 var lists = [word_list, word_list_supplement];
                 for (var l = 0; l < lists.length; l++) {
                     for (var i = 0; i < lists[l].length; i++) {
-                        var key = this.foldAccents(lists[l][i]);
+                        var key = foldAccents(lists[l][i]);
                         if (!(key in this.fold_map)) {
                             this.fold_map[key] = lists[l][i];
                         }
@@ -523,48 +552,38 @@ const app = Vue.createApp({
         },
 
         updateColors() {
-            // NOTE: if a character appears only once in the final word, but multiple times in submitted word
-            // then we want to only color one. The hierarchy is correct first, then the semi-correct ones by position.
-            // Letters are compared exactly: typing may skip accents (resolveAccents fixes the
-            // spelling first), but a plain "a" never counts for an "á" in today's word.
-            var todays_word = this.todays_word;
-            const base_class = TILE_BASE;
-            var charcounts = {};
-
-            // count characters
-            for (let i = 0; i < todays_word.length; i++) {
-                var character = todays_word[i];
-                if (charcounts[character] == undefined) {
-                    charcounts[character] = 1;
+            // Colors for the current row. Letters are compared folded (foldAccents): a plain
+            // "o" counts for "ó" in today's word and the other way round, ü = u; ñ is its own
+            // letter. Greens first; then yellows from the letters left over, left to right
+            // (a letter that appears once in the answer colors only once); the rest gray.
+            // The key of the folded letter gets the best color (colorKey).
+            var answer = Array.from(foldAccents(this.todays_word));
+            var guess = this.tiles[this.active_row].map((c) => foldAccents(c));
+            var counts = {};
+            for (let i = 0; i < answer.length; i++) {
+                counts[answer[i]] = (counts[answer[i]] || 0) + 1;
+            }
+            var colors = [];
+            for (let i = 0; i < guess.length; i++) {
+                if (guess[i] === answer[i]) {
+                    colors[i] = "correct";
+                    counts[guess[i]] -= 1;
+                }
+            }
+            for (let i = 0; i < guess.length; i++) {
+                if (colors[i]) {
+                    continue;
+                }
+                if (counts[guess[i]] > 0) {
+                    colors[i] = "semicorrect";
+                    counts[guess[i]] -= 1;
                 } else {
-                    charcounts[character] += 1;
+                    colors[i] = "incorrect";
                 }
             }
-
-            // color correct characters
-            for (let i = 0; i < this.tiles[this.active_row].length; i++) {
-                var character = this.tiles[this.active_row][i];
-                if (character == todays_word[i]) {
-                    this.tile_classes[this.active_row][i] = "correct" + " " + base_class;
-                    this.key_classes[character] = "correct"
-                    charcounts[character] -= 1;
-                }
-            }
-            for (let i = 0; i < this.tiles[this.active_row].length; i++) {
-                var character = this.tiles[this.active_row][i];
-                if (todays_word.indexOf(character) != -1 && charcounts[character] > 0 && this.tile_classes[this.active_row][i].indexOf("correct") == -1) {
-                    // if the tile is not already colored
-                    this.tile_classes[this.active_row][i] = "semicorrect" + " " + base_class;
-                    if (this.key_classes[character] != "correct") {
-                        this.key_classes[character] = "semicorrect"
-                    }
-                    charcounts[character] -= 1;
-                } else if (this.tile_classes[this.active_row][i].indexOf("correct") == -1) {
-                    this.tile_classes[this.active_row][i] = "incorrect" + " " + base_class;
-                    if (this.key_classes[character] != "correct" && this.key_classes[character] != "semicorrect") {
-                        this.key_classes[character] = "incorrect"
-                    }
-                }
+            for (let i = 0; i < guess.length; i++) {
+                this.tile_classes[this.active_row][i] = colors[i] + " " + TILE_BASE;
+                this.colorKey(this.key_classes, guess[i], colors[i]);
             }
         },
         keyClick(key) {
@@ -578,23 +597,17 @@ const app = Vue.createApp({
             }
         },
         normalizeKey(key) {
-            // Shift/Caps Lock letters ("A") become the letter we use ("a").
-            // Named keys ("Enter", "Backspace") and ⇨/⌫ stay as they are.
-            if (typeof key !== "string" || Array.from(key).length !== 1) {
+            // A typed letter becomes a keyboard letter: Shift/Caps Lock "A" -> "a", accented
+            // keys "á"/"Ü" -> "a"/"u" (accents are optional), "Ñ" -> "ñ" (its own letter).
+            // Named keys ("Enter", "Backspace", "Dead") and ⇨/⌫ stay as they are.
+            if (typeof key !== "string") {
                 return key;
             }
-            var chars = this.acceptable_characters;
-            if (chars.indexOf(key) >= 0) {
+            var nfc = key.normalize("NFC");
+            if (Array.from(nfc).length !== 1) {
                 return key;
             }
-            // locale-aware first, so Turkish "I" -> "ı" and "İ" -> "i"
-            try {
-                var local = key.toLocaleLowerCase(this.config.language_code);
-                if (chars.indexOf(local) >= 0) {
-                    return local;
-                }
-            } catch (e) { }
-            return key.toLowerCase();
+            return foldAccents(nfc.toLowerCase());
         },
         keyDown(event) {
             var key = event.key;
@@ -733,7 +746,7 @@ const app = Vue.createApp({
                 this.setRowFromServer(r, guesses[r].word, guesses[r].colors);
                 var letters = Array.from(guesses[r].word);
                 for (let i = 0; i < 5; i++) {
-                    this.colorKey(keys, letters[i], guesses[r].colors[i]);
+                    this.colorKey(keys, foldAccents(letters[i] || ""), guesses[r].colors[i]);
                 }
             }
             Object.assign(this.key_classes, keys);
@@ -860,7 +873,7 @@ const app = Vue.createApp({
             var typed = this.tiles[row].join("").toLowerCase();
             // the same word can't be guessed twice (also typed without accents)
             var resolved = this.resolveAccents(typed);
-            var fold = (w) => this.accentInsensitive() ? this.foldAccents(w) : w;
+            var fold = (w) => this.accentInsensitive() ? foldAccents(w) : w;
             var already_tried = this.tiles.slice(0, row).some(r => {
                 var w = r.join("");
                 return w === resolved || fold(w) === fold(typed);
@@ -914,7 +927,7 @@ const app = Vue.createApp({
             var keys_after = Object.assign({}, this.key_classes);
             var letters = Array.from(res.word);
             for (let i = 0; i < 5; i++) {
-                this.colorKey(keys_after, letters[i], res.colors[i]);
+                this.colorKey(keys_after, foldAccents(letters[i] || ""), res.colors[i]);
             }
             if (res.done) {
                 // the answer only arrives once the game is over
@@ -1000,7 +1013,7 @@ const app = Vue.createApp({
             }
         },
         applyLive(data) {
-            var players = data.players.filter((p) => p && typeof p === "object").slice(0, 50).map((p) => livePlayer(p, this.right_to_left));
+            var players = data.players.filter((p) => p && typeof p === "object").slice(0, 50).map((p) => livePlayer(p));
             this.live_players = players;
             this.live_count = Number.isInteger(data.count) && data.count >= 0 ? data.count : players.length;
             this.live_loaded = true;
@@ -1032,21 +1045,12 @@ const app = Vue.createApp({
             try { localStorage.setItem("casa24_lb_hint_off", "1"); } catch (e) { }
         },
         showTiles() {
-            // if left to right, then reverse the tiles visuals. else copy normally.
-            // The row that is flipping keeps its own classes (revealRow handles it).
-            if (!this.right_to_left) {
-                for (let i = 0; i < this.tiles.length; i++) {
-                    this.tiles_visual[i] = this.tiles[i].map(x => x)
-                    if (i !== this.revealing_row) {
-                        this.tile_classes_visual[i] = this.tile_classes[i].map(x => x)
-                    }
-                }
-            } else {
-                for (let i = 0; i < this.tiles.length; i++) {
-                    this.tiles_visual[i] = this.tiles[i].map(x => x).reverse();
-                    if (i !== this.revealing_row) {
-                        this.tile_classes_visual[i] = this.tile_classes[i].map(x => x).reverse();
-                    }
+            // copy the board to what is drawn; the row that is flipping keeps its own
+            // classes (revealRow handles it)
+            for (let i = 0; i < this.tiles.length; i++) {
+                this.tiles_visual[i] = this.tiles[i].map(x => x);
+                if (i !== this.revealing_row) {
+                    this.tile_classes_visual[i] = this.tile_classes[i].map(x => x);
                 }
             }
         },
@@ -1066,15 +1070,14 @@ const app = Vue.createApp({
             }
             const final = this.tile_classes[row].map(x => x);
             const typed = "uppercase font-bold select-none border-2 border-neutral-500";
-            const vis = (i) => this.right_to_left ? final.length - 1 - i : i;
             const classes = this.tile_classes_visual[row];
             this.revealing = true;
             this.revealing_row = row;
             for (let i = 0; i < final.length; i++) {
-                classes[vis(i)] = typed;
-                setTimeout(() => { classes[vis(i)] = typed + " flip"; }, i * STAGGER);
-                setTimeout(() => { classes[vis(i)] = final[i] + " flip"; }, i * STAGGER + FLIP / 2);
-                setTimeout(() => { classes[vis(i)] = final[i]; }, i * STAGGER + FLIP);
+                classes[i] = typed;
+                setTimeout(() => { classes[i] = typed + " flip"; }, i * STAGGER);
+                setTimeout(() => { classes[i] = final[i] + " flip"; }, i * STAGGER + FLIP / 2);
+                setTimeout(() => { classes[i] = final[i]; }, i * STAGGER + FLIP);
             }
             const total = (final.length - 1) * STAGGER + FLIP;
             setTimeout(() => {
@@ -1091,9 +1094,7 @@ const app = Vue.createApp({
             }
             const classes = this.tile_classes_visual[row];
             for (let i = 0; i < classes.length; i++) {
-                // bounce-dN delays follow reading order, so right-to-left rows bounce from the right
-                var order = this.right_to_left ? classes.length - 1 - i : i;
-                classes[i] = classes[i] + " bounce bounce-d" + order;
+                classes[i] = classes[i] + " bounce bounce-d" + i;
             }
             setTimeout(() => { this.showTiles(); }, 1500);
         },
@@ -1162,8 +1163,15 @@ const app = Vue.createApp({
             // type today's (demo) answer into the current row and press Enter, like a player would
             if (this.game_over || this.revealing) { return; }
             while (this.active_cell > 0) { this.keyDown({ key: "Backspace" }); }
-            for (const c of this.todays_word) { this.keyDown({ key: c }); }
+            // folded like a physical keyboard ("ó" -> "o"); Enter turns it back into the answer
+            for (const c of Array.from(foldAccents(this.todays_word))) { this.keyDown({ key: c }); }
             this.keyDown({ key: "Enter" });
+        },
+        inviteFriends() {
+            // Discord Activity: open Discord's invite dialog (the bridge in discord-activity.js)
+            if (window.C24Activity && window.C24Activity.invite) {
+                window.C24Activity.invite();
+            }
         },
         hideNotification() {
             clearTimeout(this.notification.timeout);

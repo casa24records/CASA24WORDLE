@@ -16,10 +16,13 @@
 // Messages between the two pages are plain objects (the SDK ignores those; it
 // reads arrays as its own opcodes).
 //
-// Language: the first launch shows a picker (10 languages); the choice is kept
-// in localStorage "c24_activity_lang" (when storage works; else asked once per
-// launch). The game's header button "ES ▾" asks for another one with
-// postMessage({type: "c24-lang", code}).
+// Language (Spanish or English): the choice saved on this device (localStorage
+// "c24_activity_lang") wins; else Discord's own language after the login
+// (userSettingsGetLocale: "es…" -> es, anything else -> en); only when that call
+// fails or times out, the picker (2 options) asks. The game's header button
+// "ES ▾" asks for the other one with postMessage({type: "c24-lang", code}).
+// Invite: the game posts {type: "c24-invite"}; this page opens Discord's invite
+// dialog (sdk.commands.openInviteDialog, no extra OAuth scope).
 //
 // Layout mode (PIP / grid) is subscribed here and passed to the game page
 // (postMessage {type: "c24-layout", mode, platform}); portrait lock is set here. Discord's
@@ -35,7 +38,7 @@ const AUTHORIZE_MS = 5 * 60000;    // the player may be reading Discord's permis
 const TOKEN_MS = 15000;            // our server <-> Discord token exchange
 const AUTHENTICATE_MS = 10000;
 const LANG_KEY = "c24_activity_lang";
-const LOCALE_MS = 3000;            // optional: Discord's language, to suggest one in the picker
+const LOCALE_MS = 3000;            // Discord's language (first launch on a device); else the picker
 
 function readJson(id) {
     try { return JSON.parse(document.getElementById(id).textContent); } catch (e) { return null; }
@@ -59,7 +62,8 @@ let busy = false;
 let auth = "loading";        // loading | denied | error | deleted | ready
 let everReady = false;
 let reloadGame = false;      // a re-login failed: reload the game once it works again
-let lang = null;             // language of the game in the iframe (null: picker)
+let lang = null;             // language of the game in the iframe (null: not chosen yet)
+let picking = false;         // the language picker is on screen
 let frameLoaded = false;
 let layoutMode = 0;
 let resolveReady;
@@ -90,7 +94,8 @@ function render() {
     if (auth === "denied" || auth === "error" || auth === "deleted") {
         state = auth;
     } else if (lang === null) {
-        state = "ready";  // the language picker (the login goes on behind it)
+        // the language picker (the login goes on behind it), else waiting for Discord's locale
+        state = picking ? "ready" : "loading";
     } else if (auth !== "ready") {
         state = "loading";
     } else if (!frameLoaded) {
@@ -134,13 +139,13 @@ function openGame(code) {
     const info = langInfo(code);
     if (!info || !frame) { return; }
     lang = code;
+    picking = false;
     saveLang(code);
     if (picker) { picker.hidden = true; }
     const msg = overlay && overlay.querySelector("[data-loading-game]");
     if (msg) {
         msg.textContent = info.loading || "…";
         msg.setAttribute("lang", code);
-        msg.setAttribute("dir", info.rtl ? "rtl" : "ltr");
     }
     frameLoaded = false;
     frame.hidden = false;
@@ -156,6 +161,7 @@ function openGame(code) {
 
 function showPicker() {
     lang = null;
+    picking = true;
     if (frame) { frame.hidden = true; }
     if (picker) { picker.hidden = false; }
     render();
@@ -234,6 +240,8 @@ window.addEventListener("message", (e) => {
     const data = e.data || {};
     if (data.type === "c24-lang" && typeof data.code === "string" && langInfo(data.code)) {
         if (data.code !== lang) { openGame(data.code); }
+    } else if (data.type === "c24-invite") {
+        invite();
     } else if (data.type === "c24-layout-request") {
         sendLayout();
     } else if (data.type === "c24-log" && typeof data.message === "string") {
@@ -344,23 +352,32 @@ function extras() {
     } catch (e) { }
 }
 
-function suggestLanguage() {
-    // first launch: mark Discord's own language in the picker (optional command)
-    if (lang !== null || !picker) { return; }
+function localeLang(locale) {
+    // Discord's locale ("es-ES", "es-419", "en-US", "pt-BR", ...): Spanish or English
+    return typeof locale === "string" && locale.toLowerCase().indexOf("es") === 0 ? "es" : "en";
+}
+
+function chooseLanguage() {
+    // first launch on this device (nothing saved): Discord's language; the picker
+    // only when Discord can't tell us (the call fails or takes too long)
+    if (lang !== null || picking) { return; }
     let asked;
-    try { asked = withTimeout(sdk.commands.userSettingsGetLocale(), LOCALE_MS); } catch (e) { return; }
+    try { asked = withTimeout(sdk.commands.userSettingsGetLocale(), LOCALE_MS); } catch (e) { showPicker(); return; }
     Promise.resolve(asked).then((result) => {
-        const locale = result && typeof result.locale === "string" ? result.locale.toLowerCase() : "";
-        const code = locale.split(/[-_]/)[0];
-        if (!code || lang !== null || !langInfo(code)) { return; }
-        const btn = picker.querySelector("[data-pick-lang='" + code + "']");
-        if (!btn) { return; }
-        btn.classList.add("is-suggested");
-        const active = document.activeElement;
-        if (!active || active === document.body || (active.hasAttribute && active.hasAttribute("data-pick-lang"))) {
-            try { btn.focus({ preventScroll: true }); } catch (e) { }
-        }
-    }).catch(() => { });
+        if (lang !== null || picking) { return; }
+        if (!result || typeof result.locale !== "string" || !result.locale) { showPicker(); return; }
+        openGame(localeLang(result.locale));
+    }).catch(() => { if (lang === null) { showPicker(); } });
+}
+
+function invite() {
+    // Discord's invite window for this Activity (needs no extra OAuth scope)
+    if (!sdk || !handshakeDone) { return Promise.resolve(false); }
+    try {
+        return Promise.resolve(sdk.commands.openInviteDialog()).then(() => true, () => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
 }
 
 function loggedIn() {
@@ -369,7 +386,7 @@ function loggedIn() {
         everReady = true;
         extras();
         resolveReady();
-        suggestLanguage();
+        chooseLanguage();
     } else if (reloadGame && lang !== null) {
         reloadGame = false;
         openGame(lang);  // the game gave up while logged out: start it again
@@ -430,6 +447,7 @@ window.C24Activity = {
         return reauthing;
     },
     setLang(code) { if (langInfo(code) && code !== lang) { openGame(code); } },
+    invite: invite,
     openExternal(url) {
         // our /terms and /privacy (or any other site) in the player's browser, through
         // Discord (it asks the player first). Never a navigation of this page or the iframe.
@@ -466,7 +484,9 @@ if (overlay) {
     }
 }
 
-// start: connect to Discord and, at the same time, load the game (or show the picker)
+// start: connect to Discord and, at the same time, load the game in the language
+// asked for (/lb/<lang>) or saved on this device; else wait for the login and use
+// Discord's language (chooseLanguage), with the picker only as a fallback
 const first = langInfo(cfg.lang) ? cfg.lang : savedLang();
 connect();
-if (first) { openGame(first); } else { showPicker(); }
+if (first) { openGame(first); } else { render(); }

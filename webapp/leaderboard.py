@@ -2,8 +2,10 @@
 
 - points(): 6 points for a win in 1 guess ... 1 point in 6, 0 for a loss.
 - fold_accents / resolve_accents / color_guess: 1:1 ports of foldAccents,
-  resolveAccents and updateColors in static/game.js. The server colors
-  leaderboard guesses itself, so the browser never needs the answer.
+  resolveAccents and updateColors in static/game.js (colors compare folded
+  letters: a plain vowel counts for an accented one, ñ stays its own letter).
+  The server colors leaderboard guesses itself, so the browser never needs
+  the answer.
 - update_streak / effective_streak / streaks: streak = consecutive Panama days
   with a win, recomputed from the player's results whenever it is shown.
 - Ranking order (computed in SQL by store.py): points, then wins, then whoever
@@ -24,10 +26,12 @@ def points(won, attempts):
 
 
 def fold_accents(text):
-    """'canción' -> 'cancion', but ñ stays ñ (game.js foldAccents)."""
+    """Letters as the game compares them (game.js foldAccents): accents and
+    diaeresis don't count ('canción' -> 'cancion', 'ü' -> 'u'), but ñ/Ñ stay.
+    NFC first, so a decomposed n + U+0303 is ñ too."""
     out = []
-    for c in text:
-        if c == "ñ":
+    for c in unicodedata.normalize("NFC", text or ""):
+        if c in ("ñ", "Ñ"):
             out.append(c)
         else:
             out.append("".join(ch for ch in unicodedata.normalize("NFD", c)
@@ -63,8 +67,11 @@ def build_fold_map(word_list, supplement):
 
 
 def color_guess(guess, answer):
-    """Exact-letter colors (game.js updateColors): greens first, then yellows
-    from the letters left over, left to right; the rest gray."""
+    """Tile colors (game.js updateColors). Letters are compared folded
+    (fold_accents: 'o' counts for 'ó' and back, ü = u, ñ is its own letter).
+    Greens first, then yellows from the letters left over, left to right;
+    the rest gray."""
+    guess, answer = fold_accents(guess), fold_accents(answer)
     counts = {}
     for ch in answer:
         counts[ch] = counts.get(ch, 0) + 1

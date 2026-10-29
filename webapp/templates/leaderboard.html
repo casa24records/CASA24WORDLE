@@ -1,15 +1,14 @@
-{#- Public leaderboard (/leaderboard?tab=<lang>|all), one tab per language + "Combinado".
+{#- Public leaderboard (/leaderboard?tab=all|es|en): 3 tabs, Combinado (es + en), Español, English.
     app.py passes `lb_tabs` (or `tabs`) = [{code, name_native}] in order, with
-    {"code": "all"} for Combinado, and `tab`; without it: es, en, all. Page language: the tab's language when its texts were passed
-    (`texts[code]` from that language's language_config.json "text"; missing keys
-    fall back to English), else Spanish/English from the browser (also on "all").
-    The inline strings are the es/en fallback. -#}
+    {"code": "all"} for Combinado, and `tab`; without it: all, es, en. Page language: the tab's
+    language (es/en; `texts[code]` from language_config.json "text"; missing keys
+    fall back to the inline strings), else Spanish/English from the browser (also on "all"). -#}
 {% set all_tabs = lb_tabs if (lb_tabs is defined and lb_tabs) else (tabs if (tabs is defined and tabs) else [{'code': 'es', 'name_native': 'Español'}, {'code': 'en', 'name_native': 'English'}]) %}
-{% if not (all_tabs | selectattr('code', 'equalto', 'all') | list) %}{% set all_tabs = all_tabs + [{'code': 'all', 'name_native': none}] %}{% endif %}
+{% if not (all_tabs | selectattr('code', 'equalto', 'all') | list) %}{% set all_tabs = [{'code': 'all', 'name_native': none}] + all_tabs %}{% endif %}
 {% set tab_codes = all_tabs | map(attribute='code') | list %}
 {% set tab = tab if (tab is defined and tab in tab_codes) else 'all' %}
 {% set has_texts = texts is defined and texts %}
-{% set ui = tab if (tab != 'all' and (tab in ('es', 'en') or (has_texts and texts.get(tab)))) else (request.accept_languages.best_match(['es', 'en']) or 'es') %}
+{% set ui = tab if tab in ('es', 'en') else (request.accept_languages.best_match(['es', 'en']) or 'es') %}
 {% import '_discord.html' as dc %}
 {% set me = lb_user if (lb_user is defined and lb_user) else none %}
 {#- inside the Discord Activity: public table only, no login/logout/delete (the game window has your rank) -#}
@@ -17,7 +16,7 @@
 {% set login_href = '/auth/discord/login?next=' ~ ('/leaderboard?tab=' ~ tab) | urlencode %}
 {% macro L(key, es, en) %}{% if has_texts and texts.get(ui) %}{{ texts[ui].get(key, es if ui == 'es' else en) }}{% else %}{{ es if ui == 'es' else en }}{% endif %}{% endmacro %}
 <!DOCTYPE html>
-<html lang="{{ ui }}"{% if ui in ('ar',) %} dir="rtl"{% endif %}>
+<html lang="{{ ui }}">
 
 <head>
     <meta charset="UTF-8">
@@ -66,11 +65,11 @@
     <main class="c24-lb">
         <h2 class="c24-title c24-lb-title">{{ dc.trophy('c24-trophy c24-trophy-title') }} {{ L('lb_title', 'Leaderboard', 'Leaderboard') }}</h2>
 
-        {#- 11 tabs (10 languages + Combinado): one row that scrolls sideways (snap), the active tab scrolled into view -#}
+        {#- 3 tabs (Combinado, Español, English) in one row -#}
         <nav class="c24-lb-tabs" aria-label="{{ L('lb_title', 'Leaderboard', 'Leaderboard') }}" data-lb-tabs>
             {% for t in all_tabs %}
             <a href="{{ aq('/leaderboard?tab=' ~ t.code) }}" class="c24-lb-tab{% if t.code == tab %} is-active{% endif %}"
-                {% if t.code == tab %}aria-current="page"{% endif %} data-tab="{{ t.code }}"{% if t.code != 'all' %} lang="{{ t.code }}" dir="auto"{% endif %}>
+                {% if t.code == tab %}aria-current="page"{% endif %} data-tab="{{ t.code }}"{% if t.code != 'all' %} lang="{{ t.code }}"{% endif %}>
                 {%- if t.code == 'all' %}{{ L('lb_tab_all', 'Combinado', 'Combined') }}{% else %}{{ t.name_native }}{% endif -%}
             </a>
             {% endfor %}
@@ -133,9 +132,9 @@
         </section>
 
         <p class="c24-lb-back"><a href="{{ aq('/') }}">← {{ L('lb_back', 'Menú', 'Menu') }}</a></p>
-        {#- Terms / Privacy: full texts in es and en (other languages read the English one).
+        {#- Terms / Privacy: full texts in es and en.
             Inside Discord, discord-activity.js opens data-c24-external with the SDK's openExternalLink. -#}
-        {% set legal_lang = ui if ui in ('es', 'en') else 'en' %}
+        {% set legal_lang = ui %}
         <p class="c24-legal-foot" data-legal-links>
             <a href="{{ aq('/terms?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/terms?lang={{ legal_lang }}">{{ L('legal_terms', 'Términos', 'Terms') }}</a>
             · <a href="{{ aq('/privacy?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/privacy?lang={{ legal_lang }}">{{ L('legal_privacy', 'Privacidad', 'Privacy') }}</a>

@@ -60,7 +60,6 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature
 from urllib.parse import urlencode, urlparse
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask.sessions import SecureCookieSessionInterface
-import glob
 import random
 
 # set random seed 42 for reproducibility (important to maintain stable word lists)
@@ -186,7 +185,7 @@ def asset(path):
 
 def json_script(obj):
     """JSON for a <script type="application/json"> block: raw UTF-8 (not
-    \\uXXXX, which doubled the Arabic/Korean pages) with < > & ' escaped like
+    \\uXXXX, which makes non-ASCII pages bigger) with < > & ' escaped like
     Flask's tojson, so "</script>" inside a string can't end the block."""
     text = json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
     text = (text.replace("<", "\\u003c").replace(">", "\\u003e")
@@ -277,10 +276,6 @@ def activity_url(path):
 app.jinja_env.globals.update(asset=asset, json_script=json_script, aq=activity_url)
 
 
-def _is_rtl(lang):
-    return str(language_configs[lang].get("right_to_left", "false")).lower() == "true"
-
-
 def activity_shell(lang=None):
     """The Activity shell: loads the Discord SDK ONCE per launch (ready, authorize,
     token, authenticate), keeps the session in memory and hosts the game in a
@@ -288,7 +283,6 @@ def activity_shell(lang=None):
     the SDK handshake never runs twice. `lang`: a language to open right away
     (else the one this device chose last, else the language picker)."""
     langs = [{"code": c, "name": language_configs[c]["name_native"],
-              "rtl": _is_rtl(c),
               "loading": language_configs[c]["text"].get("activity_loading_game", "Loading game…")}
              for c in LB_LANGS]
     pick = {c: language_configs[c]["text"].get("activity_pick_title", fallback)
@@ -311,8 +305,8 @@ def inject_activity():
     if activity:
         # the public app ID for the SDK (never the secret) and the language window's list
         ctx["activity_client_id"] = discord_auth.client_id()
-        ctx["activity_langs"] = [{"code": c, "name_native": language_configs[c]["name_native"],
-                                  "rtl": _is_rtl(c)} for c in LB_LANGS]
+        ctx["activity_langs"] = [{"code": c, "name_native": language_configs[c]["name_native"]}
+                                 for c in LB_LANGS]
     return ctx
 
 
@@ -329,9 +323,14 @@ def load_characters(lang):
     return characters
 
 
-language_codes = [f.split("/")[-1] for f in glob.glob(f"{data_dir}/languages/*")]
-# Spanish and English first on the menu, then the rest alphabetically
-language_codes = sorted(language_codes, key=lambda c: (c not in ("es", "en"), c != "es", c))
+# The product supports only Spanish and English (owner decision 2026-10-29).
+# This constant, not the folders under data/languages/, defines the languages.
+# Order matters: es then en (menu order, and the order the word lists load in,
+# which keeps random.seed(42) and so every daily word unchanged).
+SUPPORTED_LANGS = ("es", "en")
+# Languages the game had before 2026-10-29: their old links redirect to es or en.
+RETIRED_LANGS = ("ar", "de", "fr", "ko", "pt", "ru", "tr", "vi")
+language_codes = list(SUPPORTED_LANGS)
 language_characters = {lang: load_characters(lang) for lang in language_codes}
 
 
@@ -477,6 +476,17 @@ language_configs = {l_code: load_language_config(l_code) for l_code in language_
 
 keyboards = {k: load_keyboard(k) for k in language_codes}
 
+KEYBOARD_ACTION_KEYS = ("⇨", "⌫")
+
+
+def input_characters(lang):
+    """Sorted letters that appear on any keyboard layout of `lang` (no ⇨ / ⌫)."""
+    letters = set()
+    for layout in keyboards.get(lang, {}).get("layouts", {}).values():
+        for row in layout.get("rows", []):
+            letters.update(k for k in row if k not in KEYBOARD_ACTION_KEYS)
+    return sorted(letters)
+
 
 def load_languages():
     """returns a dict of language codes mapped to their english name and native name"""
@@ -489,7 +499,6 @@ def load_languages():
             "language_name": language_config["name"],
             "language_name_native": language_config["name_native"],
             "language_code": lang,
-            "right_to_left": str(language_config.get("right_to_left", "false")).lower(),
         }
     return languages
 
@@ -540,13 +549,16 @@ class Language:
         )
         layout_meta = self.keyboard_layouts[self.keyboard_layout_name]
         self.keyboard = layout_meta["rows"]
+        # every letter on any of this language's keyboard layouts (no ⇨ / ⌫):
+        # the keys the game accepts (es: a-z + ñ, en: a-z)
+        self.input_characters = input_characters(language_code)
 
     def _build_keyboard_layouts(self, keyboard_config):
         """
         Build canonical layout metadata from the raw keyboard config.
 
-        Ensures every layout has a label/rows and falls back to an
-        auto-generated alphabetical layout when no layouts are provided.
+        Every supported language ships a keyboard file; a missing one is an
+        error (tests catch it), never a generated layout.
         """
         layouts = {}
         for layout_name, layout_meta in keyboard_config.get("layouts", {}).items():
@@ -555,10 +567,7 @@ class Language:
             layouts[layout_name] = {"label": label, "rows": rows}
 
         if not layouts:
-            layouts["alphabetical"] = {
-                "label": "Alphabetical",
-                "rows": self._generate_alphabetical_keyboard(),
-            }
+            raise ValueError(f"no keyboard layout for {self.language_code}")
         return layouts
 
     def _select_keyboard_layout(self, requested_layout, default_layout):
@@ -573,33 +582,6 @@ class Language:
         if default_layout and default_layout in self.keyboard_layouts:
             return default_layout
         return next(iter(self.keyboard_layouts))
-
-    def _generate_alphabetical_keyboard(self):
-        """
-        Lay the letters out in alphabetical order, about 10 keys per row.
-
-        ⇨ (Enter) starts the last row and ⌫ ends it. Keys are spread evenly
-        over the rows (earlier rows get the extra key), so no row has more
-        than 11 keys and the last row isn't crammed or nearly empty.
-        """
-        letters = list(self.characters)
-        if not letters:
-            return []
-        total = len(letters) + 2  # plus ⇨ and ⌫
-        n_rows = max(1, -(-len(letters) // 10))
-        while -(-total // n_rows) > 11:
-            n_rows += 1
-        base, extra = divmod(total, n_rows)
-        sizes = [base + 1 if i < extra else base for i in range(n_rows)]
-        keyboard = []
-        pos = 0
-        for i, size in enumerate(sizes):
-            if i == n_rows - 1:
-                keyboard.append(["⇨"] + letters[pos:] + ["⌫"])
-            else:
-                keyboard.append(letters[pos:pos + size])
-                pos += size
-        return keyboard
 
 
 ###############################################################################
@@ -639,7 +621,7 @@ def activity_page():
 
 # Terms of Service and Privacy Policy (public, needed for Discord App Verification /
 # Discovery). Texts: templates/terms.html and templates/privacy.html (Spanish and
-# English, full); the other 8 languages read the English one. Change the contact
+# English, the only two languages). Change the contact
 # address or the date HERE only: both pages and the tests read these constants.
 LEGAL_CONTACT_EMAIL = "casa24records@gmail.com"
 LEGAL_OPERATOR = "Casa 24 Records"
@@ -749,9 +731,28 @@ def demo_game(lang_code):
     return response
 
 
+def retired_lang_redirect(path):
+    """302 for an old link to a removed language (/fr, /lb/ko, ...): the same route
+    in es or en (the browser's Accept-Language, default es), query kept
+    (?embed=1 and the Activity's params). `path` has a {lang} placeholder."""
+    lang = request.accept_languages.best_match(SUPPORTED_LANGS) or "es"
+    url = path.format(lang=lang)
+    query = request.query_string.decode("utf-8", "replace")
+    return _no_store(redirect(url + ("?" + query if query else ""), 302))
+
+
+# hreflang alternates for the game pages (game.html renders them in <head>)
+def hreflang_links():
+    base = public_url()
+    links = [{"lang": code, "href": f"{base}/{code}"} for code in SUPPORTED_LANGS]
+    return links + [{"lang": "x-default", "href": f"{base}/"}]
+
+
 # arbitrary app route
 @app.route("/<lang_code>")
 def language(lang_code):
+    if lang_code in RETIRED_LANGS:
+        return retired_lang_redirect("/{lang}")
     if lang_code not in language_codes:
         # removed or unknown languages go back to the menu instead of an error
         return redirect(activity_url("/"))
@@ -762,7 +763,8 @@ def language(lang_code):
     cookie_key = f"keyboard_layout_{lang_code}"
     requested_layout = request.args.get("layout") or request.cookies.get(cookie_key)
     language = Language(lang_code, word_list, requested_layout)
-    response = make_response(render_template("game.html", language=language, demo=False))
+    response = make_response(render_template("game.html", language=language, demo=False,
+                                             hreflang_links=hreflang_links()))
     selected_layout = language.keyboard_layout_name
     if request.cookies.get(cookie_key) != selected_layout:
         response.set_cookie(
@@ -774,13 +776,14 @@ def language(lang_code):
     return response
 
 ###############################################################################
-# DISCORD LEADERBOARD (every language; owner decision 2026-10-28)
+# DISCORD LEADERBOARD (es and en; owner decisions 2026-10-28 and 2026-10-29)
 ###############################################################################
 # Storage: webapp/store.py (Postgres tables wordle_players, wordle_results,
 # wordle_games, wordle_rate; an in-memory copy for tests and local dev).
 # Kept: Discord ID, username, Discord avatar hash (Discord's format only, else
 # NULL), hidden flag, per finished game lang/day/won/attempts/points, today's
-# guesses (2 days), per-minute request counters (guesses, live polling).
+# guesses (2 days; the row exists from opening the game, for presence in the
+# live view), per-minute request counters (guesses, live polling).
 # Never stored: Discord tokens, email, IP addresses. The c24_lb cookie holds only
 # the ID; the avatar hash also reaches the player's own browser in the login
 # redirect's #dc= fragment. /api/live shows other players' colors only.
@@ -796,8 +799,8 @@ import re
 import secrets
 import unicodedata
 
-LB_LANGS = tuple(language_codes)  # all loaded languages, menu order (es, en first)
-LB_TABS = LB_LANGS + ("all",)      # "all" = combined, sums every language
+LB_LANGS = SUPPORTED_LANGS        # es, en (menu order)
+LB_TABS = ("all",) + LB_LANGS      # "all" = Combinado (es + en), then ES, EN
 LB_TEXT_FALLBACK = ("es", "en")    # texts always passed to leaderboard.html
 LB_COOKIE = "c24_lb"
 LB_COOKIE_AGE = 30 * 24 * 3600
@@ -808,7 +811,8 @@ RATE_LIMIT_PER_MINUTE = 30
 LIVE_RATE_LIMIT_PER_MINUTE = 20  # own counter: polling every ~8 s never eats the guess budget
 STATE_RATE_LIMIT_PER_MINUTE = 30  # own counter for GET /api/state (focus/visibility/day-change reloads)
 LIVE_LIMIT = 30
-LIVE_RECENT_SECONDS = 5 * 60    # "en vivo" when the last guess is this recent
+LIVE_RECENT_SECONDS = 5 * 60    # "en vivo" when the last guess or visit is this recent
+PRESENCE_MIN_SECONDS = 20       # presence bumps updated_at at most this often (polls every 8 s)
 TOP_N = 50
 
 
@@ -969,7 +973,6 @@ def lb_answer(lang, idx):
 
 
 _lb_word_cache = {}
-_lb_form_cache = {}
 
 
 def _lb_words(lang):
@@ -980,27 +983,9 @@ def _lb_words(lang):
     return _lb_word_cache[lang]
 
 
-def _lb_norm_form(lang):
-    """Unicode form of this language's word lists. Korean lists are decomposed
-    jamo (NFD: the board has one tile per jamo); every other list is NFC. NFC on
-    a Korean guess would merge the jamo into syllables and break it."""
-    if lang not in _lb_form_cache:
-        main, sup, _ = _lb_words(lang)
-        words = list(main) + list(sup)
-        nfd_only = bool(words) and not all(unicodedata.is_normalized("NFC", w) for w in words) \
-            and all(unicodedata.is_normalized("NFD", w) for w in words)
-        _lb_form_cache[lang] = "NFD" if nfd_only else "NFC"
-    return _lb_form_cache[lang]
-
-
 def lb_normalize(lang, typed):
-    """The guess as the word lists store it: same Unicode form, lowercase.
-    Turkish/Azeri lowercase like game.js normalizeKey (toLocaleLowerCase):
-    "I" -> "ı", "İ" -> "i" (Python's lower() would give "i" and "i̇")."""
-    word = unicodedata.normalize("NFC", typed).strip()
-    if lang in ("tr", "az"):
-        word = word.replace("I", "ı").replace("İ", "i")
-    return unicodedata.normalize(_lb_norm_form(lang), word.lower())
+    """The guess as the word lists store it: NFC, trimmed, lowercase."""
+    return unicodedata.normalize("NFC", typed).strip().lower()
 
 
 def _accent_insensitive(lang):
@@ -1145,6 +1130,8 @@ def discord_logout():
 def lb_game(lang_code):
     if not lb_enabled():
         abort(404)
+    if lang_code in RETIRED_LANGS:
+        return retired_lang_redirect("/lb/{lang}")
     if lang_code not in LB_LANGS:
         return redirect(activity_url("/lb/es"))
     cookie_key = f"keyboard_layout_{lang_code}"
@@ -1277,10 +1264,23 @@ def api_state():
             return _err("bad_lang", 400)
         if st.rate_hit(user["id"], int(time.time() // 60), "state") > STATE_RATE_LIMIT_PER_MINUTE:
             return _err("rate", 429)
+        _lb_presence(st, user["id"], lang)
         state = lb_game_state(st, user["id"], lang)
     except store_mod.StoreError:
         return _err("store", 503)
     return _no_store(jsonify(state))
+
+
+def _lb_presence(st, pid, lang):
+    """The player has today's game open (GET /api/state or /api/live): create the
+    game row with no guesses, or bump its updated_at at most every
+    PRESENCE_MIN_SECONDS, so others' live view shows them even before the first
+    guess. Same row and columns as a guess (nothing new stored); never a result.
+    Best effort: a failure here never breaks the request."""
+    try:
+        st.touch(pid, lang, lb_today()[0], PRESENCE_MIN_SECONDS)
+    except store_mod.StoreError:
+        pass
 
 
 ACTIVITY_TOKEN_PER_MINUTE = 120  # all Activity logins together (no IPs kept): a small global budget
@@ -1353,7 +1353,9 @@ def _live_player(row, answer, now):
 
 @app.route("/api/live")
 def api_live():
-    """Everyone else playing today's word in this language (leaderboard mode only)."""
+    """Everyone else playing today's word in this language (leaderboard mode only):
+    with at least one guess, or with the game open in the last LIVE_RECENT_SECONDS
+    (presence, no guesses yet: an empty mini board)."""
     if not lb_enabled():
         return _err("disabled", 404)
     st = lb_store()
@@ -1366,10 +1368,14 @@ def api_live():
             return _err("bad_lang", 400)
         if st.rate_hit(user["id"], int(time.time() // 60), "live") > LIVE_RATE_LIMIT_PER_MINUTE:
             return _err("rate", 429)
+        _lb_presence(st, user["id"], lang)
         day, idx = lb_today()
         answer = lb_answer(lang, idx)
         now = datetime.datetime.now(datetime.timezone.utc)
-        players = [_live_player(r, answer, now) for r in st.live(lang, day, user["id"], LIVE_LIMIT)]
+        # players with no guesses yet show only while they are live (game open recently)
+        since = now - datetime.timedelta(seconds=LIVE_RECENT_SECONDS)
+        players = [_live_player(r, answer, now)
+                   for r in st.live(lang, day, user["id"], LIVE_LIMIT, present_since=since)]
     except store_mod.StoreError:
         return _err("store", 503)
     response = jsonify({"players": players, "count": len(players)})
@@ -1393,10 +1399,10 @@ def _lb_rows(st, ranked, tab, today_idx, me_id):
 
 
 def lb_tabs():
-    """Tabs for leaderboard.html: every language (menu order), then "all"
-    (name_native None: the template labels it with lb_tab_all)."""
-    return [{"code": code, "name_native": language_configs[code]["name_native"]}
-            for code in LB_LANGS] + [{"code": "all", "name_native": None}]
+    """Tabs for leaderboard.html: "all" (Combinado; name_native None: the
+    template labels it with lb_tab_all), then es, en."""
+    return [{"code": "all", "name_native": None}] + [
+        {"code": code, "name_native": language_configs[code]["name_native"]} for code in LB_LANGS]
 
 
 def lb_board(st, tab, me_id):

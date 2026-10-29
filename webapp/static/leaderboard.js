@@ -1,5 +1,6 @@
-// Casa 24 Wordle leaderboard page: the tabs row (10 languages + Combined) scrolls
-// sideways; center the active tab without scrolling the page itself.
+// Casa 24 Wordle leaderboard page: the 3 tabs (Combined, Español, English) fit in one
+// row; if a very narrow screen ever makes the row scroll, center the active tab
+// without scrolling the page itself.
 // (A file, not an inline script: the Discord Activity's CSP blocks inline code.)
 (function () {
     var nav = document.querySelector("[data-lb-tabs]");

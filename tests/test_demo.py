@@ -117,7 +117,7 @@ def test_restart_is_random_and_never_repeats(enabled, client):
 
 def test_other_languages_redirect(enabled, client):
     login(client)
-    for code in ("fr", "xx"):
+    for code in ("fr", "ko", "xx"):
         r = client.get(f"/demo/{code}")
         assert r.status_code == 302 and r.headers["Location"].endswith("/demo/es")
 

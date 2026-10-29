@@ -1,5 +1,6 @@
-"""Input and share bugs: physical keyboard (Shift, shortcuts, focus, Turkish i),
-on-screen key focus, the share button firing once, alphabetical keyboards."""
+"""Input and share bugs: physical keyboard (Shift, shortcuts, focus, accented
+and ñ keys), on-screen key focus, the share button firing once, the es/en
+keyboard layouts and the layout setting."""
 
 import threading
 
@@ -10,32 +11,29 @@ import app
 
 VM = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
 READY = "document.querySelector('#app') && window.Vue"
-GENERATED = [l for l in app.language_codes if l not in ("es", "en")]
+KEYS_JS = "Array.from(document.querySelectorAll('button.key[data-char]'), b => b.dataset.char)"
+ES_LETTERS = set("abcdefghijklmnñopqrstuvwxyz")
 
 
-def build_keyboard(lang):
-    return app.Language(lang, app.language_codes_5words[lang])
+def build_keyboard(lang, layout=None):
+    return app.Language(lang, app.language_codes_5words[lang], layout)
 
 
 # ---------------------------------------------------------------- keyboard order
 
 
-@pytest.mark.parametrize("lang", GENERATED)
-def test_generated_keyboard_is_alphabetical(lang):
-    language = build_keyboard(lang)
-    assert language.keyboard_layout_name == "alphabetical"
-    rows = language.keyboard
-    letters = [c for row in rows for c in row if c not in ("⇨", "⌫")]
-    assert letters == list(language.characters)  # alphabetical, nothing lost
-    assert rows[-1][0] == "⇨" and rows[-1][-1] == "⌫"
-    assert sum(r.count("⇨") + r.count("⌫") for r in rows) == 2
-    assert max(len(r) for r in rows) <= 11, [len(r) for r in rows]
-    assert all(rows), "no empty rows"
-
-
-def test_spanish_and_english_keep_their_layouts():
+def test_spanish_and_english_default_to_qwerty():
     for lang in ("es", "en"):
-        assert build_keyboard(lang).keyboard_layout_name != "alphabetical"
+        assert build_keyboard(lang).keyboard_layout_name == "qwerty"
+
+
+@pytest.mark.parametrize("layout", ["qwerty", "alphabetical"])
+def test_spanish_layouts_have_enye_and_no_accent_keys(layout):
+    rows = build_keyboard("es", layout).keyboard
+    letters = [c for row in rows for c in row if c not in ("⇨", "⌫")]
+    assert sorted(letters) == sorted(ES_LETTERS)  # 26 letters + ñ, each once
+    assert letters.index("ñ") == letters.index("l" if layout == "qwerty" else "n") + 1
+    assert rows[-1][0] == "⇨" and rows[-1][-1] == "⌫"
 
 
 # ---------------------------------------------------------------- browser
@@ -64,14 +62,30 @@ def row0(page):
     return page.evaluate(f"{VM}.tiles[0].join('')")
 
 
-@pytest.mark.parametrize("lang", ["de", "fr", "tr"])
-def test_rendered_keyboard_is_alphabetical(server, page, lang):
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_rendered_keyboard_matches_layout(server, page, lang):
     open_game(page, server, lang)
-    chars = page.evaluate(
-        "Array.from(document.querySelectorAll('button.key[data-char]'), b => b.dataset.char)"
-    )
     language = build_keyboard(lang)
-    assert chars == [c for row in language.keyboard for c in row]
+    assert page.evaluate(KEYS_JS) == [c for row in language.keyboard for c in row]
+
+
+@pytest.mark.parametrize("how", ["query", "cookie"])
+def test_spanish_alphabetical_setting(server, page, how):
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    if how == "query":
+        page.goto(f"{server}/es?layout=alphabetical")
+    else:
+        page.context.add_cookies([{"name": "keyboard_layout_es", "value": "alphabetical", "url": server}])
+        page.goto(f"{server}/es")
+    page.wait_for_function(READY)
+    keys = [c for c in page.evaluate(KEYS_JS) if c not in ("⇨", "⌫")]
+    assert len(keys) == 27 and set(keys) == ES_LETTERS
+    assert keys[:3] == ["a", "b", "c"] and keys.index("ñ") == keys.index("n") + 1
+    assert page.locator("#keyboard-layout-select").input_value() == "alphabetical"
+    press_key(page, "ñ")
+    assert row0(page) == "ñ"
+    assert errors == []
 
 
 def test_shift_letter_types_lowercase(server, page):
@@ -107,12 +121,33 @@ def test_typing_in_a_form_field_is_not_a_guess(server, page):
     assert row0(page) == "a"
 
 
-def test_turkish_capital_i(server, page):
-    open_game(page, server, "tr")
-    for key in ("I", "İ"):  # Turkish: I -> ı, İ -> i
-        page.evaluate(f"window.dispatchEvent(new KeyboardEvent('keydown', {{key: '{key}'}}))")
-    page.keyboard.press("Shift+C")  # ordinary letters still work
-    assert page.evaluate(f"{VM}.tiles[0]") == ["ı", "i", "c", "", ""]
+def press_key(page, key):
+    page.evaluate("k => window.dispatchEvent(new KeyboardEvent('keydown', {key: k}))", key)
+
+
+def test_physical_enye_and_accented_keys(server, page):
+    errors = open_game(page, server, "es")
+    press_key(page, "ñ")
+    press_key(page, "Ñ")          # Shift/Caps Lock
+    press_key(page, "á")          # accented keys type the plain letter
+    press_key(page, "U\u0308")    # decomposed Ü -> u
+    press_key(page, "n\u0303")    # decomposed ñ stays ñ
+    assert page.evaluate(f"{VM}.tiles[0]") == ["ñ", "ñ", "a", "u", "ñ"]
+    assert errors == []
+
+
+def test_dead_keys_and_unknown_keys_are_ignored(server, page):
+    open_game(page, server, "es")
+    for key in ("Dead", "´", "¨", "1", "ß"):
+        press_key(page, key)
+    page.keyboard.press("o")
+    assert row0(page) == "o"
+
+
+def test_english_accented_key_types_plain_letter(server, page):
+    open_game(page, server, "en")
+    press_key(page, "é")
+    assert row0(page) == "e"
 
 
 def test_physical_enter_after_tapping_a_key(server, page):

@@ -118,8 +118,8 @@ def test_links_on_start_screen_and_leaderboard(lb_env, client):
     board = page(client, "/leaderboard?tab=all", **{"Accept-Language": "es"})
     assert 'href="/terms?lang=es"' in board and 'href="/privacy?lang=es"' in board
     assert "Términos" in board
-    board_ar = page(client, "/leaderboard?tab=ar")
-    assert 'href="/privacy?lang=en"' in board_ar and "الخصوصية" in board_ar
+    board_en = page(client, "/leaderboard?tab=en")
+    assert 'href="/privacy?lang=en"' in board_en and 'href="/terms?lang=en"' in board_en
     # also without the leaderboard (guest-only site)
     assert 'href="/privacy?lang=es"' in page(app.app.test_client(), "/")
 
@@ -128,7 +128,7 @@ def test_game_settings_links(lb_env, client):
     web = page(client, "/es")
     assert 'href="/privacy?lang=es"' in web and 'data-c24-external="http://localhost/privacy?lang=es"' in web
     assert "data-activity-delete" not in web  # Activity only
-    assert 'href="/privacy?lang=en"' in page(client, "/fr")  # other languages read English
+    assert 'href="/privacy?lang=en"' in page(client, "/en")
     act = page(client, "/lb/es?embed=1")
     assert 'data-c24-external="http://localhost/privacy?lang=es"' in act
     assert 'data-c24-external="http://localhost/terms?lang=es"' in act

@@ -54,6 +54,7 @@ def test_fold_accents_keeps_enye():
     assert lb.fold_accents("canción") == "cancion"
     assert lb.fold_accents("pingüino") == "pinguino"
     assert lb.fold_accents("año") == "año"
+    assert lb.fold_accents("an\u0303o") == "año"   # decomposed ñ (NFC first)
 
 
 def test_resolve_accents():
@@ -74,11 +75,17 @@ COLOR_CASES = [
     ("eerie", "lever", [S, C, S, I, I]),
     ("lever", "eerie", [I, C, I, S, S]),
     ("perro", "perro", [C, C, C, C, C]),
-    ("canto", "cantó", [C, C, C, C, I]),   # plain o never counts for ó
-    ("pasas", "papás", [C, C, I, I, C]),   # a used up; á is a different letter
-    ("cantó", "tocan", [S, S, S, S, I]),
-    ("állos", "salas", [I, I, C, I, C]),
+    ("canto", "cantó", [C, C, C, C, C]),   # a plain o counts for ó
+    ("cantó", "canto", [C, C, C, C, C]),   # ... and the other way round
+    ("pasas", "papás", [C, C, I, C, C]),   # á = a; the 2nd s has no s left
+    ("cantó", "tocan", [S, S, S, S, S]),
+    ("állos", "salas", [S, I, C, I, C]),
     ("aaaaa", "abaca", [C, I, C, I, C]),
+    ("pingue", "pingüe", [C, C, C, C, C, C]),  # ü = u
+    ("sonar", "soñar", [C, C, I, C, C]),   # ñ is its own letter
+    ("canon", "cañón", [C, C, I, C, C]),
+    ("ñañas", "nanas", [I, C, I, C, C]),
+    ("áaaaa", "abacá", [C, I, C, I, C]),   # duplicates with accents count as one letter
 ]
 
 
@@ -104,24 +111,28 @@ def _js_method(source, name):
 
 @pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
 def test_color_and_fold_match_game_js():
-    """Run the real updateColors/foldAccents from game.js in node on the same cases."""
+    """Run the real updateColors/foldAccents/colorKey from game.js in node on the same cases."""
     with open(os.path.join(app.STATIC_DIR, "game.js"), encoding="utf-8") as f:
         src = f.read()
-    update = _js_method(src, "updateColors")
-    fold = _js_method(src, "foldAccents")
+    update = _js_method(src, "\n        updateColors")  # the method, not a call
+    fold = _js_method(src, "function foldAccents")
+    color_key = _js_method(src, "\n        colorKey")
     cases = [[g, a] for g, a, _ in COLOR_CASES]
-    words = ["canción", "pingüino", "año", "árbol", "ÉxitO".lower()]
+    words = ["canción", "pingüino", "año", "AÑO", "an\u0303o", "árbol", "ÉxitO".lower(), "Ü"]
     script = f"""
 const TILE_BASE = "uppercase font-bold select-none text-white";
-const obj = {{ updateColors{update}, foldAccents{fold} }};
-const out = {{colors: [], folds: []}};
+const COLOR_RANK = {{ "incorrect": 1, "semicorrect": 2, "correct": 3 }};
+function foldAccents{fold}
+const obj = {{ updateColors{update}, colorKey{color_key} }};
+const out = {{colors: [], folds: [], keys: []}};
 for (const [g, a] of {json.dumps(cases)}) {{
   obj.todays_word = a; obj.active_row = 0; obj.key_classes = {{}};
-  obj.tiles = [g.split("")]; obj.tile_classes = [["", "", "", "", ""]];
+  obj.tiles = [Array.from(g)]; obj.tile_classes = [Array.from(g).map(() => "")];
   obj.updateColors();
   out.colors.push(obj.tile_classes[0].map(c => c.split(" ")[0]));
+  out.keys.push(obj.key_classes);
 }}
-for (const w of {json.dumps(words)}) out.folds.push(obj.foldAccents(w));
+for (const w of {json.dumps(words)}) out.folds.push(foldAccents(w));
 console.log(JSON.stringify(out));
 """
     res = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=30)
@@ -129,6 +140,14 @@ console.log(JSON.stringify(out));
     out = json.loads(res.stdout)
     assert out["colors"] == [lb.color_guess(g, a) for g, a in cases]
     assert out["folds"] == [lb.fold_accents(w) for w in words]
+    # keys are colored on the folded letter: "ó" in a guess colors the "o" key
+    rank = {I: 1, S: 2, C: 3}
+    for (g, a), keys in zip(cases, out["keys"]):
+        want = {}
+        for ch, col in zip(lb.fold_accents(g), lb.color_guess(g, a)):
+            if rank[col] > rank.get(want.get(ch), 0):
+                want[ch] = col
+        assert keys == want, (g, a)
 
 
 # ---------- store ----------
@@ -451,8 +470,9 @@ def test_rate_limit(lb_env, client, discord):
 
 
 def test_guest_routes_never_write(lb_env, client, discord, mem):
-    for path in ["/", "/es", "/en", "/fr", "/sitemap.xml", "/leaderboard"]:
+    for path in ["/", "/es", "/en", "/sitemap.xml", "/leaderboard"]:
         assert client.get(path).status_code == 200, path
+    assert client.get("/fr").status_code == 302  # removed language: redirect, still no writes
     assert mem.is_empty()
 
 
@@ -552,12 +572,13 @@ def test_admin_hide_and_unhide(lb_env, client, discord, mem, rendered):
                        headers={"Origin": "https://evil.example"}).status_code == 403
 
 
-# ---------- every language (owner decision 2026-10-28) ----------
+# ---------- Spanish and English only (owner decision 2026-10-29) ----------
 
 import unicodedata  # noqa: E402
 
-ALL_LANGS = ("en", "es", "ar", "fr", "pt", "ru", "de", "tr", "vi", "ko")
-KEY_LANGS = ("es", "de", "tr", "ko", "ar", "vi", "ru", "fr")
+ALL_LANGS = ("es", "en")
+KEY_LANGS = ("es", "en")
+RETIRED = ("ar", "de", "fr", "ko", "pt", "ru", "tr", "vi")
 
 
 def _word_with(lang, pred):
@@ -565,12 +586,13 @@ def _word_with(lang, pred):
     return next(w for w in app.language_codes_5words[lang] if w != ans and pred(w))
 
 
-def test_lb_langs_are_every_language():
-    assert set(app.LB_LANGS) == set(ALL_LANGS) and len(app.LB_LANGS) == 10
+def test_lb_langs_are_es_and_en():
+    assert app.LB_LANGS == app.SUPPORTED_LANGS == ("es", "en")
     assert app.LB_LANGS == tuple(app.language_codes)  # menu order
-    assert app.LB_TABS == app.LB_LANGS + ("all",)
+    assert app.LB_TABS == ("all", "es", "en")
+    assert app.store_mod.SUPPORTED_LANGS == app.SUPPORTED_LANGS
     # accents resolved only where the config says so
-    assert {l for l in app.LB_LANGS if app._accent_insensitive(l)} == {"es", "fr", "pt"}
+    assert {l for l in app.LB_LANGS if app._accent_insensitive(l)} == {"es"}
 
 
 @pytest.mark.parametrize("lang", ALL_LANGS)
@@ -614,80 +636,65 @@ def test_guess_colors_and_win_every_language(lb_env, client, discord, mem, rende
     ctx = rendered[-1][1]
     assert ctx["tab"] == lang
     assert [(r["username"], r["points"], r["wins"]) for r in ctx["rows"]] == [("kolo_fan", 5, 1)]
-    other = "es" if lang != "es" else "de"
+    other = "en" if lang == "es" else "es"
     client.get(f"/leaderboard?tab={other}")
     assert rendered[-1][1]["rows"] == []
 
 
-def test_combined_sums_every_language(lb_env, client, discord, mem, rendered):
+def test_combined_sums_es_and_en(lb_env, client, discord, mem, rendered):
     login(client, discord)
     for lang in ALL_LANGS:
         assert guess(client, answer(lang), lang=lang).get_json()["points"] == 6, lang
     client.get("/leaderboard?tab=all")
     row = rendered[-1][1]["rows"][0]
-    assert (row["points"], row["wins"], row["played"]) == (60, 10, 10)
+    assert (row["points"], row["wins"], row["played"]) == (12, 2, 2)
     assert (row["current_streak"], row["best_streak"]) == (1, 1)  # one day, counted once
     for lang in ALL_LANGS:
         assert row_of(mem, P1, lang)["points"] == 6
+
+
+def test_old_language_rows_never_count(lb_env, client, discord, mem, rendered):
+    """Rows left in the tables from removed languages (before the purge) are ignored."""
+    day, today_idx = app.lb_today()
+    mem.upsert_player(P1, "kolo_fan")
+    app._record_result(mem, P1, "es", day, True, 3)
+    app._record_result(mem, P1, "fr", day, True, 1)
+    app._record_result(mem, P1, "ko", day - __import__("datetime").timedelta(days=1), True, 1)
+    with mem.game(P1, "fr", day) as g:
+        g.save(["salut"])
+    assert [r["points"] for r in mem.leaderboard("all", 10)] == [lb.points(True, 3)]
+    assert mem.standing(P1, "all")["played"] == 1
+    assert mem.histories([P1], "all")[P1] == [(day, True)]
+    assert mem.leaderboard("fr", 10) == []
+    assert mem.live("fr", day, "someone-else") == []
 
 
 def test_leaderboard_tabs_and_texts(lb_env, client, rendered):
     client.get("/leaderboard")
     ctx = rendered[-1][1]
     assert ctx["tab"] == "all"
-    assert [t["code"] for t in ctx["lb_tabs"]] == list(app.LB_LANGS) + ["all"]
-    assert ctx["lb_tabs"][-1]["name_native"] is None
-    names = {t["code"]: t["name_native"] for t in ctx["lb_tabs"][:-1]}
+    assert [t["code"] for t in ctx["lb_tabs"]] == ["all", "es", "en"]
+    assert ctx["lb_tabs"][0]["name_native"] is None
+    names = {t["code"]: t["name_native"] for t in ctx["lb_tabs"][1:]}
     assert names == {l: app.language_configs[l]["name_native"] for l in ALL_LANGS}
     assert set(ctx["texts"]) == {"es", "en"}
-    for lang in ("ko", "ar", "tr"):
+    for lang in ALL_LANGS:
         client.get(f"/leaderboard?tab={lang}")
         ctx = rendered[-1][1]
-        assert ctx["tab"] == lang and set(ctx["texts"]) == {"es", "en", lang}
-        assert ctx["texts"][lang] is app.language_configs[lang]["text"]
-    client.get("/leaderboard?tab=xx")
-    assert rendered[-1][1]["tab"] == "all"
+        assert ctx["tab"] == lang and set(ctx["texts"]) == {"es", "en"}
+    for old in RETIRED + ("xx",):
+        client.get(f"/leaderboard?tab={old}")
+        assert rendered[-1][1]["tab"] == "all", old
 
 
-def test_korean_guess_matches_jamo_lists(lb_env, client, discord):
-    # ko lists are decomposed jamo (one tile per jamo), not syllables
-    ans = answer("ko")
-    assert len(ans) == 5 and unicodedata.is_normalized("NFD", ans)
-    assert not unicodedata.is_normalized("NFC", ans)
+def test_normalize_is_nfc_lowercase():
+    assert app.lb_normalize("es", " CAÑÓN ") == "cañón"
+    assert app.lb_normalize("es", unicodedata.normalize("NFD", "CAÑÓN")) == "cañón"
+    assert app.lb_normalize("en", "Heath") == "heath"
+
+
+def test_decomposed_input_matches_nfc_lists(lb_env, client, discord):
+    w = _word_with("es", lambda x: not unicodedata.is_normalized("NFD", x))
     login(client, discord)
-    w = wrong_words("ko", 1)[0]
-    # NFC on the server would merge jamo into syllables: both forms must work
-    body = guess(client, unicodedata.normalize("NFC", w), lang="ko").get_json()
-    assert body["word"] == w and body["colors"] == lb.color_guess(w, ans)
-    body = guess(client, ans, lang="ko").get_json()  # jamo, as game.js tiles send it
-    assert body["won"] and body["colors"] == [C] * 5
-
-
-def test_turkish_dotted_and_dotless_i(lb_env, client, discord):
-    login(client, discord)
-    assert app.lb_normalize("tr", "KIŞIN") == "kışın"
-    assert app.lb_normalize("tr", "İZMİR") == "izmir"
-    assert app.lb_normalize("de", "BÖRDE") == "börde"
-    w = _word_with("tr", lambda x: "ı" in x and "i" in x)
-    upper = "".join({"i": "İ", "ı": "I"}.get(c, c.upper()) for c in w)
-    body = guess(client, upper, lang="tr").get_json()
-    assert body["word"] == w
-    assert body["colors"] == lb.color_guess(w, answer("tr"))
-    # dotted and dotless i are different letters
-    assert lb.color_guess("ı", "i") == [I]
-
-
-@pytest.mark.parametrize("lang", ("vi", "ar", "ru", "de"))
-def test_decomposed_input_matches_nfc_lists(lb_env, client, discord, lang):
-    w = _word_with(lang, lambda x: not unicodedata.is_normalized("NFD", x))
-    login(client, discord)
-    body = guess(client, unicodedata.normalize("NFD", w), lang=lang).get_json()
+    body = guess(client, unicodedata.normalize("NFD", w), lang="es").get_json()
     assert body["word"] == w and len(body["colors"]) == 5
-
-
-def test_no_accent_folding_outside_es_fr_pt(lb_env, client, discord):
-    login(client, discord)
-    w = _word_with("de", lambda x: "ö" in x and x.replace("ö", "o") not in app.language_codes_5words["de"])
-    assert guess(client, w.replace("ö", "o"), lang="de").get_json() == {"error": "invalid_word"}
-    w = _word_with("vi", lambda x: not x.isascii() and lb.fold_accents(x) not in app.language_codes_5words["vi"])
-    assert guess(client, lb.fold_accents(w), lang="vi").get_json() == {"error": "invalid_word"}

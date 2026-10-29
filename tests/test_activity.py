@@ -103,12 +103,12 @@ ACTIVITY_MARKERS = ("discord-activity.js", "discord-embedded-app-sdk", 'id="c24-
 
 
 def test_web_pages_have_no_activity_code(lb_env, client, discord):
-    pages = ["/", "/es", "/en", "/ko", "/leaderboard", "/es?frame_id=a&instance_id=b&platform=tv"]
+    pages = ["/", "/es", "/en", "/leaderboard", "/es?frame_id=a&instance_id=b&platform=tv"]
     for path in pages:
         html = client.get(path).get_data(as_text=True)
         assert not [m for m in ACTIVITY_MARKERS if m in html], path
     login(client, discord)
-    for path in pages + ["/lb/es", "/lb/ar", "/leaderboard?tab=es"]:
+    for path in pages + ["/lb/es", "/lb/en", "/leaderboard?tab=es"]:
         r = client.get(path)
         assert r.status_code == 200, path
         html = r.get_data(as_text=True)
@@ -151,7 +151,8 @@ def test_root_inside_activity_renders_the_shell(lb_env, client, rendered):
         assert data["client_id"] == CLIENT_ID and data["lang"] is None
         assert [l["code"] for l in data["langs"]] == list(app.LB_LANGS)
         assert data["langs"][0]["code"] == "es" and data["langs"][1]["code"] == "en"
-        assert [l["code"] for l in data["langs"] if l["rtl"]] == ["ar"]
+        assert [l["code"] for l in data["langs"]] == ["es", "en"]  # only Spanish and English
+        assert not any("rtl" in l for l in data["langs"])
         assert all(l["loading"] for l in data["langs"])
         assert "fake-client-secret" not in html
         # every SDK module preloaded (plain versioned-folder paths), before the shell's script
@@ -170,26 +171,32 @@ def test_root_inside_activity_renders_the_shell(lb_env, client, rendered):
         assert f'<link rel="modulepreload" href="{djs}">' in html
         game = client.get("/lb/es?embed=1").get_data(as_text=True)
         assert vue in game and tw in game and gjs in game and djs in game
-        # the iframe: same origin, no sandbox; the picker: 10 big buttons, bilingual title
+        # the iframe: same origin, no sandbox; the picker (fallback only): 2 big buttons, bilingual title
         frame = re.search(r'<iframe[^>]*id="c24-game"[^>]*>', html).group(0)
         assert "sandbox" not in frame and "src=" not in frame
         assert re.findall(r'data-pick-lang="([a-z]{2})"', html) == list(app.LB_LANGS)
-        assert re.search(r'data-pick-lang="ar"[^>]*dir="rtl"', html)
+        assert 'dir="rtl"' not in html
         assert "Elige tu idioma" in html and "Choose your language" in html
         assert "Intentar de nuevo / Try again" in html
         assert inline_problems(html) == []
         assert not r.headers.getlist("Set-Cookie")
     # a language asked for in the URL opens right away
-    assert shell_data(client.get("/?" + ACT + "&lang=ko").get_data(as_text=True))["lang"] == "ko"
+    assert shell_data(client.get("/?" + ACT + "&lang=en").get_data(as_text=True))["lang"] == "en"
     assert shell_data(client.get("/?" + ACT + "&lang=xx").get_data(as_text=True))["lang"] is None
+    assert shell_data(client.get("/?" + ACT + "&lang=ko").get_data(as_text=True))["lang"] is None
     # an old /lb/<lang> launch URL: the shell on that language (never the bare game)
+    r = client.get("/lb/en?" + ACT)
+    assert r.status_code == 200 and shell_data(r.get_data(as_text=True))["lang"] == "en"
+    # a removed language's launch URL: 302 to es (Discord's params kept), then the shell
     r = client.get("/lb/de?" + ACT)
-    assert r.status_code == 200 and shell_data(r.get_data(as_text=True))["lang"] == "de"
+    loc = urlparse(r.headers["Location"])
+    assert r.status_code == 302 and loc.path == "/lb/es" and parse_qs(loc.query)["frame_id"] == ["f1"]
 
 
 def test_shell_never_inside_its_own_iframe(lb_env, client):
     # "/" (or /activity) inside the iframe goes to the game: the SDK can't load twice
-    for path, target in (("/?embed=1", "/lb/es"), ("/?embed=1&lang=ko", "/lb/ko"), ("/activity?embed=1", "/lb/es")):
+    for path, target in (("/?embed=1", "/lb/es"), ("/?embed=1&lang=en", "/lb/en"),
+                         ("/?embed=1&lang=ko", "/lb/es"), ("/activity?embed=1", "/lb/es")):
         r = client.get(path)
         assert r.status_code == 302, path
         loc = urlparse(r.headers["Location"])
@@ -207,12 +214,15 @@ def test_shell_off_when_leaderboard_off(monkeypatch, client):
 
 
 def test_no_guest_game_inside_activity(lb_env, client):
-    r = client.get("/de?" + ACT)
+    r = client.get("/en?" + ACT)
     assert r.status_code == 302
     loc = urlparse(r.headers["Location"])
-    assert loc.path == "/lb/de" and parse_qs(loc.query)["frame_id"] == ["f1"]
+    assert loc.path == "/lb/en" and parse_qs(loc.query)["frame_id"] == ["f1"]
+    r = client.get("/en?embed=1")
+    assert r.status_code == 302 and r.headers["Location"] == "/lb/en?embed=1"
+    # a removed language: first to /es (params kept), which then goes to /lb/es
     r = client.get("/de?embed=1")
-    assert r.status_code == 302 and r.headers["Location"] == "/lb/de?embed=1"
+    assert r.status_code == 302 and r.headers["Location"] == "/es?embed=1"
     r = client.get("/nope?" + ACT)
     assert r.status_code == 302 and "frame_id=f1" in r.headers["Location"]
 
@@ -226,7 +236,7 @@ def test_activity_game_page(lb_env, client, rendered):
     assert "discord-embedded-app-sdk" not in html and "activity-shell.js" not in html
     assert '<html lang="es" class="c24-embed">' in html
     data = json.loads(re.search(r'id="c24-activity">(.*?)</script>', html).group(1))
-    assert data["lang"] == "es" and "ko" in data["langs"]
+    assert data["lang"] == "es" and "en" in data["langs"]
     assert "fake-client-secret" not in html
     page = json.loads(re.search(r'id="c24-page">(.*?)</script>', html).group(1))
     assert page["activity"] is True and page["lb"] is True and page["todays_word"] == ""
@@ -241,9 +251,9 @@ def test_activity_game_page(lb_env, client, rendered):
     btn = re.search(r'<button[^>]*data-activity-lang-open[^>]*>', html, re.S).group(0)
     assert 'aria-label="Cambiar idioma (Español)"' in btn
     assert re.search(r'<span class="c24-badge">es ▾</span>', html)
-    # the language window: the 10 languages, Arabic right to left, the current one marked
-    assert re.findall(r'data-lang-choice="([a-z]{2})"', html) == list(app.LB_LANGS)
-    assert re.search(r'data-lang-choice="ar"[^>]*dir="rtl"', html)
+    # the language window: Español and English, the current one marked
+    assert re.findall(r'data-lang-choice="([a-z]{2})"', html) == ["es", "en"]
+    assert 'dir="rtl"' not in html
     assert re.search(r'data-lang-choice="es"[^>]*aria-current="true"', html, re.S)
     # the old Settings language select is gone
     assert "activity-lang-select" not in html and "data-activity-lang>" not in html
@@ -474,14 +484,14 @@ def test_no_inline_js_in_rendered_pages(lb_env, client, discord, monkeypatch):
     monkeypatch.setenv("DEMO_PASSWORD", "demo-pass-test")
     monkeypatch.setenv("ADMIN_DISCORD_IDS", P1)
     pages = {}
-    for path in ["/", "/es", "/ar", "/ko", "/leaderboard", "/demo", "/sitemap.xml",
-                 "/?" + ACT, "/activity?" + ACT, "/lb/es?" + ACT, "/lb/es?embed=1", "/lb/ar?embed=1",
-                 "/lb/ko?embed=1", "/leaderboard?tab=es&" + ACT, "/leaderboard?tab=es&embed=1"]:
+    for path in ["/", "/es", "/en", "/leaderboard", "/demo", "/sitemap.xml",
+                 "/?" + ACT, "/activity?" + ACT, "/lb/es?" + ACT, "/lb/es?embed=1", "/lb/en?embed=1",
+                 "/leaderboard?tab=es&" + ACT, "/leaderboard?tab=es&embed=1"]:
         pages[path] = client.get(path).get_data(as_text=True)
     login(client, discord)
     app._record_result(app.lb_store(), P1, "es", app.lb_today()[0], True, 3)
     client.post("/demo", data={"password": "demo-pass-test"})
-    for path in ["/", "/lb/es", "/lb/ar", "/leaderboard?tab=es", "/demo/es", "/?login=failed", "/?deleted=1"]:
+    for path in ["/", "/lb/es", "/lb/en", "/leaderboard?tab=es", "/demo/es", "/?login=failed", "/?deleted=1"]:
         r = client.get(path)
         assert r.status_code == 200, path
         pages["in:" + path] = r.get_data(as_text=True)
@@ -564,6 +574,9 @@ export class DiscordSDK extends DiscordSDKMock {
                 scopes: ['identify'], expires: '2099-01-01', application: { id: clientId, description: '', name: 'c24' } })),
             setOrientationLockState: wrap('setOrientationLockState', () => null),
             openExternalLink: wrap('openExternalLink', () => ({ opened: true })),
+            openInviteDialog: wrap('openInviteDialog', () => null),
+            // default: Discord can't tell its language (an old client): the picker shows
+            userSettingsGetLocale: wrap('userSettingsGetLocale', () => { throw new Error('unsupported'); }),
         });
     }
     ready() {
@@ -710,7 +723,7 @@ def test_browser_web_never_loads_sdk(lb_env, server, page, discord):
 
 
 def test_browser_shell_one_sdk_for_the_whole_launch(lb_env, server, page, discord, mem):
-    """First launch: picker -> English -> guess -> header "EN ▾" -> Deutsch -> guess
+    """First launch (Discord's language unknown): picker -> English -> guess -> header "EN ▾" -> Español -> guess
     -> leaderboard window. One SDK, one handshake, one login, the shell never reloads."""
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -719,13 +732,12 @@ def test_browser_shell_one_sdk_for_the_whole_launch(lb_env, server, page, discor
     _, sdk_loads, api = setup_activity(page, server)
     page.goto(server + "/?" + ACT)  # Discord opens "/": the shell, no redirect
     assert urlparse(page.url).path == "/"
-    # first launch: the picker (while the login runs behind it)
+    # first launch, Discord's locale unknown: the picker (fallback)
     page.wait_for_selector("#c24-picker:not([hidden])")
     assert "Elige tu idioma" in page.inner_text("#c24-picker-title")
     assert "Choose your language" in page.inner_text("#c24-picker-title")
     codes = page.eval_on_selector_all("[data-pick-lang]", "els => els.map(e => e.getAttribute('data-pick-lang'))")
-    assert codes == list(app.LB_LANGS) and codes[:2] == ["es", "en"]
-    assert page.get_attribute("[data-pick-lang=ar]", "dir") == "rtl"
+    assert codes == list(app.LB_LANGS) == ["es", "en"]
     assert page.is_hidden("#c24-game")
     page.wait_for_function("document.documentElement.getAttribute('data-activity') === 'ready'")
     page.evaluate("window.__top_marker = 42")
@@ -761,7 +773,7 @@ def test_browser_shell_one_sdk_for_the_whole_launch(lb_env, server, page, discor
     word_en = wrong_words("en", 1)[0]
     type_word(frame, word_en)
     assert mem.get_game(P1, "en", app.lb_today()[0])[0] == [word_en]
-    # change language from the header: the window lists the 10, choosing swaps the iframe
+    # change language from the header: the window lists the 2, choosing swaps the iframe
     assert frame.inner_text("[data-activity-lang-open] .c24-badge").strip() == "EN ▾"
     frame.click("[data-activity-lang-open]")
     frame.wait_for_selector("[data-activity-langs]", state="visible")
@@ -769,12 +781,12 @@ def test_browser_shell_one_sdk_for_the_whole_launch(lb_env, server, page, discor
     page.keyboard.press("Escape")
     frame.wait_for_selector("[data-activity-langs]", state="hidden")
     frame.click("[data-activity-lang-open]")
-    frame.click("[data-lang-choice=de]")
-    frame = wait_ready(page, "de")
-    assert page.evaluate("localStorage.getItem('c24_activity_lang')") == "de"
-    word_de = wrong_words("de", 1)[0]
-    type_word(frame, word_de)
-    assert mem.get_game(P1, "de", app.lb_today()[0])[0] == [word_de]
+    frame.click("[data-lang-choice=es]")
+    frame = wait_ready(page, "es")
+    assert page.evaluate("localStorage.getItem('c24_activity_lang')") == "es"
+    word_es = wrong_words("es", 1)[0]
+    type_word(frame, word_es)
+    assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [word_es]
     # the leaderboard window, inside the game (no page change)
     frame.click("[data-activity-board-open]")
     frame.wait_for_selector("[data-board-table], [data-board-empty]")
@@ -795,21 +807,48 @@ def test_browser_shell_one_sdk_for_the_whole_launch(lb_env, server, page, discor
 def test_browser_remembered_language_on_relaunch(lb_env, server, page, discord, mem):
     setup_activity(page, server)
     page.goto(server + "/?" + ACT)
-    page.click("[data-pick-lang=ko]")
-    frame = wait_ready(page, "ko")
-    word = wrong_words("ko", 1)[0]
+    page.click("[data-pick-lang=en]")
+    frame = wait_ready(page, "en")
+    word = wrong_words("en", 1)[0]
     type_word(frame, word)
     ctx = page.context
     page.close()
-    # a new launch (new instance_id), same device: straight to Korean, the same game
+    # a new launch (new instance_id), same device: straight to English, the same game,
+    # even though Discord now says Spanish (the device's choice wins)
     page2 = ctx.new_page()
-    setup_activity(page2, server)
+    setup_activity(page2, server, mocks_js="{userSettingsGetLocale: () => ({locale: 'es-ES'})}")
     page2.goto(server + "/?frame_id=f2&instance_id=i2&platform=desktop")
-    frame = wait_ready(page2, "ko")
+    frame = wait_ready(page2, "en")
     assert page2.is_hidden("#c24-picker")
     frame.wait_for_function(f"document.querySelectorAll('{BOARD_COLORED}').length === 5")
     assert frame.evaluate(VM + ".active_row") == 1
     assert page2.evaluate(SDK_COUNT) == 1
+
+
+@pytest.mark.parametrize("locale, lang", [("es-ES", "es"), ("es-419", "es"), ("en-US", "en"),
+                                          ("pt-BR", "en"), ("ko", "en")])
+def test_browser_first_launch_follows_discord_locale(lb_env, server, page, discord, mem, locale, lang):
+    """Nothing saved on the device: Discord's language picks es (es-*) or en (anything
+    else), with no picker; the choice is then saved."""
+    setup_activity(page, server, mocks_js="{userSettingsGetLocale: () => ({locale: %s})}" % json.dumps(locale))
+    page.goto(server + "/?" + ACT)
+    frame = wait_ready(page, lang)
+    assert page.is_hidden("#c24-picker")
+    assert page.evaluate("localStorage.getItem('c24_activity_lang')") == lang
+    calls_now = page.evaluate("window.__calls")
+    assert calls_now.index("authenticate") < calls_now.index("userSettingsGetLocale")
+    # Invite: the game asks the shell, which opens Discord's invite window (no new scope)
+    frame.evaluate("window.C24Activity.invite()")
+    page.wait_for_function("window.__calls.indexOf('openInviteDialog') >= 0")
+    assert page.evaluate("window.__args.authorize.scope") == ["identify"]
+
+
+def test_browser_locale_timeout_shows_picker(lb_env, server, page, discord):
+    setup_activity(page, server, mocks_js="{userSettingsGetLocale: () => new Promise(() => {})}")
+    page.goto(server + "/?" + ACT)
+    page.wait_for_selector("#c24-picker:not([hidden])", timeout=10000)
+    assert page.eval_on_selector_all("[data-pick-lang]", "els => els.map(e => e.getAttribute('data-pick-lang'))") \
+        == ["es", "en"]
 
 
 def test_browser_bearer_through_the_shell(lb_env, server, page, discord, mem):
@@ -912,9 +951,9 @@ def test_browser_discord_csp(lb_env, server, page, discord, mem):
     word = wrong_words("es", 1)[0]
     type_word(frame, word)
     assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [word]
-    frame.click("button[aria-label='instructions']")
+    frame.click("button[data-help-open]")
     page.keyboard.press("Escape")
-    frame.click("button[aria-label='stats']")
+    frame.click("button[data-stats-open]")
     page.keyboard.press("Escape")
     frame.click(".c24-header-end .c24-icon-btn:last-child")  # settings
     frame.select_option("[data-theme-select]", "dark")
@@ -999,8 +1038,9 @@ def boxes_overlap(a, b):
 
 def test_browser_desktop_panel_stays_stacked_with_sidebar(lb_env, browser, server, discord):
     """Discord desktop: a wide but short panel (875x400) keeps header / board / keyboard
-    stacked (never the landscape side-by-side layout); the live sidebar shows from
-    860px wide at any height, the game centered in the space next to it."""
+    stacked (never the landscape side-by-side layout); the live rail shows from
+    860px wide at any height, in the left gutter: the game column stays centered in
+    the panel (the rail never moves or shrinks it)."""
     ctx = browser.new_context(viewport={"width": 875, "height": 400})
     page = ctx.new_page()
     try:
@@ -1036,13 +1076,13 @@ def test_browser_desktop_panel_stays_stacked_with_sidebar(lb_env, browser, serve
             assert frame.is_visible("[data-live-open]") == (not sidebar), size
             if sidebar:
                 side = frame.locator("#c24-live").bounding_box()
-                assert 220 <= side["width"] <= 280 and side["height"] >= height - 1, size
+                assert 150 <= side["width"] <= 280 and side["height"] >= height - 80, size
                 for other in (head, board, kb):
                     assert not boxes_overlap(side, other), size
-                # the game column is centered in the space right of the sidebar
+                # the game column stays centered in the panel; the rail sits left of it
                 col = frame.locator(".c24-game").bounding_box()
-                left, right = col["x"] - side["width"], width - col["x"] - col["width"]
-                assert abs(left - right) <= 2, size
+                assert abs(col["x"] + col["width"] / 2 - width / 2) <= 2, size
+                assert side["x"] + side["width"] <= col["x"] + 0.5, size
             if SHOTS and size in ("875x400", "1280x600"):
                 page.screenshot(path=os.path.join(SHOTS, f"activity-{size}.png"))
         assert page.evaluate(SDK_COUNT) == 1
@@ -1076,7 +1116,7 @@ def test_browser_picker_small_screens(lb_env, browser, server, discord):
             assert page.evaluate("document.documentElement.scrollWidth") <= size["width"]
             btn = page.locator("[data-pick-lang=es]").bounding_box()
             assert btn["height"] >= 40 and btn["x"] >= 0 and btn["x"] + btn["width"] <= size["width"] + 1
-            if size["width"] >= 390:  # the 10 big buttons fit on a phone without scrolling
+            if size["width"] >= 390:  # the 2 big buttons fit on a phone without scrolling
                 last = page.locator("[data-pick-lang]").last.bounding_box()
                 assert last["y"] + last["height"] <= size["height"]
             page.locator("[data-pick-lang=en]").scroll_into_view_if_needed()

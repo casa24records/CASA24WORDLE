@@ -6,7 +6,7 @@
 // the whole launch, and this page borrows its session via window.parent.C24Activity.
 //
 // It exposes window.C24Activity for game.js = {session, ready, fetch, reauth,
-// log, url, setLang}. Links with data-c24-external (Terms / Privacy) and links to
+// log, url, setLang, invite}. Links with data-c24-external (Terms / Privacy) and links to
 // other sites open through the shell's openExternal (SDK openExternalLink); the
 // Settings "Delete my data" form posts /api/me/delete with the session, then the
 // shell shows "data deleted" (dataDeleted()). Nothing here navigates the shell.
@@ -14,7 +14,9 @@
 //   - fetch(url, opts): this page's fetch with "Authorization: Bearer <session>";
 //     a 401 asks the shell to log in again (silently), then retries ONCE;
 //   - setLang(code): asks the shell for another language (postMessage "c24-lang");
-//     the shell swaps this iframe, the Discord connection stays.
+//     the shell swaps this iframe, the Discord connection stays;
+//   - invite(): asks the shell to open Discord's invite dialog (postMessage
+//     "c24-invite"; the shell calls the SDK's openInviteDialog, no extra scope).
 // Layout mode (PIP / grid) and platform (desktop / mobile) come from the shell
 // (postMessage {type: "c24-layout"}) and become classes on <html> (c24-pip,
 // c24-plat-desktop / c24-plat-mobile). Discord's safe areas are applied by the
@@ -189,6 +191,12 @@ window.C24Activity = {
         // the shell swaps this iframe to the other language (no new Discord login)
         if (host && window.parent) {
             window.parent.postMessage({ type: "c24-lang", code: String(code) }, window.location.origin);
+        }
+    },
+    invite() {
+        // Discord's "invite friends to this Activity" window, opened by the shell
+        if (host && window.parent) {
+            window.parent.postMessage({ type: "c24-invite" }, window.location.origin);
         }
     },
 };

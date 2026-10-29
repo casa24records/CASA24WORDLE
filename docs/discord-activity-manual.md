@@ -228,11 +228,11 @@ Al encenderlo, Discord crea solo un comando llamado **Launch** (el "Entry Point"
 
 **Qué deberías ver si salió bien:**
 - La primera vez, el modal de permiso (Paso 14).
-- **La primera vez en ese dispositivo: "Elige tu idioma / Choose your language"** con 10 botones. El idioma de tu Discord sale marcado con borde naranja. Elige uno (por ejemplo **Español**). Mientras eliges, la conexión con Discord sigue por detrás.
+- **La primera vez en ese dispositivo** el juego abre en el idioma de tu Discord: **español** si tu Discord está en español (cualquier variante), **inglés** en cualquier otro caso. Solo si Discord no lo dice (versión vieja o no responde en 3 segundos) sale **"Elige tu idioma / Choose your language"** con 2 botones (Español, English).
 - Un momento con Kolo y "Conectando…", luego "Cargando juego…" (en el idioma elegido).
 - Después, el juego directo en modo leaderboard. **Sin** botón de "Iniciar sesión" y **sin** modo invitado.
-- **Cierra y vuelve a abrir la Activity:** ya **no** sale el selector; abre directo en el idioma que elegiste (y más rápido).
-- **Para cambiar de idioma:** toca el título de arriba, **"Casa 24 ES ▾"**. Se abre una ventana con los 10 idiomas; elige otro (por ejemplo **English**). El juego cambia sin volver a conectar con Discord y sin pedir permiso otra vez. La próxima vez abrirá en ese idioma.
+- **Cierra y vuelve a abrir la Activity:** abre directo en el último idioma usado en ese dispositivo (y más rápido), aunque cambies el idioma de Discord.
+- **Para cambiar de idioma:** toca el título de arriba, **"Casa 24 ES ▾"**. Se abre una ventana con los 2 idiomas (Español, English); elige el otro. El juego cambia sin volver a conectar con Discord y sin pedir permiso otra vez. La próxima vez abrirá en ese idioma.
 - El ranking se abre en una ventana dentro del juego (ícono del trofeo).
 - En el canal aparece un mensaje automático de Discord diciendo que abriste la Activity (lo publica el comando **Launch**).
 
@@ -260,7 +260,7 @@ Si alguien pulsa **Cancel**: verá "Para jugar en Discord necesitamos tu permiso
 **Qué deberías ver si salió bien:**
 - El juego en **vertical**, aunque gires el teléfono.
 - El teclado del juego **no** queda tapado por la barra de abajo del teléfono ni por el notch.
-- La primera vez, el selector de idioma cabe en la pantalla sin desplazarse y los botones se tocan bien.
+- La primera vez el juego abre en el idioma de tu Discord (el selector de 2 botones solo sale si Discord no lo dice, y cabe en la pantalla).
 - Si minimizas la Activity (ventanita flotante, "PIP"), se ve solo el tablero; al tocarla vuelve el juego completo.
 - Cambia de idioma con **"Casa 24 ES ▾"** también en el teléfono.
 - Si es posible, prueba en un iPhone y en un Android.
@@ -268,10 +268,10 @@ Si alguien pulsa **Cancel**: verá "Para jugar en Discord necesitamos tu permiso
 ---
 
 ### Paso 16. Tu prueba de sincronización web ↔ Discord
-El servidor guarda la partida; la web y Discord solo la muestran. Esta prueba lo confirma. Hazla con **un idioma que no hayas jugado hoy** (por ejemplo, `fr`).
+El servidor guarda la partida; la web y Discord solo la muestran. Esta prueba lo confirma. Hazla con **un idioma que no hayas jugado hoy** (`es` o `en`).
 
 1. **Web:** entra con Discord en https://casa-24-wordle.vercel.app, abre el juego de ese idioma y escribe **2 palabras** (sin ganar).
-2. **Discord:** abre la Activity con la misma cuenta y elige ese idioma (en el selector si es la primera vez, o con el título **"Casa 24 ES ▾"**).
+2. **Discord:** abre la Activity con la misma cuenta y elige ese idioma (con el título **"Casa 24 ES ▾"**).
    - **Esperado:** ves las **mismas 2 filas** con los mismos colores.
 3. **Discord:** termina la partida (gana o pierde).
    - **Esperado:** sale la ventana final con tu puesto y tus puntos.
@@ -364,7 +364,7 @@ Para ver errores:
 | **Pantalla en blanco** | Falta el URL Mapping o está mal escrito (con `https://` o `/` al final); el push aún no se hizo; un archivo bloqueado por la CSP | Revisa el Paso 11. Mira la Console: si dice `Refused to…` o `blocked:csp`, mándame esa línea |
 | Se queda en **"Conectando…"** o sale "No pudimos conectar con Discord" | Discord no respondió al "saludo" en 10 segundos (red lenta, Discord viejo), el canje con nuestro servidor tardó más de 15 s, o **falta un archivo del SDK en el deploy** | Pulsa **Intentar de nuevo**. Si no, cierra y vuelve a abrir la Activity y actualiza Discord. Si se repite, mándame los logs |
 | Se queda **siempre** en "Conectando…" (a todos, en todos los dispositivos) | Un archivo de `/static/vendor/` da **404** en Vercel (pasó una vez con los archivos `lib/` del SDK, que no se habían subido) | Revisa los logs de Vercel (`vercel logs` o Vercel → casa24-wordle → **Logs**) buscando **404** en rutas `/static/vendor/…`. Mándame la ruta: es un arreglo de código |
-| Sale el selector de idioma **cada vez** | Discord no deja guardar datos en ese dispositivo (almacenamiento bloqueado) | Normal en ese caso; elige el idioma y juega. Avísame en qué dispositivo pasa |
+| Sale el selector de idioma **cada vez** | Discord no deja guardar datos en ese dispositivo (almacenamiento bloqueado) y además no nos dice su idioma | Normal en ese caso; elige el idioma y juega. Avísame en qué dispositivo pasa |
 | Mensaje de que **hace falta tu permiso** | Se pulsó **Cancel** en el modal | Pulsa **Intentar de nuevo** y luego **Authorize** |
 | Errores **CSP** (`Refused to load…`, `Refused to execute inline event handler`, `blocked:csp`) | Algo se pide fuera de nuestro dominio, o quedó un `onclick=` en el HTML | Mándame la línea exacta de la Console. Es un arreglo de código |
 | **401** en `/api/state`, `/api/guess` o `/api/live` (Vercel Logs) | La sesión de la Activity venció o no llegó | La Activity pide el permiso otra vez, en silencio, una sola vez. Si sigue, cierra y abre de nuevo |
@@ -389,7 +389,7 @@ Para ver errores:
 | Que la CSP no bloquea nada | Console: buscar `Refused to` y `blocked:csp`. Pestaña **Network**: nada en rojo |
 | El modal sale solo la primera vez | Paso 14 con una cuenta que nunca usó la app; después, cerrar y abrir |
 | Qué pasa al cancelar el modal | Pulsar **Cancel** y anotar el mensaje que sale |
-| Selector de idioma la primera vez; abrir directo la segunda | Paso 13: elegir idioma, cerrar, volver a abrir |
+| Idioma de Discord la primera vez (es → Español, otro → English); abrir directo en el último idioma la segunda | Paso 13: abrir, cambiar con "ES ▾", cerrar, volver a abrir |
 | Cambiar de idioma ("Casa 24 ES ▾") o abrir el leaderboard dentro de la Activity | Hacerlo y ver que no se pierde la sesión ni vuelve a salir "Conectando…" |
 | Móvil: vertical, márgenes, ventanita (PIP) | Paso 15 en iPhone y Android |
 | Compartir dentro de Discord | Pulsar **Compartir** al terminar, en escritorio y móvil: dentro de Discord **copia** el texto (no abre el menú del sistema); si no puede copiar, sale una ventana con el texto para copiarlo a mano |

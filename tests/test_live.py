@@ -77,7 +77,7 @@ def test_live_colors_only_and_filters(lb_env, client, discord, mem):
     _seed(mem, P4, "hidden_one", words[3:5], ago=5)
     mem.set_hidden(P4, True)
     _seed(mem, P5, "english", _words("en", 1), lang="en", ago=1)
-    _seed(mem, P6, "no_guesses", [], ago=0)
+    _seed(mem, P6, "no_guesses", [], ago=6 * 60)  # opened the game, no guess, left: not shown
     _seed(mem, "100000000000000007", "loser", words[:6], ago=20, finish=False)
     login(client, discord)
     guess(client, words[7])  # my own game today: never in my list
@@ -256,7 +256,7 @@ def test_postgres_live_against_fake_connection(monkeypatch):
     st = store.PostgresStore("postgresql://fake")
     day = datetime.date(2026, 11, 3)
     rows = st.live("es", day, "1'; DROP TABLE x;--", 30)
-    assert (store.SQL_LIVE, ("es", day, "1'; DROP TABLE x;--", 30)) in sent
+    assert (store.SQL_LIVE, ("es", ["es", "en"], day, "1'; DROP TABLE x;--", None, 30)) in sent
     assert rows[0] == {"id": "2", "username": "two", "avatar": HASH, "guesses": ["perro"],
                        "updated_at": when, "finished": True, "won": False}
     assert rows[1]["avatar"] is None and rows[1]["guesses"] == []
@@ -271,7 +271,7 @@ def test_live_sql_shape():
     sql = " ".join(store.SQL_LIVE.split())
     for part in ("JOIN wordle_players p", "LEFT JOIN wordle_results r", "g.lang = %s",
                  "g.day = %s", "NOT p.hidden", "g.discord_id <> %s",
-                 "jsonb_array_length(g.guesses) > 0", "ORDER BY g.updated_at DESC", "LIMIT %s"):
+                 "(jsonb_array_length(g.guesses) > 0 OR g.updated_at >= %s)", "ORDER BY g.updated_at DESC", "LIMIT %s"):
         assert part in sql, part
     assert "updated_at = now()" in store.SQL_GAME_SAVE  # every saved guess bumps it
 
@@ -284,7 +284,7 @@ def test_avatar_url_helper():
     assert json.dumps(app.lb_avatar_url("0", None)).endswith('/0.png"')
 
 
-@pytest.mark.parametrize("lang", ("ko", "de", "ar", "tr"))
+@pytest.mark.parametrize("lang", ("en",))
 def test_live_other_languages(lb_env, client, discord, mem, lang):
     words = wrong_words(lang, 3)
     ans = answer(lang)
@@ -302,3 +302,244 @@ def test_live_other_languages(lb_env, client, discord, mem, lang):
     text = r.get_data(as_text=True)
     letters = set("".join(words) + ans) - set(STRUCTURE)
     assert not any(ch in text for ch in letters if not ch.isascii())
+
+
+# ---------- presence: in the game with no guesses yet (owner, 2026-10-29) ----------
+
+def _other(discord, pid, name):
+    """Another logged-in player on their own client."""
+    c = app.app.test_client()
+    login(c, discord, user_id=pid, username=name)
+    return c
+
+
+def _state(c, lang="es"):
+    r = c.get("/api/state", query_string={"lang": lang})
+    assert r.status_code == 200
+    return r.get_json()
+
+
+def _age(mem, pid, seconds, lang="es"):
+    key = (pid, lang, app.lb_today()[0])
+    mem.games[key]["updated_at"] = datetime.datetime.now(datetime.timezone.utc) - \
+        datetime.timedelta(seconds=seconds)
+
+
+@pytest.mark.parametrize("opens", ("state", "live"))
+def test_presence_opening_the_game_shows_an_empty_board(lb_env, client, discord, mem, opens):
+    other = _other(discord, P2, "just_arrived")
+    login(client, discord, user_id=ME, username="kolo_fan")
+    if opens == "state":
+        _state(other)
+    else:
+        assert _live(other).get_json() == {"players": [], "count": 0}  # nobody else yet
+    body = _live(client).get_json()
+    assert body["count"] == 1
+    assert body["players"][0] == {
+        "username": "just_arrived", "avatar_url": app.lb_avatar_url(P2, None),
+        "rows": [], "done": False, "won": False, "live": True}
+    # P2 sees me too (my /api/live poll is presence), and never themselves
+    assert [p["username"] for p in _live(other).get_json()["players"]] == ["kolo_fan"]
+    # same row, same columns, no guesses; no result
+    assert mem.games[(P2, "es", app.lb_today()[0])]["guesses"] == []
+    assert not mem.results
+    # only that language
+    assert _live(client, "en").get_json()["count"] == 0
+
+
+def test_presence_ends_after_the_live_window_without_guesses(lb_env, client, discord, mem):
+    other = _other(discord, P2, "left_early")
+    _state(other)
+    login(client, discord, user_id=ME, username="kolo_fan")
+    _age(mem, P2, app.LIVE_RECENT_SECONDS - 5)
+    assert [p["username"] for p in _live(client).get_json()["players"]] == ["left_early"]
+    _age(mem, P2, app.LIVE_RECENT_SECONDS + 5)
+    assert _live(client).get_json() == {"players": [], "count": 0}
+    # back again: shown again
+    _state(other)
+    assert _live(client).get_json()["count"] == 1
+
+
+def test_presence_with_guesses_stays_as_before(lb_env, client, discord, mem):
+    other = _other(discord, P2, "guesser")
+    w = _words("es", 1)[0]
+    assert guess(other, w, attempt=0).status_code == 200
+    login(client, discord, user_id=ME, username="kolo_fan")
+    _age(mem, P2, app.LIVE_RECENT_SECONDS + 60)
+    p = _live(client).get_json()["players"][0]
+    assert (p["username"], p["live"], p["rows"]) == ("guesser", False, [lb.color_guess(w, answer())])
+    _state(other)  # opening the game again keeps the guesses and makes them live
+    p = _live(client).get_json()["players"][0]
+    assert p["live"] is True and len(p["rows"]) == 1
+    assert mem.games[(P2, "es", app.lb_today()[0])]["guesses"] == [w]
+
+
+def test_presence_throttled_on_memory_store(lb_env, client, discord, mem):
+    login(client, discord, user_id=ME, username="kolo_fan")
+    key = (ME, "es", app.lb_today()[0])
+    _state(client)
+    first = mem.games[key]["updated_at"]
+    _live(client)
+    _state(client)
+    assert mem.games[key]["updated_at"] == first  # polls within 20 s: one write
+    _age(mem, ME, app.PRESENCE_MIN_SECONDS + 1)
+    aged = mem.games[key]["updated_at"]
+    _live(client)
+    assert mem.games[key]["updated_at"] > aged
+    # directly
+    s = store.MemoryStore()
+    day = datetime.date(2026, 11, 3)
+    s.upsert_player("1", "a")
+    assert s.touch("1", "es", day, 20) is True
+    assert s.touch("1", "es", day, 20) is False
+    s.games[("1", "es", day)]["updated_at"] -= datetime.timedelta(seconds=21)
+    assert s.touch("1", "es", day, 20) is True
+    with pytest.raises(store.StoreError):
+        s.touch("2", "es", day, 20)  # unknown player: like the Postgres foreign key
+    # a presence row on a new day also cleans games older than 2 days
+    s.touch("1", "es", day + datetime.timedelta(days=3), 20)
+    assert [k[2] for k in s.games] == [day + datetime.timedelta(days=3)]
+
+
+def test_presence_throttled_on_postgres_fake_connection(monkeypatch):
+    """The throttle lives in SQL (ON CONFLICT ... WHERE updated_at < now() - interval);
+    the fake plays the database: a row comes back only when it wrote."""
+    sent = []
+    db = {"rows": {}, "now": 1000.0}
+
+    class Cur:
+        out = None
+
+        def execute(self, sql, params=None):
+            sent.append((sql, params))
+            Cur.out = (1,)
+            if sql == store.SQL_GAME_TOUCH:
+                pid, lang, day, secs = params
+                key = (pid, lang, day)
+                if key not in db["rows"]:
+                    db["rows"][key] = db["now"]
+                    Cur.out = (True,)
+                elif db["rows"][key] < db["now"] - secs:
+                    db["rows"][key] = db["now"]
+                    Cur.out = (False,)
+                else:
+                    Cur.out = None
+
+        def fetchone(self):
+            return Cur.out
+
+        def fetchall(self):
+            return []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class Conn:
+        closed = broken = False
+
+        def transaction(self):
+            return Cur()
+
+        def cursor(self):
+            return Cur()
+
+        def close(self):
+            self.closed = True
+
+    import psycopg
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: Conn())
+    monkeypatch.setattr(store.PostgresStore, "_schema_ready", True)
+    st = store.PostgresStore("postgresql://fake")
+    day = datetime.date(2026, 11, 3)
+    evil = "1'; DROP TABLE x;--"
+    assert st.touch(evil, "es", day, 20) is True        # created (no guesses)
+    db["now"] += 8
+    assert st.touch(evil, "es", day, 20) is False       # 8 s later: no write
+    db["now"] += 13
+    assert st.touch(evil, "es", day, 20) is True        # 21 s after the write: bumped
+    touches = [p for q, p in sent if q == store.SQL_GAME_TOUCH]
+    assert touches == [(evil, "es", day, 20.0)] * 3     # values only as parameters
+    cleanups = [p for q, p in sent if q == store.SQL_GAME_CLEANUP]
+    assert cleanups == [(day - datetime.timedelta(days=store.GAME_KEEP_DAYS),)]  # only on insert
+    sql = " ".join(store.SQL_GAME_TOUCH.split())
+    for part in ("INSERT INTO wordle_games (discord_id, lang, day) VALUES (%s, %s, %s)",
+                 "ON CONFLICT (discord_id, lang, day) DO UPDATE SET updated_at = now()",
+                 "WHERE wordle_games.updated_at < now() - make_interval(secs => %s)",
+                 "RETURNING (xmax = 0)"):
+        assert part in sql, part
+    assert "guesses" not in sql  # presence never touches the guesses
+    # live passes the presence cutoff as a parameter too
+    since = datetime.datetime(2026, 11, 3, 12, tzinfo=datetime.timezone.utc)
+    st.live("es", day, "1", 30, present_since=since)
+    assert (store.SQL_LIVE, ("es", ["es", "en"], day, "1", since, 30)) in sent
+    st.close()
+
+
+def test_presence_hidden_player_never_appears(lb_env, client, discord, mem):
+    other = _other(discord, P2, "hidden_one")
+    mem.set_hidden(P2, True)
+    _state(other)
+    _live(other)
+    login(client, discord, user_id=ME, username="kolo_fan")
+    assert _live(client).get_json() == {"players": [], "count": 0}
+    assert "hidden_one" not in _live(client).get_data(as_text=True)
+
+
+def test_presence_guest_and_demo_pages_create_no_rows(lb_env, client, discord, mem, monkeypatch):
+    monkeypatch.setenv("DEMO_PASSWORD", "fake-demo-pass-for-tests")
+    login(client, discord, user_id=ME, username="kolo_fan")
+    for path in ("/", "/es", "/en", "/leaderboard"):
+        assert client.get(path).status_code == 200, path
+    assert client.post("/demo", data={"password": "fake-demo-pass-for-tests"}).status_code == 302
+    assert client.get("/demo/es").status_code == 200
+    assert not mem.games and not mem.results
+    # logged out: the API refuses and writes nothing
+    guest = app.app.test_client()
+    assert guest.get("/api/state?lang=es").status_code == 401
+    assert guest.get("/api/live?lang=es").status_code == 401
+    assert not mem.games
+
+
+def test_presence_is_not_a_played_game(lb_env, client, discord, mem):
+    from lb_testlib import row_of
+    login(client, discord, user_id=ME, username="kolo_fan")
+    _state(client)
+    _live(client)
+    _state(client, "en")
+    assert len(mem.games) == 2 and not mem.results
+    for tab in ("all", "es", "en"):
+        assert mem.leaderboard(tab, 50) == [] and row_of(mem, ME, tab) is None
+    assert mem.histories([ME], "all") == {ME: []}
+    st = _state(client)
+    assert (st["attempts"], st["status"], st["done"], st["answer"]) == (0, "playing", False, None)
+    # the first guess still is row 0 (409 check), and a win counts once
+    assert guess(client, answer(), attempt=1).status_code == 409
+    r = guess(client, answer(), attempt=0)
+    assert r.status_code == 200 and r.get_json()["points"] == lb.points(True, 1)
+    _state(client)  # presence after finishing keeps the game
+    assert _state(client)["status"] == "won"
+    assert guess(client, answer(), attempt=1).get_json()["error"] == "finished"
+    assert len(mem.results) == 1
+    assert row_of(mem, ME, "es")["played"] == 1 and row_of(mem, ME, "en") is None
+
+
+def test_presence_store_error_never_breaks_state(lb_env, client, discord, mem, monkeypatch):
+    login(client, discord, user_id=ME, username="kolo_fan")
+
+    def boom(*a, **k):
+        raise store.StoreError("database error: X")
+    monkeypatch.setattr(mem, "touch", boom)
+    assert _state(client)["attempts"] == 0
+    assert _live(client).status_code == 200
+
+
+def test_presence_delete_my_data_removes_it(lb_env, client, discord, mem):
+    login(client, discord, user_id=ME, username="kolo_fan")
+    _state(client)
+    _live(client, "en")
+    assert len(mem.games) == 2
+    assert client.post("/api/me/delete").status_code == 302
+    assert mem.is_empty()

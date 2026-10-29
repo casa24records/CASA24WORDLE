@@ -43,7 +43,7 @@ Por eso hay dos caminos:
 ## 1. Qué preparar antes (lista)
 
 **Textos** (yo te los puedo redactar; pídemelo):
-- **Descripción corta** (1–2 frases), por ejemplo: "La palabra del día de Casa 24, en 10 idiomas. Juega dentro de Discord y compite en el ranking del servidor." Tiene que **describir con exactitud** lo que hace la app (Developer Terms 1(b)).
+- **Descripción corta** (1–2 frases), por ejemplo: "La palabra del día de Casa 24, en español e inglés. Juega dentro de Discord y compite en el ranking del servidor." Tiene que **describir con exactitud** lo que hace la app (Developer Terms 1(b)).
 - **Descripción larga** para el App Directory (solo si haces Discovery): cómo se juega, idiomas, ranking, qué datos usa.
 - **Etiquetas (tags)**: por ejemplo `wordle`, `word game`, `puzzle`, `daily`, `multilingual`. Discord limita cuántas se pueden poner; el Portal te dirá el máximo. [NO VERIFICADO el número exacto]
 - **Categoría**: probablemente "Games". [NO VERIFICADO: las opciones exactas solo se ven en el Portal]
@@ -198,7 +198,7 @@ Portal → **Discovery** → **Discovery Settings**. Rellena:
 - descripción larga, categoría y etiquetas;
 - imágenes de la ficha;
 - **support server** y enlaces: web `https://casa-24-wordle.vercel.app`, Terms y Privacy;
-- idiomas, si lo pide. El juego está en 10 idiomas.
+- idiomas, si lo pide. El juego está **solo en español e inglés** (decisión del 2026-10-29): marca solo Spanish y English (US).
 
 Pulsa **Save Changes**.
 
@@ -282,7 +282,8 @@ Fuentes: Discord **Developer Terms of Service** y **Developer Policy** (`support
 
 ## Estado al 2026-10-29
 - **App Verification: aprobada.** El `<>` y "Use Activity URL Override" que ve el dueño salen por ser del Team con Developer Mode; comprobar con Developer Mode apagado o con una cuenta que no sea del Team.
-- **Discovery Status — falta:** servidor de soporte **Community** (Server Settings → Enable Community, luego elegirlo como Support Server), **Summary**, **descripción larga**, al menos un **locale** (Spanish, English US) y la **Description** de General Information.
+- **Discovery Status — falta:** servidor de soporte **Community** (Server Settings → Enable Community, luego elegirlo como Support Server), **Summary**, **descripción larga**, al menos un **locale** y la **Description** de General Information.
+- **Locales de Discovery (lo cambia el dueño en el Portal):** desde el 2026-10-29 el juego es solo español e inglés. En Discovery Settings deja **solo Spanish y English (US)**; quita cualquier otro idioma que se haya marcado antes (francés, portugués, alemán, etc.), porque la ficha tiene que describir con exactitud la app.
 - **Textos sugeridos:**
-  - Resumen: "El Wordle diario de Casa 24 Records: adivina la palabra del día en 6 intentos, en 10 idiomas, y compite en el ranking con tus amigos."
-  - Descripción larga: juego diario (misma palabra para todos, 6 intentos, verde/naranja/gris), ranking con la cuenta de Discord (menos intentos = más puntos, rachas, puesto), quién juega hoy en vivo (solo colores, sin spoilers), 10 idiomas, misma partida en Discord y en casa-24-wordle.vercel.app, enlace a /privacy.
+  - Resumen: "El Wordle diario de Casa 24 Records: adivina la palabra del día en 6 intentos, en español o inglés, y compite en el ranking con tus amigos."
+  - Descripción larga: juego diario (misma palabra para todos, 6 intentos, verde/naranja/gris), ranking con la cuenta de Discord (menos intentos = más puntos, rachas, puesto), quién juega hoy en vivo (solo colores, sin spoilers), español e inglés, misma partida en Discord y en casa-24-wordle.vercel.app, enlace a /privacy.

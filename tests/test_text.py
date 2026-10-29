@@ -12,7 +12,8 @@ KEYS = ["result_won", "result_lost", "notification-repeated"]
 
 
 def test_all_languages_found():
-    assert len(CONFIGS) == 10
+    # only Spanish and English (owner decision 2026-10-29)
+    assert [os.path.basename(os.path.dirname(p)) for p in CONFIGS] == ["en", "es"]
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=lambda p: os.path.basename(os.path.dirname(p)))
