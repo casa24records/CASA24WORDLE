@@ -67,7 +67,10 @@
         "lb_live_title": "Bugün oynayanlar",
         "lb_live_empty": "Şu an başka kimse oynamıyor",
         "lb_live_now": "canlı",
-        "lb_live_open": "Bugün kimlerin oynadığını gör"
+        "lb_live_open": "Bugün kimlerin oynadığını gör",
+        "activity_pick_title": "Dilini seç",
+        "activity_loading_game": "Oyun yükleniyor…",
+        "activity_lang_button": "Dili değiştir"
     },
     "right_to_left": "false",
     "help": {

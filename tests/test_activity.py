@@ -1,7 +1,9 @@
 """Discord Activity layer (the game inside Discord).
 
-Server: detection by frame_id / instance_id / platform, "/" and guest pages
-redirect to the leaderboard game keeping Discord's query, POST
+Server: detection by frame_id / instance_id / platform (the shell) or embed=1
+(the game in the shell's iframe), "/" inside Discord renders the Activity shell
+(templates/activity.html: the SDK once, the game in a same-origin iframe), guest
+pages redirect to the leaderboard game keeping the Activity's query, POST
 /api/activity/token (fake Discord: no redirect_uri, nothing stored but ID,
 username and avatar hash, token never stored or logged), the Bearer session on
 /api/state, /api/guess, /api/live, /api/leaderboard and /api/me/delete, the
@@ -11,7 +13,10 @@ The web without those params must stay exactly as it was.
 Browser (Playwright): the vendored SDK module is swapped for a shim around the
 SDK's own DiscordSDKMock (docs/discord-activity-checklist.md section 4A); the
 real Flask app answers everything else with an in-memory store and fake Discord.
-One test repeats Discord's real CSP (section 4B) with the proxy's nonce.
+The shell must construct the SDK exactly once per launch: picking a language,
+playing, changing language and the leaderboard window never reload the shell.
+One test repeats Discord's real CSP (section 4B, with frame-src/child-src) with
+the proxy's nonce, on the shell and the iframe.
 """
 
 import json
@@ -68,10 +73,15 @@ def token_login(client, discord, code="sdk-code", user_id=None, username=None, *
     ("instance_id=b&platform=desktop", False),
     ("frame_id=&instance_id=b&platform=desktop", False),
     ("", False),
+    ("embed=1", True),        # the game in the shell's iframe (no Discord params on purpose)
+    ("embed=0", False),
+    ("embed=true", False),
 ])
 def test_activity_detection(query, expected):
     with app.app.test_request_context("/lb/es?" + query):
         assert app.is_activity() is expected
+        assert app.is_activity_embed() is ("embed=1" in query)
+        assert app.is_activity_launch() is (expected and "embed=1" not in query)
         ctx = {}
         app.app.update_template_context(ctx)
         assert ctx["C24_ACTIVITY"] is expected
@@ -88,7 +98,8 @@ def test_activity_url_keeps_discord_query_only():
 
 # ---------- the web without Discord's params is unchanged ----------
 
-ACTIVITY_MARKERS = ("discord-activity.js", "discord-embedded-app-sdk", 'id="c24-activity"', "data-activity-")
+ACTIVITY_MARKERS = ("discord-activity.js", "discord-embedded-app-sdk", 'id="c24-activity"', "data-activity-",
+                    "activity-shell.js", "c24-shell", "c24-embed", "modulepreload", "data-lang-choice")
 
 
 def test_web_pages_have_no_activity_code(lb_env, client, discord):
@@ -122,19 +133,77 @@ def test_web_redirects_and_cookie_unchanged(lb_env, client, discord):
 
 # ---------- inside the Activity ----------
 
-def test_root_redirects_to_lb_game_keeping_query(lb_env, client):
-    r = client.get("/?" + ACT)
-    assert r.status_code == 302 and r.headers["Cache-Control"] == "no-store"
-    loc = urlparse(r.headers["Location"])
-    assert loc.path == "/lb/es"
-    q = parse_qs(loc.query)
-    assert {k: v[0] for k, v in q.items() if k in ACT_PARAMS} == ACT_PARAMS
-    assert q["c24_root"] == ["1"]  # game.js may switch to the device's last language
-    r = client.get("/?" + ACT + "&lang=ko")
-    loc = urlparse(r.headers["Location"])
-    assert loc.path == "/lb/ko" and "c24_root" not in parse_qs(loc.query)
-    r = client.get("/?" + ACT + "&lang=xx")
-    assert urlparse(r.headers["Location"]).path == "/lb/es"
+def shell_data(html):
+    return json.loads(re.search(r'id="c24-shell">(.*?)</script>', html).group(1))
+
+
+def test_root_inside_activity_renders_the_shell(lb_env, client, rendered):
+    """Discord opens "/": the shell itself (no redirect: the SDK answers to the page
+    Discord framed), with the SDK preloaded and the game's files preloaded."""
+    for path in ("/?" + ACT, "/activity?" + ACT):
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store", path
+        assert rendered[-1][0] == "activity.html"
+        html = r.get_data(as_text=True)
+        assert '<script type="module" src="/static/activity-shell.js?v=' in html
+        assert '<script type="module" src="/static/discord-activity.js' not in html  # only preloaded here
+        data = shell_data(html)
+        assert data["client_id"] == CLIENT_ID and data["lang"] is None
+        assert [l["code"] for l in data["langs"]] == list(app.LB_LANGS)
+        assert data["langs"][0]["code"] == "es" and data["langs"][1]["code"] == "en"
+        assert [l["code"] for l in data["langs"] if l["rtl"]] == ["ar"]
+        assert all(l["loading"] for l in data["langs"])
+        assert "fake-client-secret" not in html
+        # every SDK module preloaded (plain versioned-folder paths), before the shell's script
+        preloads = re.findall(r'<link rel="modulepreload" href="([^"]+)">', html)
+        assert [p for p in preloads if p.startswith(SDK_DIR)] == ["/static/" + p for p in app.sdk_modulepreloads()]
+        assert SDK_DIR + "index.mjs" in preloads and len(preloads) > 50
+        assert html.index("modulepreload") < html.index("activity-shell.js")
+        # the game's Vue and Tailwind, with the same ?v URLs as game.html (one download)
+        with app.app.test_request_context("/"):
+            vue, tw = app.asset("vendor/vue.global.prod.js"), app.asset("tailwind.css")
+        assert f'<link rel="preload" href="{vue}" as="script">' in html
+        assert f'<link rel="preload" href="{tw}" as="style">' in html
+        with app.app.test_request_context("/"):
+            gjs, djs = app.asset("game.js"), app.asset("discord-activity.js")
+        assert f'<link rel="preload" href="{gjs}" as="script">' in html
+        assert f'<link rel="modulepreload" href="{djs}">' in html
+        game = client.get("/lb/es?embed=1").get_data(as_text=True)
+        assert vue in game and tw in game and gjs in game and djs in game
+        # the iframe: same origin, no sandbox; the picker: 10 big buttons, bilingual title
+        frame = re.search(r'<iframe[^>]*id="c24-game"[^>]*>', html).group(0)
+        assert "sandbox" not in frame and "src=" not in frame
+        assert re.findall(r'data-pick-lang="([a-z]{2})"', html) == list(app.LB_LANGS)
+        assert re.search(r'data-pick-lang="ar"[^>]*dir="rtl"', html)
+        assert "Elige tu idioma" in html and "Choose your language" in html
+        assert "Intentar de nuevo / Try again" in html
+        assert inline_problems(html) == []
+        assert not r.headers.getlist("Set-Cookie")
+    # a language asked for in the URL opens right away
+    assert shell_data(client.get("/?" + ACT + "&lang=ko").get_data(as_text=True))["lang"] == "ko"
+    assert shell_data(client.get("/?" + ACT + "&lang=xx").get_data(as_text=True))["lang"] is None
+    # an old /lb/<lang> launch URL: the shell on that language (never the bare game)
+    r = client.get("/lb/de?" + ACT)
+    assert r.status_code == 200 and shell_data(r.get_data(as_text=True))["lang"] == "de"
+
+
+def test_shell_never_inside_its_own_iframe(lb_env, client):
+    # "/" (or /activity) inside the iframe goes to the game: the SDK can't load twice
+    for path, target in (("/?embed=1", "/lb/es"), ("/?embed=1&lang=ko", "/lb/ko"), ("/activity?embed=1", "/lb/es")):
+        r = client.get(path)
+        assert r.status_code == 302, path
+        loc = urlparse(r.headers["Location"])
+        assert loc.path == target and parse_qs(loc.query) == {"embed": ["1"]}, path
+    # /activity on the web: back to the menu
+    r = client.get("/activity")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")
+
+
+def test_shell_off_when_leaderboard_off(monkeypatch, client):
+    for name in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SECRET_KEY", "DATABASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    html = client.get("/?" + ACT).get_data(as_text=True)
+    assert "activity-shell.js" not in html  # the normal menu, as before
 
 
 def test_no_guest_game_inside_activity(lb_env, client):
@@ -142,17 +211,22 @@ def test_no_guest_game_inside_activity(lb_env, client):
     assert r.status_code == 302
     loc = urlparse(r.headers["Location"])
     assert loc.path == "/lb/de" and parse_qs(loc.query)["frame_id"] == ["f1"]
+    r = client.get("/de?embed=1")
+    assert r.status_code == 302 and r.headers["Location"] == "/lb/de?embed=1"
     r = client.get("/nope?" + ACT)
     assert r.status_code == 302 and "frame_id=f1" in r.headers["Location"]
 
 
 def test_activity_game_page(lb_env, client, rendered):
-    r = client.get("/lb/es?" + ACT)
+    """The game in the shell's iframe: /lb/<lang>?embed=1, no SDK, no Discord params."""
+    r = client.get("/lb/es?embed=1")
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
     html = r.get_data(as_text=True)
     assert 'type="module" src="/static/discord-activity.js?v=' in html
+    assert "discord-embedded-app-sdk" not in html and "activity-shell.js" not in html
+    assert '<html lang="es" class="c24-embed">' in html
     data = json.loads(re.search(r'id="c24-activity">(.*?)</script>', html).group(1))
-    assert data["client_id"] == CLIENT_ID and data["lang"] == "es" and "ko" in data["langs"]
+    assert data["lang"] == "es" and "ko" in data["langs"]
     assert "fake-client-secret" not in html
     page = json.loads(re.search(r'id="c24-page">(.*?)</script>', html).group(1))
     assert page["activity"] is True and page["lb"] is True and page["todays_word"] == ""
@@ -161,13 +235,18 @@ def test_activity_game_page(lb_env, client, rendered):
     for absent in ("/auth/discord/login", "/auth/logout", "data-dc-toggle", "data-guest-toggle",
                    "c24-demo-bar", "data-demo", "data-dc-login"):
         assert absent not in html, absent
-    # every internal link keeps Discord's query
-    assert re.search(r'<a href="/\?frame_id=f1&amp;instance_id=i1&amp;platform=desktop', html)
-    options = re.findall(r'<option value="(/lb/[a-z]{2}\?[^"]*)"', html)
-    assert len(options) == len(app.LB_LANGS) and all("frame_id=f1" in o and "instance_id=i1" in o for o in options)
-    hidden = dict(re.findall(r'<input type="hidden" name="([a-z_]+)" value="([^"]*)">', html))
-    if any(len(app.keyboards[c]["layouts"]) > 1 for c in ["es"]):
-        assert hidden.get("frame_id") == "f1"
+    # nothing navigates to "/" or another page: the title is the language button ("ES ▾")
+    assert not re.search(r'<a href="/(\?|")', html)
+    assert 'href="/leaderboard' not in html
+    btn = re.search(r'<button[^>]*data-activity-lang-open[^>]*>', html, re.S).group(0)
+    assert 'aria-label="Cambiar idioma (Español)"' in btn
+    assert re.search(r'<span class="c24-badge">es ▾</span>', html)
+    # the language window: the 10 languages, Arabic right to left, the current one marked
+    assert re.findall(r'data-lang-choice="([a-z]{2})"', html) == list(app.LB_LANGS)
+    assert re.search(r'data-lang-choice="ar"[^>]*dir="rtl"', html)
+    assert re.search(r'data-lang-choice="es"[^>]*aria-current="true"', html, re.S)
+    # the old Settings language select is gone
+    assert "activity-lang-select" not in html and "data-activity-lang>" not in html
     # cookies are not touched inside the Activity
     assert not r.headers.getlist("Set-Cookie")
 
@@ -176,11 +255,20 @@ def test_activity_page_with_layout_form_keeps_query(lb_env, client):
     multi = [c for c in app.LB_LANGS if len(app.keyboards[c]["layouts"]) > 1]
     if not multi:
         pytest.skip("no language with two keyboard layouts")
-    html = client.get(f"/lb/{multi[0]}?" + ACT).get_data(as_text=True)
+    html = client.get(f"/lb/{multi[0]}?embed=1").get_data(as_text=True)
     form = re.search(r'<form method="get"[^>]*>(.*?)</form>', html, re.S).group(1)
-    assert '<input type="hidden" name="frame_id" value="f1">' in form
-    assert '<input type="hidden" name="platform" value="desktop">' in form
+    assert '<input type="hidden" name="embed" value="1">' in form  # stays in the iframe's game
+    assert "frame_id" not in form
     assert "data-autosubmit" in form and "onchange" not in form
+
+
+def test_activity_texts_in_all_languages():
+    for code in app.LB_LANGS:
+        text = app.language_configs[code]["text"]
+        for key in ("activity_pick_title", "activity_loading_game", "activity_lang_button"):
+            assert text.get(key, "").strip(), (code, key)
+    assert app.language_configs["es"]["text"]["activity_pick_title"] == "Elige tu idioma"
+    assert app.language_configs["en"]["text"]["activity_pick_title"] == "Choose your language"
 
 
 def test_leaderboard_page_inside_activity_is_public_and_keeps_query(lb_env, client, discord):
@@ -189,6 +277,10 @@ def test_leaderboard_page_inside_activity_is_public_and_keeps_query(lb_env, clie
     assert "/auth/logout" not in html and "/api/me/delete" not in html and "data-dc-login" not in html
     tabs = re.findall(r'<a href="(/leaderboard\?tab=[a-z]+[^"]*)"', html)
     assert tabs and all("frame_id=f1" in t for t in tabs)
+    html = client.get("/leaderboard?tab=es&embed=1").get_data(as_text=True)
+    assert "/auth/logout" not in html
+    tabs = re.findall(r'<a href="(/leaderboard\?tab=[a-z]+[^"]*)"', html)
+    assert tabs and all("embed=1" in t for t in tabs)
 
 
 # ---------- POST /api/activity/token ----------
@@ -381,7 +473,8 @@ def test_no_inline_js_in_rendered_pages(lb_env, client, discord, monkeypatch):
     monkeypatch.setenv("ADMIN_DISCORD_IDS", P1)
     pages = {}
     for path in ["/", "/es", "/ar", "/ko", "/leaderboard", "/demo", "/sitemap.xml",
-                 "/lb/es?" + ACT, "/lb/ko?" + ACT, "/leaderboard?tab=es&" + ACT]:
+                 "/?" + ACT, "/activity?" + ACT, "/lb/es?" + ACT, "/lb/es?embed=1", "/lb/ar?embed=1",
+                 "/lb/ko?embed=1", "/leaderboard?tab=es&" + ACT, "/leaderboard?tab=es&embed=1"]:
         pages[path] = client.get(path).get_data(as_text=True)
     login(client, discord)
     app._record_result(app.lb_store(), P1, "es", app.lb_today()[0], True, 3)
@@ -406,7 +499,8 @@ def test_no_inline_js_in_template_sources():
 
 
 def test_static_js_has_no_confirm_alert_or_open():
-    for name in ("game.js", "index.js", "discord.js", "theme.js", "leaderboard.js", "discord-activity.js"):
+    for name in ("game.js", "index.js", "discord.js", "theme.js", "leaderboard.js", "discord-activity.js",
+                 "activity-shell.js"):
         with open(os.path.join(STATIC, name), encoding="utf-8") as f:
             src = f.read()
         assert not re.search(r"\b(confirm|alert)\(", src.replace("confirmDialog(", "")), name
@@ -414,14 +508,30 @@ def test_static_js_has_no_confirm_alert_or_open():
 
 
 def test_activity_script_logs_no_secrets_and_pins_sdk():
-    with open(os.path.join(STATIC, "discord-activity.js"), encoding="utf-8") as f:
-        src = f.read()
-    assert not re.search(r"console\.(log|info|warn|error|debug)\([^)]*(token|session|code)", src)
-    assert not re.search(r"(localStorage|sessionStorage)\.setItem", src)
-    imports = re.findall(r"""from\s+["']([^"']+)["']""", src)
-    assert imports == ["./vendor/discord-embedded-app-sdk-2.5.0/index.mjs"]  # relative, versioned folder
+    sources = {}
+    for name in ("activity-shell.js", "discord-activity.js"):
+        with open(os.path.join(STATIC, name), encoding="utf-8") as f:
+            sources[name] = f.read()
+        src = sources[name]
+        assert not re.search(r"console\.(log|info|warn|error|debug)\([^)]*(token|session|code)", src), name
+        assert "sessionStorage" not in src, name
+    shell, game = sources["activity-shell.js"], sources["discord-activity.js"]
+    # only the shell imports the SDK (relative, versioned folder); the game page never does
+    imports = re.findall(r"""from\s+["']([^"']+)["']""", shell)
+    assert imports == ["./vendor/discord-embedded-app-sdk-2.5.0/index.mjs"]
     assert os.path.exists(os.path.join(STATIC, "vendor", "discord-embedded-app-sdk-2.5.0", "index.mjs"))
-    assert "prompt: \"none\"" in src and 'scope: ["identify"]' in src
+    assert "prompt: \"none\"" in shell and 'scope: ["identify"]' in shell
+    assert not re.search(r"\bimport\b", game) and "DiscordSDK" not in game and "authorize(" not in game
+    # storage: only the shell's language choice, never the session or a token
+    assert re.findall(r"localStorage\.setItem\(([^,]+),", shell) == ["LANG_KEY"]
+    assert 'const LANG_KEY = "c24_activity_lang";' in shell
+    assert "localStorage" not in game
+    # the shell never navigates itself (only a reload, after ready() failed)
+    for bad in ("location.href =", "location.assign", "location.replace(\"", "window.open", "history.back"):
+        assert bad not in shell, bad
+    assert shell.count("window.location.reload()") == 1
+    # messages between the pages: plain objects (the SDK reads arrays as opcodes)
+    assert not re.search(r"postMessage\(\s*\[", shell + game)
 
 
 # ---------- browser: the Activity with the SDK's own mock ----------
@@ -467,7 +577,11 @@ export class DiscordSDK extends DiscordSDKMock {
 INIT = """
 window.__calls = [];
 window.__csp = [];
-document.addEventListener('securitypolicyviolation', e => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
+document.addEventListener('securitypolicyviolation', e => {
+    const m = e.violatedDirective + ' ' + e.blockedURI;
+    window.__csp.push(m);
+    try { if (window.top !== window && window.top.__csp) { window.top.__csp.push('iframe: ' + m); } } catch (err) {}
+});
 const realFetch = window.fetch;
 window.fetch = function (url, opts) {
     if (String(url).indexOf('/api/activity/token') >= 0) { window.__calls.push('token'); }
@@ -475,12 +589,19 @@ window.fetch = function (url, opts) {
 };
 """
 
-# Discord's real proxy CSP (observed 2026-10-28, checklist 4B); 'self' = the test server
-CSP = ("default-src 'self'; script-src 'self' 'unsafe-eval' 'nonce-TEST' blob:; "
-       "style-src 'self' 'unsafe-inline' blob:; img-src 'self' blob: data: https://cdn.discordapp.com "
-       "https://media.discordapp.net; font-src 'self' data:; connect-src 'self' https://discord.com "
-       "https://cdn.discordapp.com https://media.discordapp.net data: blob:; media-src 'self' blob: data:; "
-       "worker-src 'self' blob:")
+
+def discord_csp(origin):
+    """Discord's real proxy CSP (observed 2026-10-28, checklist 4B), with the
+    frame-src / child-src lines the proxy also sends (our own discordsays origin,
+    here the test server): the shell may frame our own pages."""
+    return ("default-src 'self'; script-src 'self' 'unsafe-eval' 'nonce-TEST' blob:; "
+            "style-src 'self' 'unsafe-inline' blob:; img-src 'self' blob: data: https://cdn.discordapp.com "
+            "https://media.discordapp.net; font-src 'self' data:; connect-src 'self' https://discord.com "
+            "https://cdn.discordapp.com https://media.discordapp.net data: blob:; media-src 'self' blob: data:; "
+            f"worker-src 'self' blob:; frame-src {origin}/ https://discord.com/embeds/video-frame; "
+            f"child-src {origin}/ blob:")
+
+
 PNG_1PX = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000"
                         "1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082")
 
@@ -494,9 +615,11 @@ def server():
     srv.shutdown()
 
 
-def setup_activity(page, server, mocks_js="{}", csp=False, extra_init=""):
-    """Route the SDK to the mock shim (and, with csp=True, act like Discord's proxy)."""
-    blocked, sdk_loads = [], []
+def setup_activity(page, server, mocks_js="{}", csp=False, extra_init="", fail_once=()):
+    """Route the SDK to the mock shim (and, with csp=True, act like Discord's proxy).
+    fail_once: API paths answered 401 the first time (an expired session)."""
+    blocked, sdk_loads, api = [], [], []
+    failing = set(fail_once)
     real_index = os.path.join(STATIC, "vendor", "discord-embedded-app-sdk-2.5.0", "index.mjs")
 
     def handle(route):
@@ -508,13 +631,18 @@ def setup_activity(page, server, mocks_js="{}", csp=False, extra_init=""):
                 return route.fulfill(body=SHIM, content_type="text/javascript")
             if parsed.path == SDK_DIR + "index.real.mjs":
                 return route.fulfill(path=real_index, content_type="text/javascript")
+            if parsed.path.startswith("/api/"):
+                api.append((parsed.path, parsed.query, route.request.headers.get("authorization", "")))
+                if parsed.path in failing:
+                    failing.discard(parsed.path)
+                    return route.fulfill(status=401, body='{"error": "login"}', content_type="application/json")
             if not csp:
                 return route.continue_()
             response = route.fetch(max_redirects=0)  # let the browser follow redirects itself
             if "text/html" in response.headers.get("content-type", ""):
                 body = re.sub(r"<script(?![^>]*\bsrc=)", '<script nonce="TEST"', response.text())
                 headers = dict(response.headers)
-                headers["content-security-policy"] = CSP
+                headers["content-security-policy"] = discord_csp(server)
                 headers.pop("content-length", None)
                 return route.fulfill(response=response, body=body, headers=headers)
             return route.fulfill(response=response)
@@ -525,24 +653,45 @@ def setup_activity(page, server, mocks_js="{}", csp=False, extra_init=""):
 
     page.route("**/*", handle)
     page.add_init_script(INIT + "window.__C24_MOCKS__ = " + mocks_js + ";" + extra_init)
-    return blocked, sdk_loads
+    return blocked, sdk_loads, api
 
 
-def wait_ready(page):
+def game(page):
+    """The game page in the shell's iframe (a Playwright Frame; it survives the
+    iframe's own navigations, e.g. a language change)."""
+    page.wait_for_selector("iframe#c24-game:not([hidden])")
+    return page.frame(name="c24-game")
+
+
+def wait_ready(page, lang="es"):
+    """Shell logged in and showing the game in `lang`; the game ready to type."""
     page.wait_for_function("document.documentElement.getAttribute('data-activity') === 'ready'", timeout=10000)
-    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('.key')")
+    frame = game(page)
+    frame.wait_for_url(f"**/lb/{lang}?embed=1", timeout=10000)
+    page.wait_for_function("document.getElementById('c24-activity-overlay').getAttribute('data-state') === 'ready'",
+                           timeout=10000)
+    frame.wait_for_function("document.documentElement.getAttribute('data-activity') === 'ready'"
+                            " && window.Vue && document.querySelector('#app') && document.querySelector('.key')")
+    frame.wait_for_function(VM + ".lb_ready === true", timeout=10000)
+    return frame
 
 
+VM = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
 BOARD_COLORED = "main .grid-cols-5 > .correct, main .grid-cols-5 > .semicorrect, main .grid-cols-5 > .incorrect"
+SDK_COUNT = "window.__calls.filter(c => c.indexOf('construct:') === 0).length"
 
 
-def type_word(page, word):
+def calls(page, name):
+    return page.evaluate(f"window.__calls.filter(c => c === {json.dumps(name)}).length")
+
+
+def type_word(frame, word, rows=1):
     # the on-screen keys (as a player in Discord would tap them)
     for ch in word:
-        page.click(f".c24-keyboard .key[data-char='{ch}']")
-    page.click(".c24-keyboard .key[data-char='⇨']")
-    page.wait_for_function(
-        f"document.querySelectorAll('{BOARD_COLORED}').length >= 5 && !document.querySelector('.flip')",
+        frame.click(f".c24-keyboard .key[data-char='{ch}']")
+    frame.click(".c24-keyboard .key[data-char='⇨']")
+    frame.wait_for_function(
+        f"document.querySelectorAll('{BOARD_COLORED}').length >= {5 * rows} && !document.querySelector('.flip')",
         timeout=8000)
 
 
@@ -552,65 +701,141 @@ def test_browser_web_never_loads_sdk(lb_env, server, page, discord):
     for path in ("/", "/es", "/leaderboard", "/es?frame_id=a&instance_id=b&platform=tv"):
         page.goto(server + path)
         page.wait_for_load_state("networkidle")
-    assert not [u for u in requests if "discord-activity" in u or "discord-embedded-app-sdk" in u]
+    assert not [u for u in requests if "discord-activity" in u or "discord-embedded-app-sdk" in u
+                or "activity-shell" in u]
     assert page.evaluate("typeof window.C24Activity") == "undefined"
 
 
-def test_browser_activity_auto_login_and_guess(lb_env, server, page, discord, mem):
+def test_browser_shell_one_sdk_for_the_whole_launch(lb_env, server, page, discord, mem):
+    """First launch: picker -> English -> guess -> header "EN ▾" -> Deutsch -> guess
+    -> leaderboard window. One SDK, one handshake, one login, the shell never reloads."""
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    setup_activity(page, server)
-    page.goto(server + "/?" + ACT)  # Discord opens "/" -> /lb/es
-    wait_ready(page)
-    assert urlparse(page.url).path == "/lb/es"
-    q = parse_qs(urlparse(page.url).query)
-    assert {k: v[0] for k, v in q.items()} == ACT_PARAMS  # c24_root dropped, Discord's params kept
-    calls = page.evaluate("window.__calls")
-    order = [c for c in calls if c in ("ready", "authorize", "token", "authenticate")]
+    top_navigations = []
+    page.on("framenavigated", lambda f: f == page.main_frame and top_navigations.append(f.url))
+    _, sdk_loads, api = setup_activity(page, server)
+    page.goto(server + "/?" + ACT)  # Discord opens "/": the shell, no redirect
+    assert urlparse(page.url).path == "/"
+    # first launch: the picker (while the login runs behind it)
+    page.wait_for_selector("#c24-picker:not([hidden])")
+    assert "Elige tu idioma" in page.inner_text("#c24-picker-title")
+    assert "Choose your language" in page.inner_text("#c24-picker-title")
+    codes = page.eval_on_selector_all("[data-pick-lang]", "els => els.map(e => e.getAttribute('data-pick-lang'))")
+    assert codes == list(app.LB_LANGS) and codes[:2] == ["es", "en"]
+    assert page.get_attribute("[data-pick-lang=ar]", "dir") == "rtl"
+    assert page.is_hidden("#c24-game")
+    page.wait_for_function("document.documentElement.getAttribute('data-activity') === 'ready'")
+    page.evaluate("window.__top_marker = 42")
+    page.click("[data-pick-lang=en]")
+    frame = wait_ready(page, "en")
+    # the iframe has no Discord params (nothing in it can start the SDK)
+    assert parse_qs(urlparse(frame.url).query) == {"embed": ["1"]}
+    assert frame.evaluate("typeof window.DiscordSDK") == "undefined"
+    assert page.evaluate("localStorage.getItem('c24_activity_lang')") == "en"
+    calls_now = page.evaluate("window.__calls")
+    order = [c for c in calls_now if c in ("ready", "authorize", "token", "authenticate")]
     assert order == ["ready", "authorize", "token", "authenticate"]
-    assert calls[0] == "construct:" + CLIENT_ID
+    assert calls_now[0] == "construct:" + CLIENT_ID
     assert page.evaluate("window.__args.authorize") == {
         "client_id": CLIENT_ID, "response_type": "code", "state": "", "prompt": "none", "scope": ["identify"]}
     assert page.evaluate("window.__args.authenticate.access_token") == SECRET_BITS["token"]
-    assert "subscribe:ACTIVITY_LAYOUT_MODE_UPDATE" in calls
-    assert not page.is_visible("#c24-activity-overlay")
-    # the token is nowhere in the page afterwards (the session stays, in memory only)
-    leaked = page.evaluate("""tok => {
+    assert "subscribe:ACTIVITY_LAYOUT_MODE_UPDATE" in calls_now
+    # the token is nowhere afterwards (the session stays, in memory only)
+    leak_check = """tok => {
         const blobs = [JSON.stringify(localStorage), JSON.stringify(sessionStorage), document.cookie,
                        document.documentElement.outerHTML];
         for (const k of Object.keys(window)) { try { const v = window[k];
             if (typeof v === 'string') blobs.push(v); } catch (e) {} }
         try { blobs.push(JSON.stringify(window.C24Activity)); } catch (e) {}
         return blobs.some(b => b && b.indexOf(tok) >= 0);
-    }""", SECRET_BITS["token"])
-    assert leaked is False
-    assert page.evaluate("typeof window.C24Activity.session") == "string"
-    assert page.evaluate("JSON.stringify(localStorage)").find(page.evaluate("window.C24Activity.session")) < 0
-    # play one guess: the server colors and keeps it
-    word = wrong_words("es", 1)[0]
-    type_word(page, word)
-    assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [word]
-    # a new launch (new instance_id) continues the same game from the server
-    page.goto(server + "/lb/es?frame_id=f2&instance_id=i2&platform=desktop")
-    wait_ready(page)
-    page.wait_for_function(f"document.querySelectorAll('{BOARD_COLORED}').length === 5")
-    vm = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
-    assert page.evaluate(vm + ".active_row") == 1
-    # language window: options keep Discord's query; choosing one navigates with it
-    page.click("button[aria-label='Settings'], button[aria-label='Ajustes'], .c24-header-end .c24-icon-btn:last-child")
-    page.select_option("[data-activity-lang]", index=list(app.LB_LANGS).index("en"))
-    page.wait_for_url("**/lb/en?**")
-    assert parse_qs(urlparse(page.url).query)["instance_id"] == ["i2"]
-    wait_ready(page)
+    }"""
+    assert page.evaluate(leak_check, SECRET_BITS["token"]) is False
+    assert frame.evaluate(leak_check, SECRET_BITS["token"]) is False
+    session = page.evaluate("window.C24Activity.session")
+    assert isinstance(session, str) and frame.evaluate("window.C24Activity.session") == session
+    assert session not in page.evaluate("JSON.stringify(localStorage)")
+    # play in English
+    word_en = wrong_words("en", 1)[0]
+    type_word(frame, word_en)
+    assert mem.get_game(P1, "en", app.lb_today()[0])[0] == [word_en]
+    # change language from the header: the window lists the 10, choosing swaps the iframe
+    assert frame.inner_text("[data-activity-lang-open] .c24-badge").strip() == "EN ▾"
+    frame.click("[data-activity-lang-open]")
+    frame.wait_for_selector("[data-activity-langs]", state="visible")
+    assert frame.eval_on_selector_all("[data-lang-choice]", "els => els.length") == len(app.LB_LANGS)
+    page.keyboard.press("Escape")
+    frame.wait_for_selector("[data-activity-langs]", state="hidden")
+    frame.click("[data-activity-lang-open]")
+    frame.click("[data-lang-choice=de]")
+    frame = wait_ready(page, "de")
+    assert page.evaluate("localStorage.getItem('c24_activity_lang')") == "de"
+    word_de = wrong_words("de", 1)[0]
+    type_word(frame, word_de)
+    assert mem.get_game(P1, "de", app.lb_today()[0])[0] == [word_de]
+    # the leaderboard window, inside the game (no page change)
+    frame.click("[data-activity-board-open]")
+    frame.wait_for_selector("[data-board-table], [data-board-empty]")
+    page.keyboard.press("Escape")
+    # one SDK, one handshake, one login for everything; the shell was never reloaded
+    assert page.evaluate(SDK_COUNT) == 1
+    assert calls(page, "ready") == 1 and calls(page, "authorize") == 1
+    assert calls(page, "token") == 1 and calls(page, "authenticate") == 1
+    assert len(sdk_loads) == 1
+    assert page.evaluate("window.__top_marker") == 42
+    assert len(top_navigations) == 1 and urlparse(page.url).path == "/"
+    # every API call carried the shell's session; none had Discord's params
+    assert api and all(h == "Bearer " + session for p, q, h in api if p != "/api/activity/token")
+    assert not [q for p, q, h in api if "frame_id" in q]
     assert errors == []
 
 
-def test_browser_last_language_on_relaunch(lb_env, server, page, discord):
-    setup_activity(page, server, extra_init="try { localStorage.setItem('casa24_lang', 'ko'); } catch (e) {}")
+def test_browser_remembered_language_on_relaunch(lb_env, server, page, discord, mem):
+    setup_activity(page, server)
     page.goto(server + "/?" + ACT)
-    page.wait_for_url("**/lb/ko?**")
-    wait_ready(page)
-    assert "c24_root" not in page.url and "frame_id=f1" in page.url
+    page.click("[data-pick-lang=ko]")
+    frame = wait_ready(page, "ko")
+    word = wrong_words("ko", 1)[0]
+    type_word(frame, word)
+    ctx = page.context
+    page.close()
+    # a new launch (new instance_id), same device: straight to Korean, the same game
+    page2 = ctx.new_page()
+    setup_activity(page2, server)
+    page2.goto(server + "/?frame_id=f2&instance_id=i2&platform=desktop")
+    frame = wait_ready(page2, "ko")
+    assert page2.is_hidden("#c24-picker")
+    frame.wait_for_function(f"document.querySelectorAll('{BOARD_COLORED}').length === 5")
+    assert frame.evaluate(VM + ".active_row") == 1
+    assert page2.evaluate(SDK_COUNT) == 1
+
+
+def test_browser_bearer_through_the_shell(lb_env, server, page, discord, mem):
+    """The game's /api calls carry the shell's session; a 401 -> the shell logs in
+    again (silently, same SDK) and the call is retried once."""
+    _, _, api = setup_activity(page, server, fail_once=("/api/live",))
+    page.goto(server + "/?" + ACT + "&lang=es")
+    frame = wait_ready(page)
+    session = page.evaluate("window.C24Activity.session")
+    statuses = frame.evaluate("""async () => {
+        const out = {};
+        for (const u of ['/api/state?lang=es', '/api/leaderboard?tab=es', '/api/live?lang=es']) {
+            const r = await window.C24Activity.fetch(u, { headers: { 'Accept': 'application/json' } });
+            out[u.split('?')[0]] = r.status;
+        }
+        return out;
+    }""")
+    assert statuses == {"/api/state": 200, "/api/leaderboard": 200, "/api/live": 200}
+    word = wrong_words("es", 1)[0]
+    type_word(frame, word)  # POST /api/guess through the shell's session
+    assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [word]
+    paths = {p for p, q, h in api}
+    assert {"/api/state", "/api/guess", "/api/live", "/api/leaderboard"} <= paths
+    for p, q, h in api:
+        if p != "/api/activity/token":
+            assert h.startswith("Bearer "), p
+    # the 401 made the shell authorize again (same SDK, no new handshake)
+    assert calls(page, "authorize") == 2 and calls(page, "ready") == 1 and page.evaluate(SDK_COUNT) == 1
+    assert page.evaluate("window.C24Activity.session") != "" and session
 
 
 def test_browser_leaderboard_window_and_share(lb_env, server, page, discord, mem):
@@ -619,23 +844,22 @@ def test_browser_leaderboard_window_and_share(lb_env, server, page, discord, mem
         mem.upsert_player(pid, f"rival{i}")
         app._record_result(mem, pid, "es", app.lb_today()[0], True, 3 + i)
     setup_activity(page, server)
-    page.goto(server + "/lb/es?" + ACT)
-    wait_ready(page)
-    page.click("[data-activity-board-open]")
-    page.wait_for_selector("[data-board-table] tbody tr")
-    assert page.inner_text("[data-board-table]").count("@rival") == 2
-    page.click("[data-board-tab=all]")
-    page.wait_for_function("document.querySelector('[data-board-tab=all]').classList.contains('is-active')")
+    page.goto(server + "/?" + ACT + "&lang=es")
+    frame = wait_ready(page)
+    frame.click("[data-activity-board-open]")
+    frame.wait_for_selector("[data-board-table] tbody tr")
+    assert frame.inner_text("[data-board-table]").count("@rival") == 2
+    frame.click("[data-board-tab=all]")
+    frame.wait_for_function("document.querySelector('[data-board-tab=all]').classList.contains('is-active')")
     page.keyboard.press("Escape")
-    assert not page.is_visible("[data-activity-board]")
+    assert not frame.is_visible("[data-activity-board]")
     # share: copy to the clipboard; when that fails, the text in a window (never a new window)
-    page.evaluate("() => { navigator.clipboard.writeText = () => Promise.reject(new Error('blocked')); }")
+    frame.evaluate("() => { navigator.clipboard.writeText = () => Promise.reject(new Error('blocked')); }")
     opened = []
     page.on("popup", lambda p: opened.append(p))
-    vm = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
-    page.evaluate(vm + ".shareResults()")
-    page.wait_for_selector("[data-share-dialog]", state="visible")
-    assert page.input_value("[data-share-text]").startswith("Casa 24 Wordle ES #")
+    frame.evaluate(VM + ".shareResults()")
+    frame.wait_for_selector("[data-share-dialog]", state="visible")
+    assert frame.input_value("[data-share-text]").startswith("Casa 24 Wordle ES #")
     assert opened == []
 
 
@@ -644,22 +868,24 @@ def test_browser_refused_then_try_again(lb_env, server, page, discord):
         if (n === 1) { return Promise.reject({ code: 5000, message: 'User cancelled' }); }
         return { code: 'mock_code' }; }; })() }"""
     setup_activity(page, server, mocks_js=mocks)
-    page.goto(server + "/lb/es?" + ACT)
+    page.goto(server + "/?" + ACT + "&lang=es")
     page.wait_for_selector("#c24-activity-overlay[data-state=denied]")
     assert page.is_visible("[data-when=denied]") and page.is_visible("[data-activity-retry]")
     assert "Intentar de nuevo / Try again" in page.inner_text("[data-activity-retry]")
     assert page.locator("a[href*='/auth/discord/login']").count() == 0  # no web login inside Discord
+    page.evaluate("window.__top_marker = 1")
     page.click("[data-activity-retry]")
     wait_ready(page)
-    assert page.evaluate("window.__calls.filter(c => c === 'authorize').length") == 2
-    assert page.evaluate("window.__calls.filter(c => c === 'ready').length") == 1
+    assert calls(page, "authorize") == 2 and calls(page, "ready") == 1
+    assert page.evaluate("window.__top_marker") == 1  # retried in the page, no reload
 
 
 def test_browser_ready_timeout_shows_error(lb_env, server, page, discord):
     setup_activity(page, server, extra_init="window.__C24_READY_NEVER = true;")
     page.clock.install()
-    page.goto(server + "/lb/es?" + ACT)
+    page.goto(server + "/?" + ACT + "&lang=es")
     page.wait_for_selector("#c24-activity-overlay[data-state=loading]")
+    assert page.is_visible("#c24-activity-overlay .c24-step-connect")
     page.clock.run_for(11000)
     page.wait_for_selector("#c24-activity-overlay[data-state=error]")
     assert page.is_visible("[data-activity-retry]")
@@ -667,46 +893,54 @@ def test_browser_ready_timeout_shows_error(lb_env, server, page, discord):
 
 
 def test_browser_discord_csp(lb_env, server, page, discord, mem):
-    """Discord's proxy CSP + nonce on inline scripts: zero violations, nothing
-    loaded from other hosts, and the game works (guess, help, stats, theme, layout)."""
+    """Discord's proxy CSP (with frame-src) + nonce on inline scripts, on the shell
+    and the game iframe: zero violations, nothing loaded from other hosts, and the
+    game works (guess, help, stats, theme, leaderboard, language, keyboard layout)."""
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("console", lambda m: m.type == "error" and errors.append(m.text))
-    blocked, sdk_loads = setup_activity(page, server, csp=True)
+    blocked, sdk_loads, _ = setup_activity(page, server, csp=True)
     page.goto(server + "/?" + ACT)
-    wait_ready(page)
+    page.click("[data-pick-lang=es]")
+    frame = wait_ready(page)
     assert sdk_loads
+    csp_header = page.evaluate("""async () => (await fetch('/lb/es?embed=1')).headers.get('content-security-policy')""")
+    assert csp_header and "frame-src" in csp_header  # the iframe's page got the proxy's CSP too
     word = wrong_words("es", 1)[0]
-    type_word(page, word)
+    type_word(frame, word)
     assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [word]
-    page.click("button[aria-label='instructions']")
+    frame.click("button[aria-label='instructions']")
     page.keyboard.press("Escape")
-    page.click("button[aria-label='stats']")
+    frame.click("button[aria-label='stats']")
     page.keyboard.press("Escape")
-    page.click(".c24-header-end .c24-icon-btn:last-child")  # settings
-    page.select_option("[data-theme-select]", "dark")
-    assert page.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"
+    frame.click(".c24-header-end .c24-icon-btn:last-child")  # settings
+    frame.select_option("[data-theme-select]", "dark")
+    assert frame.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"
     page.keyboard.press("Escape")
-    page.click("[data-activity-board-open]")
-    page.wait_for_selector("[data-board-table], [data-board-empty]")
+    frame.click("[data-activity-board-open]")
+    frame.wait_for_selector("[data-board-table], [data-board-empty]")
     page.keyboard.press("Escape")
-    # a page with a keyboard layout form, through the form (keeps Discord's query)
+    frame.click("[data-activity-lang-open]")
+    frame.click("[data-lang-choice=en]")
+    frame = wait_ready(page, "en")
+    # a keyboard layout change: a GET form inside the iframe (keeps embed=1)
     multi = [c for c in app.LB_LANGS if len(app.keyboards[c]["layouts"]) > 1]
     if multi:
-        page.goto(server + f"/lb/{multi[0]}?" + ACT)
-        wait_ready(page)
-        page.click(".c24-header-end .c24-icon-btn:last-child")
+        frame.click("[data-activity-lang-open]")
+        frame.click(f"[data-lang-choice={multi[0]}]")
+        frame = wait_ready(page, multi[0])
+        frame.click(".c24-header-end .c24-icon-btn:last-child")
         other = [k for k in app.keyboards[multi[0]]["layouts"] if k != app.keyboards[multi[0]]["default"]][0]
-        page.select_option("#keyboard-layout-select", other)
-        page.wait_for_url(f"**layout={other}**")
-        assert "frame_id=f1" in page.url
-        wait_ready(page)
-    page.goto(server + "/leaderboard?tab=es&" + ACT)
-    page.click("[data-theme-toggle]")
-    page.wait_for_load_state("networkidle")
+        frame.select_option("#keyboard-layout-select", other)
+        frame.wait_for_url(f"**layout={other}**")
+        assert "embed=1" in frame.url and "frame_id" not in frame.url
+        frame.wait_for_function("document.documentElement.getAttribute('data-activity') === 'ready'"
+                                " && document.querySelector('.key')")
+    page.wait_for_timeout(500)  # (the game polls /api/live, so no "networkidle")
     assert page.evaluate("window.__csp") == []
     assert blocked == []
     assert errors == [], errors
+    assert page.evaluate(SDK_COUNT) == 1 and calls(page, "authorize") == 1
 
 
 def test_browser_mobile_layout_pip_and_safe_area(lb_env, browser, server, discord):
@@ -714,32 +948,139 @@ def test_browser_mobile_layout_pip_and_safe_area(lb_env, browser, server, discor
     page = ctx.new_page()
     try:
         setup_activity(page, server)
-        page.goto(server + "/lb/es?" + ACT.replace("desktop", "mobile"))
-        wait_ready(page)
+        page.goto(server + "/?" + ACT.replace("desktop", "mobile") + "&lang=es")
+        frame = wait_ready(page)
         assert page.evaluate("window.__args.setOrientationLockState") == {"lock_state": 2}
         assert page.evaluate("document.documentElement.scrollWidth") <= 390
-        kb = page.locator(".c24-keyboard").bounding_box()
-        board = page.locator(".c24-board").bounding_box()
+        assert frame.evaluate("document.documentElement.scrollWidth") <= 390
+        kb = frame.locator(".c24-keyboard").bounding_box()
+        board = frame.locator(".c24-board").bounding_box()
         assert kb["y"] + kb["height"] <= 844 + 1 and board["y"] >= 0 and board["y"] + board["height"] <= kb["y"] + 1
-        # Discord's safe-area variable moves the keyboard up
-        pad = "parseFloat(getComputedStyle(document.querySelector('.c24-keyboard')).paddingBottom)"
-        before = page.evaluate(pad)
+        # Discord's safe-area variables (on the shell) keep the whole game inside them
         page.evaluate("document.documentElement.style.setProperty('--discord-safe-area-inset-bottom', '40px')")
-        assert page.evaluate(pad) >= 40 and page.evaluate(pad) != before
+        page.evaluate("document.documentElement.style.setProperty('--discord-safe-area-inset-top', '30px')")
+        frame.wait_for_function("window.innerHeight === 844 - 70")
+        kb = frame.locator(".c24-keyboard").bounding_box()
+        head = frame.locator(".c24-header").bounding_box()
+        assert kb["y"] + kb["height"] <= 844 - 40 + 1 and head["y"] >= 30 - 1
+        page.evaluate("document.documentElement.style.removeProperty('--discord-safe-area-inset-bottom')")
+        page.evaluate("document.documentElement.style.removeProperty('--discord-safe-area-inset-top')")
         # picture-in-picture: the board only
         page.evaluate("window.__sdk.emitEvent('ACTIVITY_LAYOUT_MODE_UPDATE', { layout_mode: 1 })")
-        page.wait_for_function("document.documentElement.classList.contains('c24-pip')")
-        assert not page.is_visible(".c24-keyboard") and not page.is_visible(".c24-header")
+        frame.wait_for_function("document.documentElement.classList.contains('c24-pip')")
+        assert not frame.is_visible(".c24-keyboard") and not frame.is_visible(".c24-header")
         page.set_viewport_size({"width": 240, "height": 180})
-        board = page.locator(".c24-board").bounding_box()
+        frame.wait_for_function("window.innerWidth === 240")
+        board = frame.locator(".c24-board").bounding_box()
         assert board["width"] > 40 and board["y"] >= 0 and board["y"] + board["height"] <= 180 + 1
         assert board["x"] >= 0 and board["x"] + board["width"] <= 240 + 1
         page.evaluate("window.__sdk.emitEvent('ACTIVITY_LAYOUT_MODE_UPDATE', { layout_mode: 0 })")
         page.set_viewport_size({"width": 390, "height": 844})
-        page.wait_for_function("!document.documentElement.classList.contains('c24-pip')")
-        assert page.is_visible(".c24-keyboard")
+        frame.wait_for_function("!document.documentElement.classList.contains('c24-pip')")
+        assert frame.is_visible(".c24-keyboard")
+        assert page.evaluate(SDK_COUNT) == 1
     finally:
         ctx.close()
+
+
+ACT_LIVE = [{"username": f"player{i}", "avatar_url": "https://cdn.discordapp.com/embed/avatars/1.png",
+             "rows": [["correct", "incorrect", "semicorrect", "incorrect", "incorrect"]],
+             "done": False, "won": False, "live": i == 0} for i in range(4)]
+SHOTS = os.environ.get("C24_ACT_SHOTS")  # optional folder for screenshots of the desktop layout
+
+
+def boxes_overlap(a, b):
+    return a["x"] < b["x"] + b["width"] - 0.5 and b["x"] < a["x"] + a["width"] - 0.5 \
+        and a["y"] < b["y"] + b["height"] - 0.5 and b["y"] < a["y"] + a["height"] - 0.5
+
+
+def test_browser_desktop_panel_stays_stacked_with_sidebar(lb_env, browser, server, discord):
+    """Discord desktop: a wide but short panel (875x400) keeps header / board / keyboard
+    stacked (never the landscape side-by-side layout); the live sidebar shows from
+    860px wide at any height, the game centered in the space next to it."""
+    ctx = browser.new_context(viewport={"width": 875, "height": 400})
+    page = ctx.new_page()
+    try:
+        setup_activity(page, server)
+        page.route("**/api/live?**", lambda r: r.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"players": ACT_LIVE, "count": len(ACT_LIVE)})))
+        page.goto(server + "/?" + ACT + "&lang=es")
+        frame = wait_ready(page)
+        frame.wait_for_function("document.documentElement.classList.contains('c24-plat-desktop')")
+        frame.wait_for_selector(".c24-live-card", state="attached")
+        for width, height in ((875, 400), (1000, 450), (1280, 600), (1600, 800), (700, 400), (875, 360)):
+            page.set_viewport_size({"width": width, "height": height})
+            frame.wait_for_function(f"window.innerWidth === {width} && window.innerHeight === {height}")
+            frame.wait_for_timeout(50)
+            size = f"{width}x{height}"
+            assert frame.evaluate("document.documentElement.scrollHeight") <= height, size
+            assert frame.evaluate("document.documentElement.scrollWidth") <= width, size
+            head = frame.locator("header.c24-header").bounding_box()
+            board = frame.locator(".c24-board").bounding_box()
+            kb = frame.locator(".c24-keyboard").bounding_box()
+            # stacked: header above the board, the board above the keyboard, all on screen
+            assert head["y"] + head["height"] <= board["y"] + 0.5, size
+            assert kb["y"] >= board["y"] + board["height"] - 0.5, size
+            assert kb["y"] + kb["height"] <= height + 0.5, size
+            tile = frame.locator("main .grid-cols-5 > div").first.bounding_box()
+            assert abs(tile["width"] - tile["height"]) <= 1 and tile["width"] >= 20, size
+            keys = frame.evaluate("[...document.querySelectorAll('.c24-keyboard .key')].map(k => "
+                                  "{ const r = k.getBoundingClientRect(); return [r.width, r.height]; })")
+            assert min(w for w, _ in keys) >= 24 and min(h for _, h in keys) >= 26, size
+            sidebar = width >= 860
+            assert frame.is_visible("#c24-live") == sidebar, size
+            assert frame.is_visible("[data-live-open]") == (not sidebar), size
+            if sidebar:
+                side = frame.locator("#c24-live").bounding_box()
+                assert 220 <= side["width"] <= 280 and side["height"] >= height - 1, size
+                for other in (head, board, kb):
+                    assert not boxes_overlap(side, other), size
+                # the game column is centered in the space right of the sidebar
+                col = frame.locator(".c24-game").bounding_box()
+                left, right = col["x"] - side["width"], width - col["x"] - col["width"]
+                assert abs(left - right) <= 2, size
+            if SHOTS and size in ("875x400", "1280x600"):
+                page.screenshot(path=os.path.join(SHOTS, f"activity-{size}.png"))
+        assert page.evaluate(SDK_COUNT) == 1
+    finally:
+        ctx.close()
+
+
+def test_browser_website_landscape_unchanged(server, page):
+    """The website (no Activity) on a landscape phone still puts the board and the
+    keyboard side by side; the Activity's desktop rules never reach it."""
+    page.set_viewport_size({"width": 844, "height": 390})
+    page.goto(server + "/es")
+    page.wait_for_function("window.Vue && document.querySelector('#app') && document.querySelector('.key')")
+    assert not page.evaluate("document.documentElement.classList.contains('c24-embed')")
+    board = page.locator(".c24-board").bounding_box()
+    kb = page.locator(".c24-keyboard").bounding_box()
+    assert kb["x"] >= board["x"] + board["width"] - 0.5
+    assert kb["y"] < board["y"] + board["height"]
+    assert page.evaluate("document.documentElement.scrollHeight") <= 390
+
+
+def test_browser_picker_small_screens(lb_env, browser, server, discord):
+    """The first-launch picker at phone size and in a 240x180 picture-in-picture tile."""
+    for size in ({"width": 390, "height": 844}, {"width": 240, "height": 180}):
+        ctx = browser.new_context(viewport=size, is_mobile=True, has_touch=True)
+        page = ctx.new_page()
+        try:
+            setup_activity(page, server)
+            page.goto(server + "/?" + ACT.replace("desktop", "mobile"))
+            page.wait_for_selector("#c24-picker:not([hidden])")
+            assert page.evaluate("document.documentElement.scrollWidth") <= size["width"]
+            btn = page.locator("[data-pick-lang=es]").bounding_box()
+            assert btn["height"] >= 40 and btn["x"] >= 0 and btn["x"] + btn["width"] <= size["width"] + 1
+            if size["width"] >= 390:  # the 10 big buttons fit on a phone without scrolling
+                last = page.locator("[data-pick-lang]").last.bounding_box()
+                assert last["y"] + last["height"] <= size["height"]
+            page.locator("[data-pick-lang=en]").scroll_into_view_if_needed()
+            page.click("[data-pick-lang=en]")
+            wait_ready(page, "en")
+        finally:
+            ctx.close()
 
 
 def test_browser_delete_confirm_is_an_in_page_dialog(lb_env, server, page, discord, mem):
@@ -763,6 +1104,181 @@ def test_browser_delete_confirm_is_an_in_page_dialog(lb_env, server, page, disco
     page.wait_for_url("**/?deleted=1")
     assert mem.get_player(P1) is None
     assert dialogs == []  # never a browser confirm()/alert()
+
+
+# ---------- browser: typing a guess (physical keyboard / on-screen keys) and sync ----------
+
+ERRS_INIT = """
+window.__errs = [];
+window.addEventListener('error', e => window.__errs.push(String(e.message)));
+window.addEventListener('unhandledrejection', e => window.__errs.push('rejection ' + String(e.reason && e.reason.message)));
+"""
+COLORED_ROWS = "document.querySelectorAll('" + BOARD_COLORED + "').length"
+
+
+def wait_rows(frame, rows):
+    frame.wait_for_function(f"{COLORED_ROWS} >= {5 * rows} && !document.querySelector('.flip')", timeout=8000)
+
+
+def guess_posts(api):
+    return [h for p, q, h in api if p == "/api/guess"]
+
+
+def web_page(ctx, server, lang="es"):
+    """The website's leaderboard game for P1 (the c24_lb cookie = the same signed ID
+    the Activity's Bearer session carries)."""
+    ctx.add_cookies([{"name": "c24_lb", "value": session_for(P1), "url": server},
+                     {"name": "c24_avr", "value": "1", "url": server}])
+    web = ctx.new_page()
+    web.goto(server + "/lb/" + lang)
+    web.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('.key')")
+    return web
+
+
+def force_sync(target):
+    # what a focus / visible-tab event does after the 5 s gap: GET /api/state and repaint
+    target.evaluate("SYNC.at = 0; window.dispatchEvent(new Event('focus'))")
+
+
+def test_browser_physical_keyboard_with_focus_on_the_shell_or_the_game(lb_env, server, page, discord, mem):
+    """Regression (2026-10-29): a word typed on the computer's keyboard was never sent
+    (no POST /api/guess) when focus was on the shell document (a click on the overlay,
+    picker or safe-area margin) instead of the game iframe: game.js listens on the
+    iframe's window. The shell now passes keys on and moves focus into the game."""
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    _, _, api = setup_activity(page, server, extra_init=ERRS_INIT)
+    page.goto(server + "/?" + ACT)
+    page.click("[data-pick-lang=es]")  # a click in the shell: focus is on the shell document
+    frame = wait_ready(page)
+    session = page.evaluate("window.C24Activity.session")
+    w1, w2, w3 = wrong_words("es", 3)
+    # 1) focus on the shell (not in the iframe): typing still reaches the board
+    page.evaluate("document.activeElement && document.activeElement.blur(); window.focus()")
+    assert frame.evaluate("document.hasFocus()") is False
+    page.keyboard.type(w1)
+    assert frame.evaluate(VM + ".tiles[0].join('')") == w1
+    page.keyboard.press("Enter")
+    wait_rows(frame, 1)
+    assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [w1]
+    assert frame.evaluate("document.hasFocus()") is True  # the next keys go straight to the game
+    # 2) focus inside the iframe (a click on the board), typed in CAPITALS
+    frame.click(".c24-board")
+    page.keyboard.type(w2.upper())
+    page.keyboard.press("Enter")
+    wait_rows(frame, 2)
+    # 3) typed before the first state from the server (lb_ready false): not dropped
+    frame.evaluate(VM + ".lb_ready = false")
+    page.keyboard.type(w3)
+    page.keyboard.press("Enter")
+    wait_rows(frame, 3)
+    assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [w1, w2, w3]
+    posts = guess_posts(api)
+    assert posts == ["Bearer " + session] * 3
+    assert errors == [] and page.evaluate("window.__errs") == [] and frame.evaluate("window.__errs") == []
+
+
+def test_browser_on_screen_keys_and_both_sync_directions(lb_env, server, page, discord, mem):
+    """On-screen keys (incl. ⇨) send the guess; Activity -> web (cookie login, same
+    rows), web -> Activity (a relaunch shows the web's rows), and with both open a
+    guess on one side shows on the other after a focus; a stale row is a 409 that
+    repaints the server's game (nothing saved twice, nothing lost)."""
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    _, _, api = setup_activity(page, server, extra_init=ERRS_INIT)
+    page.goto(server + "/?" + ACT + "&lang=es")
+    frame = wait_ready(page)
+    w1, w2, w3, w4, w5 = wrong_words("es", 5)
+    type_word(frame, w1)  # on-screen letters + ⇨
+    assert guess_posts(api) == ["Bearer " + page.evaluate("window.C24Activity.session")]
+    day = app.lb_today()[0]
+    assert mem.get_game(P1, "es", day)[0] == [w1]
+    # Activity -> web: the website shows the same row
+    ctx = page.context
+    web = web_page(ctx, server)
+    web.wait_for_function(f"{COLORED_ROWS} === 5")
+    assert web.evaluate(VM + ".tiles[0].join('')") == w1 and web.evaluate(VM + ".active_row") == 1
+    # web -> Activity, both open: a guess on the web shows in the Activity after a focus
+    for ch in w2:
+        web.click(f".c24-keyboard .key[data-char='{ch}']")
+    web.click(".c24-keyboard .key[data-char='⇨']")
+    web.wait_for_function(f"{COLORED_ROWS} >= 10 && !document.querySelector('.flip')")
+    assert mem.get_game(P1, "es", day)[0] == [w1, w2]
+    force_sync(frame)
+    wait_rows(frame, 2)
+    assert frame.evaluate(VM + ".tiles[1].join('')") == w2 and frame.evaluate(VM + ".active_row") == 2
+    # Activity -> web, both open
+    type_word(frame, w3, rows=3)
+    force_sync(web)
+    web.wait_for_function(f"{COLORED_ROWS} >= 15 && !document.querySelector('.flip')")
+    assert web.evaluate(VM + ".tiles[2].join('')") == w3
+    # a stale side (the web missed a guess made in the Activity): 409 -> repaint, no double save
+    frame.click(".c24-board")
+    page.keyboard.type(w4)
+    page.keyboard.press("Enter")
+    wait_rows(frame, 4)
+    for ch in w5:
+        web.click(f".c24-keyboard .key[data-char='{ch}']")  # web still shows 3 rows: attempt 3
+    web.click(".c24-keyboard .key[data-char='⇨']")
+    web.wait_for_function(f"{COLORED_ROWS} >= 20 && !document.querySelector('.flip')")
+    assert web.evaluate(VM + ".tiles[3].join('')") == w4 and web.evaluate(VM + ".active_row") == 4
+    assert mem.get_game(P1, "es", day)[0] == [w1, w2, w3, w4]
+    # relaunch the Activity: the server's rows on load
+    web.close()
+    page.close()
+    page2 = ctx.new_page()
+    setup_activity(page2, server)
+    page2.goto(server + "/?frame_id=f2&instance_id=i2&platform=desktop")
+    frame2 = wait_ready(page2)
+    wait_rows(frame2, 4)
+    assert [frame2.evaluate(VM + f".tiles[{r}].join('')") for r in range(4)] == [w1, w2, w3, w4]
+    assert frame2.evaluate(VM + ".active_row") == 4
+    assert errors == []
+
+
+def test_browser_web_guess_then_activity_launch(lb_env, server, browser, discord, mem):
+    """web -> Activity: a guess made on the website first; the Activity's first state shows it."""
+    ctx = browser.new_context()
+    try:
+        mem.upsert_player(P1, "x")
+        web = web_page(ctx, server)
+        word = wrong_words("es", 1)[0]
+        for ch in word:
+            web.click(f".c24-keyboard .key[data-char='{ch}']")
+        web.click(".c24-keyboard .key[data-char='⇨']")
+        web.wait_for_function(f"{COLORED_ROWS} >= 5 && !document.querySelector('.flip')")
+        assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [word]
+        page = ctx.new_page()
+        setup_activity(page, server)
+        page.goto(server + "/?" + ACT + "&lang=es")
+        frame = wait_ready(page)
+        wait_rows(frame, 1)
+        assert frame.evaluate(VM + ".tiles[0].join('')") == word and frame.evaluate(VM + ".active_row") == 1
+    finally:
+        ctx.close()
+
+
+def test_browser_guess_error_is_shown_and_logged(lb_env, server, page, discord, mem):
+    """A guess the server can't take: a toast for the player, a line in Discord's console
+    (through the shell), and the game keeps working."""
+    logs = []
+    page.on("console", lambda m: logs.append(m.text))
+    setup_activity(page, server)
+    page.goto(server + "/?" + ACT + "&lang=es")
+    frame = wait_ready(page)
+    page.route("**/api/guess", lambda r: r.fulfill(status=500, body="{}", content_type="application/json"))
+    w1 = wrong_words("es", 1)[0]
+    frame.click(".c24-board")
+    page.keyboard.type(w1)
+    page.keyboard.press("Enter")
+    frame.wait_for_function(VM + ".notification.show === true")
+    assert frame.evaluate(VM + ".lb_busy") is False
+    page.wait_for_function("true")
+    assert any("Casa 24 game: guess not saved" in t for t in logs), logs
+    page.unroute("**/api/guess")
+    page.keyboard.press("Enter")  # the same word again, now saved
+    wait_rows(frame, 1)
+    assert mem.get_game(P1, "es", app.lb_today()[0])[0] == [w1]
 
 
 def test_vendored_sdk_fully_tracked():

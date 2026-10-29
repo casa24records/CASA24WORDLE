@@ -39,26 +39,6 @@ function lbFetch(url, opts) {
     return activityReady().then(function () { return window.C24Activity.fetch(url, opts); });
 }
 
-if (ACTIVITY) {
-    // "/" inside Discord lands on /lb/es?...&c24_root=1: go once to the language this
-    // device played last (read before this page saves its own), then drop the marker.
-    (function () {
-        var params = new URLSearchParams(window.location.search);
-        if (!params.has("c24_root")) { return; }
-        params.delete("c24_root");
-        var saved = null;
-        try { saved = localStorage.getItem("casa24_lang"); } catch (e) { }
-        var langs = (readJson("c24-activity") || {}).langs || [];
-        var query = params.toString();
-        if (saved && saved !== config.language_code && langs.indexOf(saved) >= 0) {
-            window.C24_LEAVING = true;  // discord-activity.js: don't start the SDK on this page
-            window.location.replace("/lb/" + saved + (query ? "?" + query : ""));
-        } else if (window.history.replaceState) {
-            window.history.replaceState(null, "", window.location.pathname + (query ? "?" + query : "") + window.location.hash);
-        }
-    })();
-}
-
 // Kolo shown on the end screen, one picked at random per game. These must match
 // the files in static/images/kolo/win/ and lose/ (scripts/brand_assets.py makes them).
 const KOLO_WIN = ["car.webp", "chill.webp", "dj.webp", "face.webp", "hoodie.webp", "montuno.webp", "pizza.webp",
@@ -119,6 +99,9 @@ function livePlayer(p, rtl) {
 const SYNC_MIN_GAP = 5000;
 const SYNC_EVERY = 60000;
 const SYNC = { busy: false, at: 0, gen: 0, stopped: false, reauthed: false };
+// a guess still unanswered after this long is given up (error toast; typing works
+// again). Safe: "attempt" makes a late duplicate a 409, never a second guess.
+const GUESS_MS = 20000;
 const EMPTY_TILE = "border-2 border-neutral-300";
 
 function panamaDate(ms) {
@@ -237,8 +220,9 @@ const app = Vue.createApp({
             live_count: 0,
             live_loaded: false, // first answer arrived (shows the empty state)
             live_open: false,   // narrow screens: the bottom sheet is open
-            lb_ready: !ACTIVITY, // Discord Activity: typing waits for the first state from the server
+            lb_ready: !ACTIVITY, // Discord Activity: the first state from the server has been painted
             board_open: false,  // Discord Activity: leaderboard window
+            lang_open: false,   // Discord Activity: language window (header "ES ▾")
             board_tab: "",
             board_rows: [],
             board_me: null,
@@ -387,6 +371,23 @@ const app = Vue.createApp({
             this.board_open = true;
             this.loadBoard(this.board_tab || this.config.language_code);
         },
+        openLang() {
+            // Discord Activity: the language window (header "ES ▾")
+            this.show_options_modal = false;
+            this.show_stats_modal = false;
+            this.lang_open = true;
+            this.$nextTick(() => {
+                var current = document.querySelector("[data-lang-choice][aria-current='true']");
+                if (current && current.focus) { current.focus(); }
+            });
+        },
+        chooseLang(code) {
+            // the Activity shell swaps this page for the other language; its Discord
+            // connection stays (no new login, no reload of the Activity)
+            this.lang_open = false;
+            if (code === this.config.language_code) { return; }
+            if (window.C24Activity && window.C24Activity.setLang) { window.C24Activity.setLang(code); }
+        },
         loadBoard(tab) {
             this.board_tab = tab;
             this.board_loading = true;
@@ -419,7 +420,7 @@ const app = Vue.createApp({
         activityWatchdog() {
             // discord-activity.js never ran (blocked or failed to load): say so, offer a reload
             setTimeout(() => {
-                if (window.C24Activity || window.C24_LEAVING) { return; }
+                if (window.C24Activity) { return; }
                 var overlay = document.getElementById("c24-activity-overlay");
                 if (!overlay) { return; }
                 overlay.setAttribute("data-state", "error");
@@ -603,6 +604,7 @@ const app = Vue.createApp({
                 this.show_stats_modal = false;
                 this.show_options_modal = false;
                 this.board_open = false;
+                this.lang_open = false;
                 this.share_open = false;
                 return;
             }
@@ -619,7 +621,9 @@ const app = Vue.createApp({
             }
             key = this.normalizeKey(key);
 
-            if (this.game_over || this.revealing || this.lb_busy || !this.lb_ready) {
+            // (typing never waits for the first state: a guess sent before it carries
+            // "attempt", and a server that has moved on answers 409 with its game)
+            if (this.game_over || this.revealing || this.lb_busy) {
                 return;
             }
             // console.log('keyDown', this.active_cell, this.active_row, event.key);
@@ -868,14 +872,20 @@ const app = Vue.createApp({
             this.lb_busy = true;
             SYNC.gen++;
             var lang = this.config.language_code;
+            // never stuck "on its way": give up after GUESS_MS (also while still waiting
+            // for the Discord login), so typing and syncing never stop for good
+            var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+            var timer = setTimeout(() => { if (ctrl) { ctrl.abort(); } }, GUESS_MS);
             lbFetch("/api/guess", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ lang: lang, guess: typed, attempt: row }),
+                signal: ctrl ? ctrl.signal : undefined,
             }).then((response) => {
                 return response.json().catch(() => ({})).then((data) => ({ ok: response.ok, status: response.status, data: data }));
             }).then((result) => {
+                clearTimeout(timer);
                 this.lb_busy = false;
                 var data = result.data || {};
                 if (result.ok && Array.isArray(data.colors)) {
@@ -889,11 +899,12 @@ const app = Vue.createApp({
                     // played elsewhere meanwhile: just show the server's game, no error
                     this.paintState(data.state);
                 } else {
-                    this.lbError(data.error || (result.status === 401 ? "login" : ""));
+                    this.lbError(data.error || (result.status === 401 ? "login" : ""), "http " + result.status);
                 }
-            }).catch(() => {
+            }).catch((error) => {
+                clearTimeout(timer);
                 this.lb_busy = false;
-                this.lbError("");
+                this.lbError("", error && error.name === "AbortError" ? "timeout" : "network");
             });
         },
         applyLbGuess(res) {
@@ -914,7 +925,11 @@ const app = Vue.createApp({
             this.commitRow(keys_after, !!res.won, !!res.done);
             this.showTiles();
         },
-        lbError(code) {
+        lbError(code, detail) {
+            // inside Discord: also into Discord's debug console (via the shell; codes only)
+            if (ACTIVITY && code !== "invalid_word" && code !== "repeat" && window.C24Activity && window.C24Activity.log) {
+                window.C24Activity.log("guess not saved: " + (code || "") + " " + (detail || ""));
+            }
             if (code === "login" && ACTIVITY) {
                 // inside Discord: log in again silently (no login page in the iframe)
                 if (!this.activityReauth()) {

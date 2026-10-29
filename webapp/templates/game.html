@@ -6,7 +6,7 @@
     leaderboard and language in windows of this page (no extra page loads) -#}
 {% set in_activity = C24_ACTIVITY is defined and C24_ACTIVITY and lb is defined and lb %}
 <!DOCTYPE html>
-<html lang="{{ language.language_code }}">
+<html lang="{{ language.language_code }}"{% if in_activity %} class="c24-embed"{% endif %}>
 
 <head>
     <meta charset="UTF-8">
@@ -90,12 +90,20 @@
                             <polyline points="11 12 12 12 12 16 13 16"></polyline>
                         </svg>
                     </button>
-                </div>
+                </div>{% if in_activity %}
+                <!-- inside Discord: the title opens the language window (never a page change:
+                     the Activity shell swaps the game, its Discord connection stays) -->
+                <h1 class="c24-title c24-header-title uppercase"><button type="button" class="c24-lang-btn inline-flex items-center gap-2"
+                        data-activity-lang-open aria-haspopup="dialog" v-on:click="openLang"
+                        aria-label="{{ t('activity_lang_button', 'Change language') }} ({{ language.config.name_native }})">
+                        <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="" class="c24-logo">
+                        <span class="c24-title-text">Casa 24</span>
+                        <span class="c24-badge">{{ language.config.language_code }} ▾</span></button></h1>{% else %}
                 <h1 class="c24-title c24-header-title uppercase"><a href="{{ aq('/') }}" class="inline-flex items-center gap-2">
                         <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
                         <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
                         <span class="c24-title-text">Casa 24</span>
-                        <span class="c24-badge">{{ language.config.language_code }}</span>{% if lb %}<span class="c24-badge c24-badge-lb" title="{{ t('lb_title', 'Leaderboard') }}" role="img" aria-label="{{ t('lb_title', 'Leaderboard') }}">{{ dc.trophy('c24-trophy c24-trophy-badge') }}</span>{% endif %}</a></h1>
+                        <span class="c24-badge">{{ language.config.language_code }}</span>{% if lb %}<span class="c24-badge c24-badge-lb" title="{{ t('lb_title', 'Leaderboard') }}" role="img" aria-label="{{ t('lb_title', 'Leaderboard') }}">{{ dc.trophy('c24-trophy c24-trophy-badge') }}</span>{% endif %}</a></h1>{% endif %}
                 <div class="c24-header-side c24-header-end">
                     {% if lb %}
                     <!-- who else is playing today: opens the live sheet (hidden where the sidebar shows).
@@ -216,7 +224,7 @@
         {% endif %}
 
         <!-- NOTIFICATIONS & MODALS-->
-        <div v-show="showHelpModal || show_stats_modal || show_options_modal || board_open || share_open" class="c24-backdrop" v-cloak></div>
+        <div v-show="showHelpModal || show_stats_modal || show_options_modal || board_open{% if in_activity %} || lang_open{% endif %} || share_open" class="c24-backdrop" v-cloak></div>
 
         <!-- help modal -->
         <div id="HelpModal" v-show="showHelpModal" class="c24-modal-wrap" v-cloak>
@@ -349,19 +357,7 @@
                         </form>
                         {% endif %}
 
-                        {% if in_activity and activity_langs %}
-                        <!-- inside Discord there is no menu page: change language here -->
-                        <div class="border-t-2 border-gray-300"></div>
-                        <div class="flex flex-row items-center">
-                            <p id="activity-lang-label" class="flex-grow">{{ t('language', 'Language') }}</p>
-                            <select id="activity-lang-select" aria-labelledby="activity-lang-label" class="rounded border px-2 py-1"
-                                data-nav-select data-activity-lang>
-                                {% for l in activity_langs %}
-                                <option value="{{ aq('/lb/' ~ l.code) }}" lang="{{ l.code }}"{% if l.code == language.language_code %} selected{% endif %}>{{ l.name_native }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        {% endif %}
+                        {# inside Discord the language is changed from the header button ("ES ▾") #}
 
                         {% if not lb %}
                         <div class="border-t-2 border-gray-300"></div>
@@ -534,6 +530,25 @@
                 </p>
             </div>
         </div>
+
+        <!-- Discord Activity: the language window (header "ES ▾"). Choosing tells the shell
+             (postMessage "c24-lang"), which swaps this game for the other language -->
+        <div v-show="lang_open" class="c24-modal-wrap" data-activity-langs v-cloak>
+            <div class="c24-modal c24-modal-sm bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
+                aria-modal="true" aria-labelledby="lang-title">
+                <button type="button" class="c24-close" aria-label="{{ t('lb_dismiss', 'Close') }}"
+                    v-on:click="lang_open = false">×</button>
+                <h3 id="lang-title" class="c24-board-title uppercase font-bold text-xl tracking-wider">{{ t('activity_lang_button', 'Change language') }}</h3>
+                <div class="c24-lang-list">
+                    {% for l in activity_langs %}
+                    <button type="button" class="c24-lang-choice{% if l.code == language.language_code %} is-active{% endif %}"
+                        data-lang-choice="{{ l.code }}" lang="{{ l.code }}"{% if l.rtl %} dir="rtl"{% endif %}
+                        {% if l.code == language.language_code %}aria-current="true"{% endif %}
+                        v-on:click="chooseLang('{{ l.code }}')">{{ l.name_native }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
         {% endif %}
 
         <!-- share text to copy by hand, when the browser can neither share nor copy
@@ -565,7 +580,7 @@
     </div>
 
     {% if in_activity %}
-    <!-- Discord Activity: shown until the automatic Discord login is done (discord-activity.js).
+    <!-- Discord Activity: shown until the shell's Discord login is done (discord-activity.js).
          Only "Try again" after a refusal or an error; there is no login button and no guest mode. -->
     <div id="c24-activity-overlay" class="c24-activity-overlay" data-state="loading" role="status" aria-live="polite">
         <div class="c24-activity-box">
@@ -581,8 +596,8 @@
     <!-- JS (the theme menu's saved value and its change handler live in theme.js) -->
     <script defer src="{{ asset('game.js') }}"></script>
     {% if in_activity %}
-    <!-- Discord Activity only: the Discord SDK (static/vendor, our origin) and the automatic login.
-         Never loaded on the web (no frame_id / instance_id / platform in the URL). -->
+    <!-- Discord Activity only (the game in the Activity shell's iframe): borrows the shell's
+         Discord session; never loads the SDK itself. Never loaded on the web. -->
     <script type="module" src="{{ asset('discord-activity.js') }}"></script>
     {% endif %}
 </body>

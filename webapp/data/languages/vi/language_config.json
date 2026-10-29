@@ -67,7 +67,10 @@
         "lb_live_title": "Đang chơi hôm nay",
         "lb_live_empty": "Hiện không có ai khác đang chơi",
         "lb_live_now": "trực tiếp",
-        "lb_live_open": "Xem ai đang chơi hôm nay"
+        "lb_live_open": "Xem ai đang chơi hôm nay",
+        "activity_pick_title": "Chọn ngôn ngữ của bạn",
+        "activity_loading_game": "Đang tải trò chơi…",
+        "activity_lang_button": "Đổi ngôn ngữ"
     },
     "right_to_left": "false",
     "help": {

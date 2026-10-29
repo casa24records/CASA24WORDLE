@@ -1283,6 +1283,152 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 .c24-activity-overlay[data-state="error"] .c24-activity-retry { display: inline-flex; align-items: center; }
 .c24-activity-retry:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
 
+/* the shell's two loading steps: "Conectando…" (Discord) then "Cargando juego…" (the iframe) */
+.c24-activity-overlay[data-step="connect"] .c24-step-game,
+.c24-activity-overlay[data-step="game"] .c24-step-connect { display: none !important; }
+
+/* The Activity shell (templates/activity.html): the game fills it in a same-origin iframe.
+   Discord's safe-area variables exist only on the shell, so the iframe sits inside
+   them; around it, the game's own background. */
+.c24-shell-html, body.c24-shell { height: 100%; margin: 0; overflow: hidden; }
+body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
+.c24-shell-frame {
+    position: fixed;
+    top: var(--c24-safe-top);
+    right: var(--c24-safe-right);
+    bottom: var(--c24-safe-bottom);
+    left: var(--c24-safe-left);
+    width: calc(100% - var(--c24-safe-left) - var(--c24-safe-right));
+    height: calc(100% - var(--c24-safe-top) - var(--c24-safe-bottom));
+    border: 0;
+    display: block;
+    background: var(--c24-bg);
+}
+.c24-shell-frame[hidden], .c24-picker[hidden] { display: none; }
+
+/* first launch: the language picker (10 big buttons, es/en first) */
+.c24-picker {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: max(16px, var(--c24-safe-top)) max(16px, var(--c24-safe-right)) max(16px, var(--c24-safe-bottom)) max(16px, var(--c24-safe-left));
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.c24-picker-logo { width: 64px; height: 64px; flex: none; margin-top: auto; border-radius: 9999px; background: var(--c24-orange); }
+.c24-picker-title { margin: 0; text-align: center; font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
+.c24-picker-title span[lang="en"] { display: block; font-weight: 400; font-size: 0.9em; color: var(--c24-subtle); }
+.c24-picker-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: min(26rem, 100%);
+    margin-bottom: auto;
+}
+.c24-picker-btn, .c24-lang-choice {
+    min-height: 48px;
+    padding: 0 0.75rem;
+    border: 2px solid var(--c24-line-strong, #999);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+}
+.c24-picker-btn:hover, .c24-lang-choice:hover { background: var(--c24-hover); }
+.c24-picker-btn:focus-visible, .c24-lang-choice:focus-visible, .c24-lang-btn:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+.c24-picker-btn.is-suggested { border-color: var(--c24-orange); }
+.c24-lang-choice.is-active { background: var(--c24-correct-bg); color: var(--c24-correct-fg); border-color: transparent; }
+@media (max-height: 420px) {
+    /* landscape phones and the small picture-in-picture tile: no logo, tighter buttons */
+    .c24-picker { gap: 0.4rem; }
+    .c24-picker-logo { display: none; }
+    .c24-picker-title { margin-top: auto; font-size: 1rem; }
+    .c24-picker-list { grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); width: 100%; gap: 0.4rem; }
+    .c24-picker-btn { min-height: 40px; font-size: 0.95rem; }
+}
+
+/* the game page in the shell's iframe: the shell already keeps it inside the safe areas */
+:root.c24-embed { --c24-safe-top: 0px; --c24-safe-right: 0px; --c24-safe-bottom: 0px; --c24-safe-left: 0px; }
+
+/* ---------- the Activity on Discord desktop (owner, 2026-10-29) ----------
+   The desktop panel can be wide but short (e.g. 875x400). There the game stays
+   stacked (header, board ABOVE keyboard; never the landscape side-by-side layout),
+   keys shrink with the height, and the live sidebar shows from 860px wide at any
+   height. The shell passes the platform (c24-plat-desktop / c24-plat-mobile);
+   until it arrives the page counts as desktop. Mobile keeps the web rules
+   (portrait lock). The website (no c24-embed) is unchanged. */
+:root.c24-embed:not(.c24-plat-mobile) .c24-game {
+    --kgap: clamp(3px, min(1vw, var(--vh) * 1), 6px);
+    display: flex;
+    flex-direction: column;
+    max-width: 500px;
+}
+:root.c24-embed:not(.c24-plat-mobile) .c24-keyboard {
+    --kh: clamp(26px, min(var(--vh) * 7, (var(--vh) * 42 - (var(--rows) - 1) * var(--kgap)) / var(--rows)), 58px);
+    align-self: stretch;
+    padding: 0 8px max(8px, var(--c24-safe-bottom));
+}
+/* short panels: the compact 40px header of the landscape rule, without its grid */
+@media (max-height: 500px) {
+    :root.c24-embed:not(.c24-plat-mobile) .c24-keyboard { padding-bottom: 6px; }
+}
+@media (min-width: 860px) {
+    :root.c24-embed:not(.c24-plat-mobile) { --c24-live-w: 240px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live,
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live.is-open {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        z-index: 30;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: auto;
+        width: var(--c24-live-w);
+        max-height: none;
+        margin: 0;
+        padding: 0;
+        background: var(--c24-bg);
+        border: 0;
+        border-inline-end: 1px solid var(--c24-line);
+        border-radius: 0;
+        box-shadow: none;
+    }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-head { padding-right: 12px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-btn,
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-close,
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-backdrop { display: none !important; }
+    /* the game column centered in the space right of the sidebar */
+    :root.c24-embed:not(.c24-plat-mobile):not(.c24-pip) body { padding-left: var(--c24-live-w); }
+}
+@media (min-width: 1280px) {
+    :root.c24-embed:not(.c24-plat-mobile) { --c24-live-w: 280px; }
+}
+
+/* the game's header title inside the Activity: opens the language window ("ES ▾") */
+.c24-lang-btn {
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.c24-lang-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+@media (max-width: 360px) { .c24-header-title .c24-lang-btn { gap: 0.35rem; } }
+
 /* Picture-in-picture / grid (layout mode 1 or 2): a small tile in Discord.
    Only the board, no header, keyboard, live view or windows. */
 .c24-pip .c24-header,

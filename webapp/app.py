@@ -54,6 +54,7 @@ if not os.environ.get("VERCEL") and "pytest" not in sys.modules:
 import daily
 import discord_auth
 import leaderboard as lbrules
+from preload import sdk_modulepreloads
 import store as store_mod
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 from urllib.parse import urlencode, urlparse
@@ -217,22 +218,42 @@ def inject_asset_helpers():
 ###############################################################################
 # Discord opens the Activity as an iframe on https://<client id>.discordsays.com
 # (a proxy to this server) with ?frame_id=...&instance_id=...&platform=... in the
-# URL. Only then is a page "inside the Activity": it loads static/discord-activity.js
-# (the Discord SDK, automatic login), has no guest mode, no login/logout buttons
-# and no Developer view, and every internal link keeps Discord's query (the SDK
-# reads it on every page load). Without those params nothing here changes the web.
+# URL. Only then is a page "inside the Activity". "/" (and "/activity") is then the
+# Activity shell (templates/activity.html + static/activity-shell.js): the one page
+# that loads the Discord SDK (once per launch: ready, authorize, token,
+# authenticate) and hosts the game in a same-origin <iframe> at /lb/<lang>?embed=1
+# (no Discord params in the iframe: is_activity_embed()). The game page
+# (static/discord-activity.js) borrows the shell's session; language changes swap
+# the iframe, never the shell (a second SDK handshake after any navigation can't
+# work: the SDK answers to document.referrer). Inside: no guest mode, no
+# login/logout buttons, no Developer view, and every internal link keeps the
+# Activity's query (embed=1), so the server still knows.
+# Without those params nothing here changes the web.
 
 ACTIVITY_PLATFORMS = ("desktop", "mobile")
 # our own page params: never carried to the next page by activity_url()
 ACTIVITY_OWN_PARAMS = ("layout", "tab", "lang", "c24_root", "login", "deleted", "skip", "next")
 
 
-def is_activity():
+def is_activity_launch():
     """True when Discord's launch params are in the URL (frame_id, instance_id and a
-    valid platform; the SDK refuses any other platform)."""
+    valid platform; the SDK refuses any other platform): the Activity shell."""
     args = request.args
     return bool(args.get("frame_id") and args.get("instance_id")) \
         and args.get("platform") in ACTIVITY_PLATFORMS
+
+
+def is_activity_embed():
+    """The game page inside the Activity shell's <iframe> (?embed=1). Its URL has no
+    frame_id / instance_id / platform on purpose (like Discord's nested-messages
+    sample): nothing in the iframe can mistake itself for the Activity's top page or
+    start the SDK; it borrows the shell's session (window.parent.C24Activity)."""
+    return request.args.get("embed") == "1"
+
+
+def is_activity():
+    """Inside the Discord Activity: the shell (launch params) or its game iframe (embed=1)."""
+    return is_activity_launch() or is_activity_embed()
 
 
 def activity_params():
@@ -256,6 +277,32 @@ def activity_url(path):
 app.jinja_env.globals.update(asset=asset, json_script=json_script, aq=activity_url)
 
 
+def _is_rtl(lang):
+    return str(language_configs[lang].get("right_to_left", "false")).lower() == "true"
+
+
+def activity_shell(lang=None):
+    """The Activity shell: loads the Discord SDK ONCE per launch (ready, authorize,
+    token, authenticate), keeps the session in memory and hosts the game in a
+    same-origin <iframe>. Language changes swap the iframe, never this page, so
+    the SDK handshake never runs twice. `lang`: a language to open right away
+    (else the one this device chose last, else the language picker)."""
+    langs = [{"code": c, "name": language_configs[c]["name_native"],
+              "rtl": _is_rtl(c),
+              "loading": language_configs[c]["text"].get("activity_loading_game", "Loading game…")}
+             for c in LB_LANGS]
+    pick = {c: language_configs[c]["text"].get("activity_pick_title", fallback)
+            for c, fallback in (("es", "Elige tu idioma"), ("en", "Choose your language"))}
+    response = make_response(render_template(
+        "activity.html",
+        shell={"client_id": discord_auth.client_id(), "langs": langs,
+               "lang": lang if lang in LB_LANGS else None},
+        pick=pick,
+        sdk_preloads=sdk_modulepreloads(),
+    ))
+    return _no_store(response)
+
+
 @app.context_processor
 def inject_activity():
     activity = is_activity()
@@ -264,8 +311,8 @@ def inject_activity():
     if activity:
         # the public app ID for the SDK (never the secret) and the language window's list
         ctx["activity_client_id"] = discord_auth.client_id()
-        ctx["activity_langs"] = [{"code": c, "name_native": language_configs[c]["name_native"]}
-                                 for c in LB_LANGS]
+        ctx["activity_langs"] = [{"code": c, "name_native": language_configs[c]["name_native"],
+                                  "rtl": _is_rtl(c)} for c in LB_LANGS]
     return ctx
 
 
@@ -563,13 +610,13 @@ class Language:
 @app.route("/")
 def index():
     if is_activity() and lb_enabled():
-        # inside Discord: straight to the leaderboard game (no menu, no guest mode),
-        # keeping Discord's query. No ?lang: Spanish, and c24_root=1 lets game.js
-        # switch once to the language this device played last.
+        # inside Discord (URL Mapping "/"): the Activity shell, no redirect (no menu,
+        # no guest mode). Inside the shell's iframe "/" goes to the game instead,
+        # so the shell (and the SDK) can never load twice.
         lang = request.args.get("lang")
-        extra = [] if lang in LB_LANGS else [("c24_root", "1")]
-        query = urlencode(list(request.args.items(multi=True)) + extra)
-        return _no_store(redirect(f"/lb/{lang if lang in LB_LANGS else 'es'}?{query}"))
+        if is_activity_embed():
+            return _no_store(redirect(activity_url(f"/lb/{lang if lang in LB_LANGS else 'es'}")))
+        return activity_shell(lang)
     return render_template(
         "index.html",
         languages=languages,
@@ -578,6 +625,16 @@ def index():
         demo_enabled=demo_enabled(),
         texts={lang: language_configs[lang]["text"] for lang in DEMO_LANGS},
     )
+
+
+@app.route("/activity")
+def activity_page():
+    # the Activity shell by its own name (same as "/" inside Discord)
+    if not (is_activity() and lb_enabled()):
+        return redirect("/")
+    if is_activity_embed():
+        return _no_store(redirect(activity_url("/lb/es")))
+    return activity_shell(request.args.get("lang"))
 
 
 # sitemap
@@ -1040,9 +1097,12 @@ def lb_game(lang_code):
     if lang_code not in LB_LANGS:
         return redirect(activity_url("/lb/es"))
     cookie_key = f"keyboard_layout_{lang_code}"
+    if is_activity() and not is_activity_embed():
+        # inside Discord but not in the shell's iframe: open the shell on this language
+        return activity_shell(lang_code)
     if is_activity():
-        # inside Discord: no cookie travels, so the page is an empty board; after the
-        # automatic login (discord-activity.js) game.js asks GET /api/state with the session
+        # the game in the Activity shell's iframe: no cookie travels, so the page is an
+        # empty board; game.js asks GET /api/state with the shell's session (Bearer)
         language = Language(lang_code, language_codes_5words[lang_code], request.args.get("layout"))
         language.daily_word = ""
         response = make_response(render_template(

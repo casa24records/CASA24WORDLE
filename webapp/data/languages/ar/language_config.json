@@ -67,7 +67,10 @@
         "lb_live_title": "يلعبون اليوم",
         "lb_live_empty": "لا أحد غيرك يلعب الآن",
         "lb_live_now": "مباشر",
-        "lb_live_open": "شاهد من يلعب اليوم"
+        "lb_live_open": "شاهد من يلعب اليوم",
+        "activity_pick_title": "اختر لغتك",
+        "activity_loading_game": "جارٍ تحميل اللعبة…",
+        "activity_lang_button": "تغيير اللغة"
     },
     "right_to_left": "true",
     "help": {

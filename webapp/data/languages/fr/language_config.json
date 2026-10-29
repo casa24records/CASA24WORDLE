@@ -67,7 +67,10 @@
         "lb_live_title": "En jeu aujourd'hui",
         "lb_live_empty": "Personne d'autre ne joue en ce moment",
         "lb_live_now": "en direct",
-        "lb_live_open": "Voir qui joue aujourd'hui"
+        "lb_live_open": "Voir qui joue aujourd'hui",
+        "activity_pick_title": "Choisis ta langue",
+        "activity_loading_game": "Chargement du jeu…",
+        "activity_lang_button": "Changer de langue"
     },
     "right_to_left": "false",
     "help": {

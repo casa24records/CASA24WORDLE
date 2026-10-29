@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+{#- The Discord Activity shell (app.py activity_shell()). Discord loads it once per
+    launch; static/activity-shell.js talks to the Discord SDK (ready, authorize,
+    token, authenticate), keeps the session in memory and shows the game in the
+    same-origin <iframe> below. Changing language swaps the iframe, never this page,
+    so the SDK handshake runs exactly once. No inline code (Discord's CSP): JSON only. -#}
+<html lang="es" class="c24-shell-html">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <title>Casa 24 Wordle</title>
+    <!-- the Discord SDK first: its whole module graph in parallel (no import waterfall).
+         Plain paths: the folder name carries the SDK version, the files import each other without ?v= -->
+    {% for path in sdk_preloads %}
+    <link rel="modulepreload" href="{{ url_for('static', filename=path) }}">
+    {% endfor %}
+    <script type="module" src="{{ asset('activity-shell.js') }}"></script>
+    <!-- the game page's own files, same ?v URLs as game.html so the iframe reuses them -->
+    <link rel="preload" href="{{ asset('vendor/vue.global.prod.js') }}" as="script">
+    <link rel="preload" href="{{ asset('tailwind.css') }}" as="style">
+    <link rel="preload" href="{{ asset('game.js') }}" as="script">
+    <link rel="modulepreload" href="{{ asset('discord-activity.js') }}">
+    <link rel="stylesheet" href="{{ asset('style.css') }}">
+    <script src="{{ asset('theme.js') }}"></script>
+    <script type="application/json" id="c24-shell">{{ json_script(shell) }}</script>
+</head>
+
+<body class="c24-shell">
+    <!-- the game: /lb/<lang>?embed=1 plus Discord's query (activity-shell.js sets the src) -->
+    <iframe id="c24-game" name="c24-game" class="c24-shell-frame" title="Casa 24 Wordle"
+        allow="clipboard-write" hidden></iframe>
+
+    <!-- first launch: pick a language (remembered on this device) -->
+    <section id="c24-picker" class="c24-picker" aria-labelledby="c24-picker-title" hidden>
+        <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-picker-logo">
+        <h1 id="c24-picker-title" class="c24-picker-title"><span lang="es">{{ pick.es }}</span> <span lang="en">{{ pick.en }}</span></h1>
+        <div class="c24-picker-list">
+            {% for l in shell.langs %}
+            <button type="button" class="c24-picker-btn" data-pick-lang="{{ l.code }}" lang="{{ l.code }}"{% if l.rtl %} dir="rtl"{% endif %}>{{ l.name }}</button>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- connecting / loading / refused / error; "Try again" is the only button -->
+    <div id="c24-activity-overlay" class="c24-activity-overlay" data-state="loading" data-step="connect" role="status" aria-live="polite">
+        <div class="c24-activity-box">
+            <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="" class="c24-activity-kolo">
+            <p class="c24-activity-msg c24-step-connect" data-when="loading"><span lang="es">Conectando…</span> <span lang="en">Connecting…</span></p>
+            <p class="c24-activity-msg c24-step-game" data-when="loading" data-loading-game>Cargando juego…</p>
+            <p class="c24-activity-msg" data-when="denied"><span lang="es">Para jugar en Discord necesitamos tu permiso (solo tu nombre de usuario).</span> <span lang="en">To play in Discord we need your permission (only your username).</span></p>
+            <p class="c24-activity-msg" data-when="error"><span lang="es">No pudimos conectar con Discord. Intenta de nuevo, o cierra y vuelve a abrir la actividad.</span> <span lang="en">We couldn't connect to Discord. Try again, or close and reopen the activity.</span></p>
+            <button type="button" class="c24-activity-retry" data-activity-retry>Intentar de nuevo / Try again</button>
+        </div>
+    </div>
+</body>
+
+</html>
