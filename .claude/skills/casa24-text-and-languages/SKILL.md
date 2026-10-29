@@ -37,10 +37,15 @@ Current `text` keys:
   - `/leaderboard` page: `lb_title`, `lb_tab_all` ("Combinado"; the language tabs show each `name_native`, so `lb_tab_es` / `lb_tab_en` exist but are unused), `lb_col_player`, `lb_col_points`, `lb_col_wins`, `lb_col_streak`, `lb_col_best`, `lb_you`, `lb_my_position`, `lb_empty`, `lb_delete`, `lb_delete_confirm`, `lb_hide`, `lb_back`
   - Removed: `lb_rank`, `lb_points`, `lb_point_one` (the numbers are now plain "#N" / "+N" with a label). Also removed with the mode switch: `lb_mode_label`, `lb_mode_guest`, `lb_mode_lb`, `lb_logged_in_as` (`lb_login` is still used by `index.html`).
   - No `lb_*` key has placeholders any more (`lb_my_position` is followed by ": #N" in the template).
+- Discord Activity (**all 10, since 2026-10-29**; tested by `test_activity_texts_in_all_languages`):
+  - `activity_pick_title` ("Elige tu idioma" / "Choose your language"): first-launch language picker in the Activity shell. The shell shows **es and en together** (`activity_shell()` reads them into `pick`; inline fallbacks in `app.py`).
+  - `activity_loading_game` ("Cargando juego…" / "Loading game…"): shell overlay while the game iframe loads, shown in the chosen language (`langs[].loading` in the shell JSON).
+  - `activity_lang_button` ("Cambiar idioma" / "Change language"): aria-label of the game header's "Casa 24 ES ▾" button and title of the language window (`game.html`, `t()`).
+  - The shell's "Conectando…", permission and error texts are hard-coded es + en side by side in `templates/activity.html` (the language isn't known yet).
 
 Which languages have which keys (2026-10-28):
 - **es, en:** every key above.
-- **The other 8** (ar, de, fr, ko, pt, ru, tr, vi): **every key except `demo_*`** (Developer view stays es/en). That includes the notifications, settings, stats, theme, all `lb_*` and `lb_live_*` keys. A new key that every player sees now goes in **all 10**; only a `demo_*` key stays es/en.
+- **The other 8** (ar, de, fr, ko, pt, ru, tr, vi): **every key except `demo_*`** (Developer view stays es/en). That includes the notifications, settings, stats, theme, all `lb_*`, `lb_live_*` and `activity_*` keys. A new key that every player sees now goes in **all 10**; only a `demo_*` key stays es/en.
 - Translation notes for the 8 (keep these when editing):
   - Informal "you" like the Spanish tú: French **tu** ("Réessaie", "Toi"), German **du** ("Versuch es nochmal", "Du"), Russian **ты** ("Попробуй", "Ты"), Turkish **sen** ("Sen"). Portuguese uses Brazilian **você**; Vietnamese **bạn**; Korean polite **-요** endings; Arabic informal masculine imperative.
   - Product names stay as is: "Discord" everywhere; `lb_tab_es`/`lb_tab_en` stay "Español"/"English".

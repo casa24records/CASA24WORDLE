@@ -16,6 +16,7 @@
 5. **El SDK no tiene timeouts.** [SDK] `ready()` y cada comando esperan para siempre si Discord no contesta. Un mensaje `CLOSE` de Discord se lee pero **no avisa a la app**. Los timeouts los ponemos nosotros.
 6. **El proxy inyecta un script propio** [OBS] que anula `RTCPeerConnection` y `WebTransport` y **bloquea el registro de Service Workers**. No usamos ninguno, pero no hay que añadirlos.
 7. **El SDK es "para una sola página" (SPA).** [DOC] "This SDK is intended for use by a single-page application." Nosotros somos multipágina (`/`, `/<lang>`, `/lb/<lang>`, `/leaderboard`). Cada navegación vuelve a cargar el SDK y repite el handshake. Esto no está documentado: hay que minimizar navegaciones y **conservar siempre la query** (`frame_id`…) al navegar. [NO VERIFICADO] que un segundo handshake en el mismo `frame_id` funcione.
+   - **RESUELTO (2026-10-29): un segundo handshake tras navegar NO funciona** [SDK]. `getRPCServerSource()` usa `document.referrer` como `targetOrigin`; tras navegar dentro del iframe el referrer es nuestro propio `https://<id>.discordsays.com/…`, el navegador descarta el mensaje y `READY` nunca llega (era el error "No pudimos conectar"). `location.reload()` sí conserva el referrer. **Solución aplicada: diseño "shell"** (el patrón que recomienda Discord, ejemplo oficial `nested-messages`): `/` sirve `activity.html` sin redirección, que crea el SDK **una sola vez** y **nunca navega**; el juego va en un iframe del mismo origen `/lb/<lang>?embed=1` sin parámetros de Discord y sin SDK (`discord-activity.js` usa la sesión del padre). Mensajes entre ambos: solo objetos, nunca arrays; se comprueban `origin` y `source`. Detalles: skill `casa24-discord-activity`.
 8. **La primera vez, Discord muestra un modal de permiso** aunque se use `prompt:'none'` (ver M5). No se puede evitar.
 9. **Existe una autenticación opcional del proxy** (`X-Signature-Ed25519`, `X-Signature-Timestamp`, `X-Discord-Proxy-Payload`) para comprobar que una petición pasó por Discord. [DOC] No es obligatoria.
 10. **Ya hay SDK 3.0.0-beta** (beta.3 del 2026-10-26). La versión estable es **2.5.0**. Hay que fijar la 2.5.0 y no actualizar sin revisar.
@@ -269,16 +270,25 @@ Formato de cada punto: **Qué** · **Por qué** (cita + URL) · **Cómo lo cumpl
 
 ### B. Prueba "CSP de Discord" (la más importante)
 Repite en Playwright lo que hace el proxy. Esto detecta CDN externos, fuentes externas y `onclick=` en un solo test.
-1. **Copiar la CSP real** (observada el 2026-10-28) con `<origin>` = nuestro servidor de pruebas:
-   `default-src 'self'; script-src 'self' 'unsafe-eval' 'nonce-TEST' blob:; style-src 'self' 'unsafe-inline' blob:; img-src 'self' blob: data: https://cdn.discordapp.com https://media.discordapp.net; font-src 'self' data:; connect-src 'self' https://discord.com https://cdn.discordapp.com https://media.discordapp.net data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:`
+1. **Copiar la CSP real** (observada el 2026-10-28, revisada con las líneas `frame-src`/`child-src` que el proxy ahora envía) con `<origin>` = nuestro servidor de pruebas:
+   `default-src 'self'; script-src 'self' 'unsafe-eval' 'nonce-TEST' blob:; style-src 'self' 'unsafe-inline' blob:; img-src 'self' blob: data: https://cdn.discordapp.com https://media.discordapp.net; font-src 'self' data:; connect-src 'self' https://discord.com https://cdn.discordapp.com https://media.discordapp.net data: blob:; media-src 'self' blob: data:; worker-src 'self' blob:; frame-src <origin>/ https://discord.com/embeds/video-frame; child-src <origin>/ blob:`
+   - Lo que el proxy real envía (3 Activities públicas: `945737671223947305`, `832012774040141894`, `880218394199220334`) [OBS]:
+     ```
+     frame-src https://<id>.discordsays.com/ wss://<id>.discordsays.com/ https://discord.com/embeds/video-frame ...;
+     child-src https://<id>.discordsays.com/ wss://<id>.discordsays.com/ blob:;
+     worker-src https://<id>.discordsays.com/ ... blob:;
+     ```
+   - Una fuente con `/` final vale para todas las rutas, así que el shell puede enmarcar `/lb/<lang>?embed=1`. El HTML del iframe también pasa por el proxy (su propia CSP y nonce, `no-store`).
+   - Nunca enviar `X-Frame-Options` ni `frame-ancestors`: Discord enmarca el shell y el shell enmarca el juego.
+   - Implementado en `tests/test_activity.py` (`discord_csp()`, `test_browser_discord_csp`).
 2. Con `page.route("**/*")`, para respuestas `text/html` de nuestro origen:
    - hacer `route.fetch()`;
    - añadir el encabezado `Content-Security-Policy`;
    - poner `nonce="TEST"` a cada `<script` **sin** `src`, como hace el proxy.
    - Para cualquier petición cuyo host no sea el nuestro, `discord.com` (`/api/`) o `cdn.discordapp.com`/`media.discordapp.net`: `route.abort()` y anotarla.
 3. Antes de cargar, con `page.add_init_script`: `document.addEventListener('securitypolicyviolation', e => (window.__csp ||= []).push(e.violatedDirective + ' ' + e.blockedURI))`.
-4. Cargar `/?frame_id=f&instance_id=i&platform=desktop` (y `/lb/es?...`) con el mock de A, jugar un intento, abrir Ayuda y Estadísticas, cambiar el tema y el teclado.
-5. **Comprobar:** `window.__csp` vacío, cero peticiones abortadas, el tablero se pinta y el intento se colorea.
+4. Cargar `/?frame_id=f&instance_id=i&platform=desktop` (el shell) con el mock de A, elegir idioma en el selector, y dentro del iframe `/lb/es?embed=1`: jugar un intento, abrir Ayuda, Estadísticas, ranking y la ventana de idioma, cambiar el tema y el teclado.
+5. **Comprobar:** `window.__csp` vacío en el shell **y** en el iframe, cero peticiones abortadas, el tablero se pinta, el intento se colorea y el SDK se creó **una sola vez**.
 
 ### C. Emular los parámetros y el handshake real (opcional, más fiel)
 - Parámetros: siempre `frame_id`, `instance_id` y `platform` (`desktop` o `mobile`). Para más realismo, también `guild_id`, `channel_id`, `location_id` y `mobile_app_version`.
@@ -327,6 +337,6 @@ Repite en Playwright lo que hace el proxy. Esto detecta CDN externos, fuentes ex
 - El texto exacto del modal de autorización y el código de error al cancelarlo.
 - Límites de velocidad del comando `authorize`.
 - `Host` / `X-Forwarded-Host` en Vercel a través del proxy.
-- Si un segundo handshake (navegación entre páginas) funciona siempre.
+- ~~Si un segundo handshake (navegación entre páginas) funciona siempre.~~ **Resuelto 2026-10-29: no funciona** (el SDK responde a `document.referrer`); por eso el diseño shell + iframe, ver §0 punto 7.
 - Portapapeles, `confirm()` y `localStorage` dentro del iframe en escritorio, iOS y Android.
 - Que el proxy añada el nonce a **todos** los `<script>` en línea. Visto en una app publicada; no está documentado. Si falla, mover los scripts en línea de `game.html` a archivos.
