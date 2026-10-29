@@ -90,3 +90,6 @@ Portal → Activities → Settings → untick **Enable Activities** → Save (go
 3. Change the import in `discord-activity.js` and the version in `tests/test_activity.py` (route patterns, pin test).
 4. Check the names we use still exist: `DiscordSDK`, `Common.OrientationLockStateTypeObject`, `ready`, `commands.authorize/authenticate/setOrientationLockState`, `subscribe('ACTIVITY_LAYOUT_MODE_UPDATE')`, `DiscordSDKMock` in `mock.mjs`.
 5. Full suite (including the CSP test), then real Discord (manual, Parte C). Delete the old folder in a later commit.
+
+## Gotcha: the `lib/` gitignore rule (fixed 2026-10-29)
+The standard Python `.gitignore` has `lib/`, which silently hid the vendored SDK's bundled dependencies (`vendor/discord-embedded-app-sdk-2.5.0/lib/…`: tslib, uuid, zod, …). They existed locally (tests passed) but were never committed, so on Vercel they returned 404, the SDK import failed and the Activity showed "No pudimos conectar con Discord" after the 10 s timeout. `.gitignore` now un-ignores `webapp/static/vendor/**/lib/`, and `tests/test_activity.py::test_vendored_sdk_fully_tracked` fails if any module the SDK imports is not tracked by git. When updating the SDK, run that test before pushing. First debugging step for "stuck connecting": check `vercel logs` for 404s under `/static/vendor/`.

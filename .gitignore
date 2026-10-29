@@ -17,6 +17,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+# ...but keep the vendored Discord SDK, whose bundled dependencies live in lib/
+!webapp/static/vendor/**/lib/
+!webapp/static/vendor/**/lib/**
 lib64/
 parts/
 sdist/

@@ -763,3 +763,34 @@ def test_browser_delete_confirm_is_an_in_page_dialog(lb_env, server, page, disco
     page.wait_for_url("**/?deleted=1")
     assert mem.get_player(P1) is None
     assert dialogs == []  # never a browser confirm()/alert()
+
+
+def test_vendored_sdk_fully_tracked():
+    """Every module the vendored Discord SDK imports must be committed to git.
+
+    Regression: the Python `lib/` rule in .gitignore once hid the SDK's bundled
+    dependencies (lib/tslib, lib/uuid, ...); they existed locally but 404'd on
+    Vercel, so the Activity never connected.
+    """
+    import pathlib
+    import re
+    import subprocess
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    sdk = root / "webapp" / "static" / "vendor"
+    tracked = set(subprocess.run(
+        ["git", "ls-files", "webapp/static/vendor"], cwd=root,
+        capture_output=True, text=True, check=True).stdout.split())
+    spec = re.compile(r"""(?:import|export)[^'"]*?from\s*['"](\.[^'"]+)['"]|import\s*\(\s*['"](\.[^'"]+)['"]""")
+    missing = []
+    for mod in sdk.rglob("*.mjs"):
+        for m in spec.finditer(mod.read_text(encoding="utf-8")):
+            target = (mod.parent / (m.group(1) or m.group(2))).resolve()
+            rel = target.relative_to(root).as_posix()
+            if rel not in tracked:
+                missing.append(f"{mod.relative_to(root).as_posix()} -> {rel}")
+    assert not missing, "vendored SDK imports files that are not in git:\n" + "\n".join(missing[:20])
+    ignored = subprocess.run(
+        ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "webapp/static/vendor"],
+        cwd=root, capture_output=True, text=True, check=True).stdout.split()
+    assert not ignored, f"git ignores vendored files: {ignored[:10]}"
