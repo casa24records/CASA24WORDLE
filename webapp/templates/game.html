@@ -2,6 +2,9 @@
 {% macro t(key, default) %}{{ language.config.text.get(key, default) | trim }}{% endmacro %}
 {% import '_discord.html' as dc %}
 {% set me = lb_user if (lb_enabled is defined and lb_enabled and lb_user is defined and lb_user) else none %}
+{#- inside the Discord Activity (app.py is_activity()): automatic login, no login/logout menu,
+    leaderboard and language in windows of this page (no extra page loads) -#}
+{% set in_activity = C24_ACTIVITY is defined and C24_ACTIVITY and lb is defined and lb %}
 <!DOCTYPE html>
 <html lang="{{ language.language_code }}">
 
@@ -44,27 +47,21 @@
     <script src="{{ asset('theme.js') }}"></script>
     {% if lb_enabled %}{{ dc.script(me) }}{% endif %}
 
-    <!-- backend data: raw UTF-8 JSON (see json_script in app.py) -->
+    <!-- backend data: raw UTF-8 JSON (see json_script in app.py). JSON only, no inline code:
+         the Discord Activity's CSP runs only files from our origin. game.js reads both blocks. -->
     <script type="application/json" id="c24-data">{{ json_script({"word_list": language.word_list, "word_list_supplement": language.word_list_supplement, "characters": language.characters, "config": language.config}) }}</script>
-    <script>
-        const c24_data = JSON.parse(document.getElementById("c24-data").textContent);
-        const word_list = c24_data.word_list;
-        const word_list_supplement = c24_data.word_list_supplement;
-        const characters = c24_data.characters;
-        const config = c24_data.config;
-        const todays_idx = "{{ language.todays_idx }}";
-        const todays_word = "{{ language.daily_word }}";
-        const KOLO_BASE = "{{ url_for('static', filename='images/kolo/') }}";
-        const ASSET_V = "{{ asset_version('images/kolo/') }}";  // version of the whole kolo/ folder
-        const DEMO = {{ 'true' if demo else 'false' }};  // Developer view: same game + Restart / Fill in word buttons; nothing is saved
-        const LB = {{ 'true' if lb else 'false' }};  // leaderboard game (/lb/<lang>, any language): the server checks every guess; nothing is saved locally
-        const LB_ENABLED = {{ 'true' if lb_enabled else 'false' }};
-    </script>
+    <!-- page settings: todays_word is "" in the leaderboard game (the server colors guesses);
+         demo = Developer view; lb = leaderboard game (/lb/<lang>); activity = inside Discord -->
+    <script type="application/json" id="c24-page">{{ json_script({"todays_idx": language.todays_idx | string, "todays_word": language.daily_word, "kolo_base": url_for('static', filename='images/kolo/'), "asset_v": asset_version('images/kolo/'), "demo": (demo is defined and demo) and true or false, "lb": (lb is defined and lb) and true or false, "lb_enabled": (lb_enabled is defined and lb_enabled) and true or false, "activity": in_activity and true or false}) }}</script>
     <!-- leaderboard game: today's guesses so far, from the server ({"guesses", "done", "won", "answer", "points", "rank"}) -->
     <script type="application/json" id="c24-lb-state">{{ json_script(lb_state if (lb and lb_state is defined) else none) }}</script>
+    {% if in_activity %}
+    <!-- Discord Activity: public app ID (never the secret) and the languages for the language window -->
+    <script type="application/json" id="c24-activity">{{ json_script({"client_id": activity_client_id, "lang": language.language_code, "langs": activity_langs | map(attribute='code') | list}) }}</script>
+    {% endif %}
 </head>
 
-<body class="c24-game-page">
+<body class="c24-game-page{% if in_activity %} c24-activity{% endif %}">
     <!-- data-public-origin: the canonical public address for share links (public_url() in app.py) -->
     <div id="app" data-public-origin="{{ public_url }}">
         <!-- Header, board and keyboard: one centered column that fills the screen (style.css "game layout") -->
@@ -72,7 +69,12 @@
             <!-- The Header: 3 columns (help / title / stats + settings), so nothing overlaps -->
             <header class="c24-header{% if lb %} c24-header-lb{% endif %} border-b border-neutral-300">
                 <div class="c24-header-side">
-                    {% if lb %}
+                    {% if in_activity %}
+                    <!-- inside Discord: the leaderboard opens in a window (no login menu, no page change) -->
+                    <button type="button" class="c24-icon-btn" data-activity-board-open
+                        aria-label="{{ t('lb_view', 'View leaderboard') }}" title="{{ t('lb_view', 'View leaderboard') }}"
+                        v-on:click="openBoard">{{ dc.trophy() }}</button>
+                    {% elif lb %}
                     {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
                         t('lb_account', 'Your Discord account'), t('lb_signin', 'Sign in with Discord'),
                         t('lb_view', 'View leaderboard'), t('lb_logout', 'Log out')) }}
@@ -89,7 +91,7 @@
                         </svg>
                     </button>
                 </div>
-                <h1 class="c24-title c24-header-title uppercase"><a href="/" class="inline-flex items-center gap-2">
+                <h1 class="c24-title c24-header-title uppercase"><a href="{{ aq('/') }}" class="inline-flex items-center gap-2">
                         <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
                         <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
                         <span class="c24-title-text">Casa 24</span>
@@ -214,7 +216,7 @@
         {% endif %}
 
         <!-- NOTIFICATIONS & MODALS-->
-        <div v-show="showHelpModal || show_stats_modal || show_options_modal" class="c24-backdrop" v-cloak></div>
+        <div v-show="showHelpModal || show_stats_modal || show_options_modal || board_open || share_open" class="c24-backdrop" v-cloak></div>
 
         <!-- help modal -->
         <div id="HelpModal" v-show="showHelpModal" class="c24-modal-wrap" v-cloak>
@@ -332,10 +334,11 @@
                         <div class="border-t-2 border-gray-300"></div>
                         <form method="get" class="flex flex-row items-center"
                             aria-label="Keyboard layout selector">
+                            {% for k, v in activity_params %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
                             <p id="keyboard-layout-label" class="flex-grow">{{ t('keyboard_layout', 'Keyboard layout') }}</p>
                             <select id="keyboard-layout-select" name="layout" aria-labelledby="keyboard-layout-label"
                                 class="border border-neutral-300 rounded px-2 py-1 bg-white"
-                                onchange="this.form.submit()">
+                                data-autosubmit>
                                 {% for layout_name, layout_meta in language.keyboard_layouts.items() %}
                                 <option value="{{ layout_name }}"
                                     {% if layout_name == language.keyboard_layout_name %}selected{% endif %}>
@@ -344,6 +347,20 @@
                                 {% endfor %}
                             </select>
                         </form>
+                        {% endif %}
+
+                        {% if in_activity and activity_langs %}
+                        <!-- inside Discord there is no menu page: change language here -->
+                        <div class="border-t-2 border-gray-300"></div>
+                        <div class="flex flex-row items-center">
+                            <p id="activity-lang-label" class="flex-grow">{{ t('language', 'Language') }}</p>
+                            <select id="activity-lang-select" aria-labelledby="activity-lang-label" class="rounded border px-2 py-1"
+                                data-nav-select data-activity-lang>
+                                {% for l in activity_langs %}
+                                <option value="{{ aq('/lb/' ~ l.code) }}" lang="{{ l.code }}"{% if l.code == language.language_code %} selected{% endif %}>{{ l.name_native }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         {% endif %}
 
                         {% if not lb %}
@@ -359,7 +376,7 @@
                         <div class="flex flex-row items-center">
                             <p id="theme-label" class="flex-grow">{{ t('theme', 'Theme') }}</p>
                             <select id="theme-select" aria-labelledby="theme-label" class="rounded border px-2 py-1"
-                                onchange="casa24SetTheme(this.value)">
+                                data-theme-select>
                                 <option value="auto">{{ t('theme_auto', 'Automatic') }}</option>
                                 <option value="light">{{ t('theme_light', 'Light') }}</option>
                                 <option value="dark">{{ t('theme_dark', 'Dark') }}</option>
@@ -429,7 +446,11 @@
                             <p class="c24-lb-small">[[ lb_points === 1 ? {{ t('lb_point_label', 'point')|tojson }} : {{ t('lb_points_label', 'points')|tojson }} ]]</p>
                         </div>
                     </div>
+                    {% if in_activity %}
+                    <button type="button" class="c24-lb-link" data-activity-board-link v-on:click="openBoard">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_view', 'View leaderboard') }} →</button>
+                    {% else %}
                     <a href="/leaderboard?tab={{ language.config.language_code }}" class="c24-lb-link">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_view', 'View leaderboard') }} →</a>
+                    {% endif %}
                 </div>
                 {% else %}
                 <div class="flex flex-row justify-center items-start gap-2 border-t border-solid px-3 py-5">
@@ -467,6 +488,72 @@
             </div>
         </div>
 
+        {% if in_activity %}
+        <!-- Discord Activity: the leaderboard in a window (GET /api/leaderboard, same numbers as /leaderboard) -->
+        <div v-show="board_open" class="c24-modal-wrap" data-activity-board v-cloak>
+            <div class="c24-modal bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
+                aria-modal="true" aria-labelledby="board-title">
+                <button type="button" class="c24-close" aria-label="{{ t('lb_dismiss', 'Close') }}"
+                    v-on:click="board_open = false">×</button>
+                <h3 id="board-title" class="c24-board-title uppercase font-bold text-xl tracking-wider">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_title', 'Leaderboard') }}</h3>
+                <nav class="c24-board-tabs" aria-label="{{ t('lb_title', 'Leaderboard') }}">
+                    <button type="button" class="c24-lb-tab" data-board-tab="{{ language.language_code }}"
+                        v-bind:class="{ 'is-active': board_tab === '{{ language.language_code }}' }"
+                        v-on:click="loadBoard('{{ language.language_code }}')">{{ language.config.name_native }}</button>
+                    <button type="button" class="c24-lb-tab" data-board-tab="all"
+                        v-bind:class="{ 'is-active': board_tab === 'all' }"
+                        v-on:click="loadBoard('all')">{{ t('lb_tab_all', 'Combined') }}</button>
+                </nav>
+                <p v-if="board_error" class="c24-lb-empty">{{ t('lb_error', 'Something went wrong. Please try again.') }}</p>
+                <p v-else-if="board_loading" class="c24-lb-empty">…</p>
+                <p v-else-if="board_rows.length === 0" class="c24-lb-empty" data-board-empty>{{ t('lb_empty', 'No games yet.') }}</p>
+                <table v-else class="c24-lb-table" data-board-table>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="c24-lb-n">#</th>
+                            <th scope="col" class="c24-lb-name">{{ t('lb_col_player', 'Player') }}</th>
+                            <th scope="col" class="c24-lb-num">{{ t('lb_col_points', 'Points') }}</th>
+                            <th scope="col" class="c24-lb-num c24-lb-opt1">{{ t('lb_col_wins', 'Wins') }}</th>
+                            <th scope="col" class="c24-lb-num c24-lb-opt2">{{ t('lb_col_streak', 'Streak') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in board_rows" v-bind:key="row.rank + ':' + row.username"
+                            v-bind:class="{ 'is-me': row.is_me }">
+                            <td class="c24-lb-n">[[ row.rank ]]</td>
+                            <td class="c24-lb-name"><span class="c24-lb-user" dir="ltr">@[[ row.username ]]</span>
+                                <span v-if="row.is_me" class="c24-lb-you">{{ t('lb_you', 'You') }}</span></td>
+                            <td class="c24-lb-num c24-lb-pts">[[ row.points ]]</td>
+                            <td class="c24-lb-num c24-lb-opt1">[[ row.wins ]]</td>
+                            <td class="c24-lb-num c24-lb-opt2"><span v-if="row.current_streak">🔥 </span>[[ row.current_streak ]]</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p v-if="board_me && !board_loading && !board_error" class="c24-lb-me" data-board-me>
+                    {{ t('lb_my_position', 'Your position') }}: <b>#[[ board_me.rank ]]</b> · [[ board_me.points ]] {{ t('lb_col_points', 'Points') | lower }}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- share text to copy by hand, when the browser can neither share nor copy
+             (and inside Discord when copying fails): no alert box, no new windows -->
+        <div v-show="share_open" class="c24-modal-wrap" data-share-dialog v-cloak>
+            <div class="c24-modal c24-modal-sm bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
+                aria-modal="true" aria-labelledby="share-title">
+                <button type="button" class="c24-close" aria-label="{{ t('lb_dismiss', 'Close') }}"
+                    v-on:click="share_open = false">×</button>
+                <div class="flex flex-col gap-2">
+                    <h3 id="share-title" class="uppercase font-bold text-xl tracking-wider">{{ language.config.text.share }}</h3>
+                    <p class="text-sm">{{ t('notification-share-unsupported', "Sorry, your browser doesn't support sharing. Please copy the text and share it yourself.") }}</p>
+                    <textarea class="c24-share-text" readonly rows="9" data-share-text v-bind:value="share_text"
+                        aria-labelledby="share-title"></textarea>
+                    <button type="button" class="c24-text-btn uppercase font-bold text-sm tracking-wider"
+                        v-on:click="share_open = false">{{ language.config.help.close }}</button>
+                </div>
+            </div>
+        </div>
+
         <!-- alert that floats slowly down from the top and closes after 3 seconds
              (game.js moves it with notification.top; tests find it as "#app .fixed.top-0 p.font-bold") -->
         <div v-if="notification.show" class="fixed top-0 c24-toast" role="status" aria-live="polite" v-cloak>
@@ -477,15 +564,27 @@
         </div>
     </div>
 
-    <!-- JS -->
+    {% if in_activity %}
+    <!-- Discord Activity: shown until the automatic Discord login is done (discord-activity.js).
+         Only "Try again" after a refusal or an error; there is no login button and no guest mode. -->
+    <div id="c24-activity-overlay" class="c24-activity-overlay" data-state="loading" role="status" aria-live="polite">
+        <div class="c24-activity-box">
+            <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="" class="c24-activity-kolo">
+            <p class="c24-activity-msg" data-when="loading"><span lang="es">Conectando con Discord…</span> <span lang="en">Connecting to Discord…</span></p>
+            <p class="c24-activity-msg" data-when="denied"><span lang="es">Para jugar en Discord necesitamos tu permiso (solo tu nombre de usuario).</span> <span lang="en">To play in Discord we need your permission (only your username).</span></p>
+            <p class="c24-activity-msg" data-when="error"><span lang="es">No pudimos conectar con Discord. Intenta de nuevo, o cierra y vuelve a abrir la actividad.</span> <span lang="en">We couldn't connect to Discord. Try again, or close and reopen the activity.</span></p>
+            <button type="button" class="c24-activity-retry" data-activity-retry>Intentar de nuevo / Try again</button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- JS (the theme menu's saved value and its change handler live in theme.js) -->
     <script defer src="{{ asset('game.js') }}"></script>
-    <script>
-        // after the deferred Vue + game.js have mounted the page
-        document.addEventListener("DOMContentLoaded", function () {
-            var select = document.getElementById("theme-select");
-            if (select) select.value = casa24GetTheme();
-        });
-    </script>
+    {% if in_activity %}
+    <!-- Discord Activity only: the Discord SDK (static/vendor, our origin) and the automatic login.
+         Never loaded on the web (no frame_id / instance_id / platform in the URL). -->
+    <script type="module" src="{{ asset('discord-activity.js') }}"></script>
+    {% endif %}
 </body>
 
 </html>

@@ -233,7 +233,9 @@ def test_7_panama_day_change_new_empty_game(lb_env, client, discord, mem, today,
 
 
 def test_8_guest_web_pages_write_nothing(lb_env, client, discord, mem):
-    paths = ["/", "/es", "/en", "/ko", "/es?frame_id=abc&instance_id=i&platform=desktop", "/leaderboard"]
+    # (platform=tv is not a Discord Activity: still the guest game; inside the
+    # Activity /es redirects to the leaderboard game, see test_activity.py)
+    paths = ["/", "/es", "/en", "/ko", "/es?frame_id=abc&instance_id=i&platform=tv", "/leaderboard"]
     for path in paths:
         assert client.get(path).status_code == 200, path
     assert client.get("/api/state?lang=es").status_code == 401

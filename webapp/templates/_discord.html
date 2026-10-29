@@ -7,8 +7,9 @@
     - dc.privacy_link / dc.privacy_dialog: the "(i) Privacy" link and its dialog
     - dc.toast(...): short notice (login failed/cancelled, data deleted) that closes itself
     - dc.trophy(): line trophy icon (same style as the header icons)
-    - dc.script(lb_user): reads #dc=<avatar hash> after login, keeps it in localStorage
-      (c24_dc_avatar, this browser only) and fills every img[data-dc-avatar].
+    - dc.script(lb_user): static/discord.js (reads #dc=<avatar hash> after login, keeps it in
+      localStorage c24_dc_avatar, this browser only, fills every img[data-dc-avatar], menus,
+      privacy dialog, in-page delete confirmation). No inline JS (Discord Activity CSP).
     Pieces inside the Vue apps carry v-pre so Vue leaves them alone. -#}
 
 {% macro logo(cls='c24-dc-logo') -%}
@@ -37,7 +38,7 @@
 {#- Header slot (top left). Logged in: avatar button with a small menu
     (@username, leaderboard, log out, optionally delete my data). Logged out:
     small Discord login icon. Labels may be markup; aria_* are plain text. -#}
-{% macro header_slot(user, login_href, aria_account, aria_login, view_label, logout_label, delete_label=none, delete_confirm='') -%}
+{% macro header_slot(user, login_href, aria_account, aria_login, view_label, logout_label, delete_label=none, delete_confirm='', cancel_label='Cancelar / Cancel') -%}
 {% if user %}
 <div class="c24-dc-menu" data-dc-menu v-pre>
     <button type="button" class="c24-icon-btn c24-dc-me" data-dc-toggle aria-haspopup="true" aria-expanded="false"
@@ -49,7 +50,7 @@
             <button type="submit" class="c24-dc-pop-item" data-dc-logout><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 8V6a2 2 0 0 0 -2 -2H5a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2"/><path d="M9 12h12l-3 -3"/><path d="M18 15l3 -3"/></svg><span>{{ logout_label }}</span></button>
         </form>
         {% if delete_label %}
-        <form method="post" action="/api/me/delete" data-dc-clear data-confirm="{{ delete_confirm }}" onsubmit="return window.confirm(this.dataset.confirm)">
+        <form method="post" action="/api/me/delete" data-dc-clear data-confirm="{{ delete_confirm }}" data-confirm-ok="{{ delete_label | striptags }}" data-confirm-cancel="{{ cancel_label | striptags }}">
             <button type="submit" class="c24-dc-pop-item c24-dc-pop-danger" data-lb-delete><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg><span>{{ delete_label }}</span></button>
         </form>
         {% endif %}
@@ -84,85 +85,11 @@
 </div>
 {%- endmacro %}
 
-{#- In <head>: handles the #dc= fragment left by the login, the avatar URL,
-    the header menu, and clears the saved avatar on log out / delete. -#}
+{#- In <head>: the logged-in player's ID (JSON, not code) and static/discord.js, which
+    handles the #dc= fragment left by the login, the avatar URL, the header menu, the
+    privacy dialog, the delete confirmation and clears the saved avatar on log out / delete.
+    No inline script: the Discord Activity's CSP only runs files from our origin. -#}
 {% macro script(user) -%}
-<script>
-(function () {
-    var ME = {{ (user.id if user else none) | tojson }};
-    var KEY = "c24_dc_avatar", HASH = /^(a_)?[0-9a-f]{32}$/;
-    function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
-    function save(v) { try { if (v) { localStorage.setItem(KEY, JSON.stringify(v)); } else { localStorage.removeItem(KEY); } } catch (e) { } }
-    // after the Discord login the server sends us to <page>#dc=<avatar hash>
-    var m = /^#dc=([^&]*)$/.exec(window.location.hash);
-    if (m) {
-        var h = m[1];
-        if (ME && HASH.test(h)) { save({ id: ME, hash: h }); }
-        else if (ME && h === "") { save(null); }  // no picture on Discord: default avatar
-        if (window.history.replaceState) { window.history.replaceState(null, "", window.location.pathname + window.location.search); }
-    }
-    function avatarUrl(id) {
-        var s = load();
-        if (s && s.id === id && HASH.test(s.hash || "")) {
-            return "https://cdn.discordapp.com/avatars/" + id + "/" + s.hash + ".png?size=64";
-        }
-        return null;  // keep the picture the server rendered (saved avatar or Discord default)
-    }
-    window.c24DcAvatars = function () {
-        var imgs = document.querySelectorAll("img[data-dc-avatar]");
-        for (var k = 0; k < imgs.length; k++) {
-            var url = avatarUrl(imgs[k].getAttribute("data-dc-id"));
-            if (url && imgs[k].getAttribute("src") !== url) { imgs[k].setAttribute("src", url); }
-        }
-    };
-    // deferred scripts (Vue apps) have mounted by now
-    document.addEventListener("DOMContentLoaded", window.c24DcAvatars);
-    function closeMenus(except) {
-        var open = document.querySelectorAll("[data-dc-pop]:not([hidden])");
-        for (var k = 0; k < open.length; k++) {
-            if (open[k] === except) { continue; }
-            open[k].hidden = true;
-            var b = open[k].parentNode.querySelector("[data-dc-toggle]");
-            if (b) { b.setAttribute("aria-expanded", "false"); }
-        }
-    }
-    document.addEventListener("click", function (e) {
-        var t = e.target.closest ? e.target.closest("[data-dc-toggle]") : null;
-        if (t) {
-            var pop = t.parentNode.querySelector("[data-dc-pop]");
-            closeMenus(pop);
-            pop.hidden = !pop.hidden;
-            t.setAttribute("aria-expanded", pop.hidden ? "false" : "true");
-            t.blur();
-            return;
-        }
-        if (!(e.target.closest && e.target.closest("[data-dc-pop]"))) { closeMenus(null); }
-    });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") { closeMenus(null); } });
-    document.addEventListener("click", function (e) {
-        if (!e.target.closest) { return; }
-        if (e.target.closest("[data-dc-privacy]")) {
-            var d = document.getElementById("c24-privacy");
-            closeMenus(null);
-            if (d && d.showModal) { d.showModal(); } else if (d) { d.setAttribute("open", ""); }
-            return;
-        }
-        var d2 = document.getElementById("c24-privacy");
-        if (d2 && e.target === d2) { d2.close(); }  // tap on the backdrop
-        var x = e.target.closest("[data-c24-toast-close]");
-        if (x) { x.parentNode.remove(); }
-    });
-    // notices close themselves
-    document.addEventListener("DOMContentLoaded", function () {
-        var toasts = document.querySelectorAll("[data-c24-toast]");
-        for (var k = 0; k < toasts.length; k++) {
-            (function (el) { setTimeout(function () { el.classList.add("is-leaving"); setTimeout(function () { el.remove(); }, 300); }, 6000); })(toasts[k]);
-        }
-    });
-    document.addEventListener("submit", function (e) {
-        // log out / delete my data: forget the picture too
-        if (!e.defaultPrevented && e.target.hasAttribute && e.target.hasAttribute("data-dc-clear")) { save(null); }
-    });
-})();
-</script>
+<script type="application/json" id="c24-dc-me">{{ json_script(user.id if user else none) }}</script>
+<script src="{{ asset('discord.js') }}"></script>
 {%- endmacro %}

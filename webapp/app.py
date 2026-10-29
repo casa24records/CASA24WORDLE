@@ -56,7 +56,7 @@ import discord_auth
 import leaderboard as lbrules
 import store as store_mod
 from itsdangerous import URLSafeTimedSerializer, BadSignature
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask.sessions import SecureCookieSessionInterface
 import glob
@@ -210,6 +210,63 @@ def public_url():
 def inject_asset_helpers():
     return {"asset": asset, "asset_version": asset_version, "json_script": json_script,
             "public_url": public_url()}
+
+
+###############################################################################
+# DISCORD ACTIVITY (the game inside Discord, same app and same server)
+###############################################################################
+# Discord opens the Activity as an iframe on https://<client id>.discordsays.com
+# (a proxy to this server) with ?frame_id=...&instance_id=...&platform=... in the
+# URL. Only then is a page "inside the Activity": it loads static/discord-activity.js
+# (the Discord SDK, automatic login), has no guest mode, no login/logout buttons
+# and no Developer view, and every internal link keeps Discord's query (the SDK
+# reads it on every page load). Without those params nothing here changes the web.
+
+ACTIVITY_PLATFORMS = ("desktop", "mobile")
+# our own page params: never carried to the next page by activity_url()
+ACTIVITY_OWN_PARAMS = ("layout", "tab", "lang", "c24_root", "login", "deleted", "skip", "next")
+
+
+def is_activity():
+    """True when Discord's launch params are in the URL (frame_id, instance_id and a
+    valid platform; the SDK refuses any other platform)."""
+    args = request.args
+    return bool(args.get("frame_id") and args.get("instance_id")) \
+        and args.get("platform") in ACTIVITY_PLATFORMS
+
+
+def activity_params():
+    """[(key, value)] of Discord's launch query, to keep on every in-Activity link
+    (everything in the URL except our own page params). [] outside the Activity."""
+    if not is_activity():
+        return []
+    return [(k, v) for k, v in request.args.items(multi=True) if k not in ACTIVITY_OWN_PARAMS]
+
+
+def activity_url(path):
+    """`path` plus Discord's launch query inside the Activity; `path` unchanged on the web."""
+    params = activity_params()
+    if not params:
+        return path
+    base, _, fragment = path.partition("#")
+    url = base + ("&" if "?" in base else "?") + urlencode(params)
+    return url + ("#" + fragment if fragment else "")
+
+
+app.jinja_env.globals.update(asset=asset, json_script=json_script, aq=activity_url)
+
+
+@app.context_processor
+def inject_activity():
+    activity = is_activity()
+    ctx = {"C24_ACTIVITY": activity, "activity_params": activity_params() if activity else [],
+           "activity_langs": []}
+    if activity:
+        # the public app ID for the SDK (never the secret) and the language window's list
+        ctx["activity_client_id"] = discord_auth.client_id()
+        ctx["activity_langs"] = [{"code": c, "name_native": language_configs[c]["name_native"]}
+                                 for c in LB_LANGS]
+    return ctx
 
 
 ###############################################################################
@@ -505,6 +562,14 @@ class Language:
 
 @app.route("/")
 def index():
+    if is_activity() and lb_enabled():
+        # inside Discord: straight to the leaderboard game (no menu, no guest mode),
+        # keeping Discord's query. No ?lang: Spanish, and c24_root=1 lets game.js
+        # switch once to the language this device played last.
+        lang = request.args.get("lang")
+        extra = [] if lang in LB_LANGS else [("c24_root", "1")]
+        query = urlencode(list(request.args.items(multi=True)) + extra)
+        return _no_store(redirect(f"/lb/{lang if lang in LB_LANGS else 'es'}?{query}"))
     return render_template(
         "index.html",
         languages=languages,
@@ -581,7 +646,10 @@ def demo_game(lang_code):
 def language(lang_code):
     if lang_code not in language_codes:
         # removed or unknown languages go back to the menu instead of an error
-        return redirect("/")
+        return redirect(activity_url("/"))
+    if is_activity() and lb_enabled() and lang_code in LB_LANGS:
+        # no guest games inside Discord: the same language's leaderboard game
+        return _no_store(redirect(activity_url(f"/lb/{lang_code}")))
     word_list = language_codes_5words[lang_code]
     cookie_key = f"keyboard_layout_{lang_code}"
     requested_layout = request.args.get("layout") or request.cookies.get(cookie_key)
@@ -667,9 +735,21 @@ def _serializer(salt):
     return URLSafeTimedSerializer(lb_secret(), salt=salt)
 
 
+def _lb_session_value():
+    """The signed session: `Authorization: Bearer <signed id>` (the Discord Activity,
+    where our cookies don't travel) or else the c24_lb cookie (the web). When the
+    header is there it is the only thing read, never mixed with a cookie."""
+    header = request.headers.get("Authorization")
+    if header is not None:
+        scheme, _, value = header.strip().partition(" ")
+        return value.strip() if scheme.lower() == "bearer" else ""
+    return request.cookies.get(LB_COOKIE)
+
+
 def lb_player_id():
-    """Discord ID from the signed c24_lb cookie (the cookie holds nothing else)."""
-    raw = request.cookies.get(LB_COOKIE)
+    """Discord ID from the signed session (cookie or Bearer header; same signature,
+    salt and 30-day max age; it holds nothing else). The one place that decides who is playing."""
+    raw = _lb_session_value()
     if not raw or not lb_secret():
         return None
     try:
@@ -721,12 +801,25 @@ def inject_leaderboard():
     return {"lb_enabled": enabled, "lb_user": user}
 
 
+def _discordsays_host():
+    """<client id>.discordsays.com: Discord's proxy for our Activity (None without a client ID)."""
+    cid = discord_auth.client_id()
+    return f"{cid}.discordsays.com" if cid.isdigit() else None
+
+
 def _same_origin():
-    """False when the browser says the POST came from another site."""
+    """False when the browser says the POST came from another site. Our own host,
+    or exactly https://<DISCORD_CLIENT_ID>.discordsays.com (the Activity's proxy)."""
     for header in ("Origin", "Referer"):
         value = request.headers.get(header)
         if value:
-            return value != "null" and urlparse(value).netloc == request.host
+            if value == "null":
+                return False
+            parsed = urlparse(value)
+            if parsed.netloc == request.host:
+                return True
+            proxy = _discordsays_host()
+            return bool(proxy) and parsed.scheme == "https" and parsed.netloc == proxy
     return True
 
 
@@ -945,7 +1038,16 @@ def lb_game(lang_code):
     if not lb_enabled():
         abort(404)
     if lang_code not in LB_LANGS:
-        return redirect("/lb/es")
+        return redirect(activity_url("/lb/es"))
+    cookie_key = f"keyboard_layout_{lang_code}"
+    if is_activity():
+        # inside Discord: no cookie travels, so the page is an empty board; after the
+        # automatic login (discord-activity.js) game.js asks GET /api/state with the session
+        language = Language(lang_code, language_codes_5words[lang_code], request.args.get("layout"))
+        language.daily_word = ""
+        response = make_response(render_template(
+            "game.html", language=language, demo=False, lb=True, lb_state=None, lb_user=None))
+        return _no_store(response)
     st = lb_store()
     user = lb_current_user(st)
     if not user:
@@ -953,7 +1055,6 @@ def lb_game(lang_code):
     refresh = lb_avatar_refresh(user, f"/lb/{lang_code}")
     if refresh is not None:
         return refresh
-    cookie_key = f"keyboard_layout_{lang_code}"
     language = Language(lang_code, language_codes_5words[lang_code],
                         request.args.get("layout") or request.cookies.get(cookie_key))
     language.daily_word = ""  # the browser never gets the answer; the server colors guesses
@@ -1071,6 +1172,49 @@ def api_state():
     return _no_store(jsonify(state))
 
 
+ACTIVITY_TOKEN_PER_MINUTE = 120  # all Activity logins together (no IPs kept): a small global budget
+
+
+@app.route("/api/activity/token", methods=["POST"])
+def api_activity_token():
+    """Discord Activity login: the SDK's authorize() code -> Discord token -> who is it.
+
+    Body {"code"}. Answers {"access_token", "session", "user": {"username"}}:
+    the access token goes back only so the browser can call the SDK's
+    authenticate(); it is never stored or logged here. "session" is the same
+    signed ID as the c24_lb cookie, sent back as `Authorization: Bearer`.
+    Stored: ID, username, avatar hash (Discord's format only), like the web login."""
+    if not lb_enabled():
+        return _err("disabled", 404)
+    if not _same_origin():
+        return _err("forbidden", 403)
+    body = request.get_json(silent=True)
+    code = body.get("code") if isinstance(body, dict) else None
+    if not isinstance(code, str) or not 0 < len(code) <= 200 or not code.isprintable():
+        return _err("bad_request", 400)
+    st = lb_store()
+    try:
+        if st.rate_hit("activity", int(time.time() // 60), "token") > ACTIVITY_TOKEN_PER_MINUTE:
+            return _err("rate", 429)
+    except store_mod.StoreError:
+        return _err("store", 503)
+    try:
+        # no redirect_uri: the Embedded App SDK's codes are exchanged without one
+        token = discord_auth.exchange_code(code, None)
+        discord_id, username, avatar_hash = discord_auth.parse_me(discord_auth.fetch_me(token))
+    except Exception:
+        return _err("discord", 400)  # nothing logged: messages could carry request details
+    try:
+        st.upsert_player(discord_id, username, avatar_hash)
+    except store_mod.StoreError:
+        return _err("store", 503)
+    response = jsonify({"access_token": token,
+                        "session": _serializer("c24-lb").dumps(discord_id),
+                        "user": {"username": username}})
+    del token
+    return _no_store(response)
+
+
 def lb_avatar_url(discord_id, avatar_hash):
     """Discord CDN picture (64 px), or Discord's default avatar when there is no hash."""
     if isinstance(avatar_hash, str) and AVATAR_HASH_RE.fullmatch(avatar_hash):
@@ -1144,6 +1288,42 @@ def lb_tabs():
             for code in LB_LANGS] + [{"code": "all", "name_native": None}]
 
 
+def lb_board(st, tab, me_id):
+    """(top rows, my row when I'm not in them) for one tab: the /leaderboard page
+    and GET /api/leaderboard use the same numbers."""
+    _, today_idx = lb_today()
+    rows = _lb_rows(st, st.leaderboard(tab, TOP_N), tab, today_idx, me_id)
+    me_row = None
+    if me_id and not any(r["is_me"] for r in rows):
+        mine = st.standing(me_id, tab)
+        if mine:
+            me_row = _lb_rows(st, [mine], tab, today_idx, me_id)[0]
+    return rows, me_row
+
+
+BOARD_FIELDS = ("rank", "username", "points", "wins", "played", "current_streak", "best_streak", "is_me")
+
+
+@app.route("/api/leaderboard")
+def api_leaderboard():
+    """The /leaderboard table as JSON (the Discord Activity shows it in a window
+    instead of opening another page). Public like the page; with a session
+    (cookie or Bearer) the player's own row is marked. No Discord IDs."""
+    if not lb_enabled():
+        return _err("disabled", 404)
+    tab = request.args.get("tab", "all")
+    if tab not in LB_TABS:
+        return _err("bad_tab", 400)
+    st = lb_store()
+    try:
+        rows, me_row = lb_board(st, tab, lb_player_id())
+    except store_mod.StoreError:
+        return _err("store", 503)
+    pick = lambda r: {k: r[k] for k in BOARD_FIELDS}  # noqa: E731
+    return _no_store(jsonify({"tab": tab, "rows": [pick(r) for r in rows],
+                              "me": pick(me_row) if me_row else None}))
+
+
 @app.route("/leaderboard")
 def leaderboard_page():
     if not lb_enabled():
@@ -1152,15 +1332,10 @@ def leaderboard_page():
     if tab not in LB_TABS:
         tab = "all"
     st = lb_store()
-    user = lb_current_user(st)
+    # inside the Activity no cookie travels: the public table (the game shows yours)
+    user = None if is_activity() else lb_current_user(st)
     me_id = user["id"] if user else None
-    _, today_idx = lb_today()
-    rows = _lb_rows(st, st.leaderboard(tab, TOP_N), tab, today_idx, me_id)
-    me_row = None
-    if me_id and not any(r["is_me"] for r in rows):
-        mine = st.standing(me_id, tab)
-        if mine:
-            me_row = _lb_rows(st, [mine], tab, today_idx, me_id)[0]
+    rows, me_row = lb_board(st, tab, me_id)
     text_langs = LB_TEXT_FALLBACK + ((tab,) if tab in LB_LANGS and tab not in LB_TEXT_FALLBACK else ())
     response = make_response(render_template(
         "leaderboard.html", tab=tab, rows=rows, me_row=me_row,

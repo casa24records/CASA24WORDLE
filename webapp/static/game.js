@@ -1,5 +1,63 @@
-// Casa 24 Wordle game page (Vue 3). Word lists, characters and config come
-// from Jinja as globals in game.html.
+// Casa 24 Wordle game page (Vue 3). Word lists, characters, config and page
+// settings come from the JSON blocks #c24-data and #c24-page in game.html (data,
+// not code: no inline scripts, so the Discord Activity's CSP can run the page).
+
+function readJson(id) {
+    try { return JSON.parse(document.getElementById(id).textContent); } catch (e) { return null; }
+}
+const c24_data = readJson("c24-data") || {};
+const c24_page = readJson("c24-page") || {};
+const word_list = c24_data.word_list || [];
+const word_list_supplement = c24_data.word_list_supplement || [];
+const characters = c24_data.characters || [];
+const config = c24_data.config || {};
+const todays_idx = String(c24_page.todays_idx || "");
+const todays_word = c24_page.todays_word || "";  // "" in the leaderboard game: the server colors guesses
+const KOLO_BASE = c24_page.kolo_base || "/static/images/kolo/";
+const ASSET_V = c24_page.asset_v || "";  // version of the whole kolo/ folder
+const DEMO = c24_page.demo === true;  // Developer view: same game + Restart / Fill in word buttons; nothing is saved
+const LB = c24_page.lb === true;  // leaderboard game (/lb/<lang>, any language): the server checks every guess; nothing is saved locally
+const LB_ENABLED = c24_page.lb_enabled === true;
+// Inside the Discord Activity (app.py is_activity()): discord-activity.js logs in
+// automatically and exposes window.C24Activity ({session, ready, fetch, reauth});
+// every leaderboard request waits for it and carries the session header.
+const ACTIVITY = c24_page.activity === true && LB;
+
+function activityReady() {
+    // resolves once the Discord login is done (right away on the web)
+    if (!ACTIVITY) { return Promise.resolve(); }
+    if (window.C24Activity) { return window.C24Activity.ready; }
+    return new Promise(function (resolve) {
+        window.addEventListener("c24activity", function () { resolve(window.C24Activity.ready); }, { once: true });
+    });
+}
+
+function lbFetch(url, opts) {
+    // the one way game.js talks to /api/*: web = same-origin cookie; Discord = Bearer session
+    opts = Object.assign({ credentials: "same-origin" }, opts || {});
+    if (!ACTIVITY) { return fetch(url, opts); }
+    return activityReady().then(function () { return window.C24Activity.fetch(url, opts); });
+}
+
+if (ACTIVITY) {
+    // "/" inside Discord lands on /lb/es?...&c24_root=1: go once to the language this
+    // device played last (read before this page saves its own), then drop the marker.
+    (function () {
+        var params = new URLSearchParams(window.location.search);
+        if (!params.has("c24_root")) { return; }
+        params.delete("c24_root");
+        var saved = null;
+        try { saved = localStorage.getItem("casa24_lang"); } catch (e) { }
+        var langs = (readJson("c24-activity") || {}).langs || [];
+        var query = params.toString();
+        if (saved && saved !== config.language_code && langs.indexOf(saved) >= 0) {
+            window.C24_LEAVING = true;  // discord-activity.js: don't start the SDK on this page
+            window.location.replace("/lb/" + saved + (query ? "?" + query : ""));
+        } else if (window.history.replaceState) {
+            window.history.replaceState(null, "", window.location.pathname + (query ? "?" + query : "") + window.location.hash);
+        }
+    })();
+}
 
 // Kolo shown on the end screen, one picked at random per game. These must match
 // the files in static/images/kolo/win/ and lose/ (scripts/brand_assets.py makes them).
@@ -60,7 +118,7 @@ function livePlayer(p, rtl) {
 // and when the Panama date changes (new word: empty board and keyboard).
 const SYNC_MIN_GAP = 5000;
 const SYNC_EVERY = 60000;
-const SYNC = { busy: false, at: 0, gen: 0, stopped: false };
+const SYNC = { busy: false, at: 0, gen: 0, stopped: false, reauthed: false };
 const EMPTY_TILE = "border-2 border-neutral-300";
 
 function panamaDate(ms) {
@@ -179,6 +237,15 @@ const app = Vue.createApp({
             live_count: 0,
             live_loaded: false, // first answer arrived (shows the empty state)
             live_open: false,   // narrow screens: the bottom sheet is open
+            lb_ready: !ACTIVITY, // Discord Activity: typing waits for the first state from the server
+            board_open: false,  // Discord Activity: leaderboard window
+            board_tab: "",
+            board_rows: [],
+            board_me: null,
+            board_loading: false,
+            board_error: false,
+            share_open: false,  // share text to copy by hand
+            share_text: "",
         }
     },
     computed: {
@@ -214,16 +281,21 @@ const app = Vue.createApp({
         // listen for any keypresses
         window.addEventListener('keydown', this.keyDown);
 
-        // load results
-        if (localStorage.getItem("game_results") === null) {
+        // load results (storage can be blocked, e.g. inside some iframes: then start empty)
+        try {
+            if (localStorage.getItem("game_results") === null) {
+                this.game_results = {};
+                this.game_results[this.config.language_code] = [];
+                localStorage.setItem("game_results", JSON.stringify(this.game_results));
+            } else {
+                this.game_results = JSON.parse(localStorage.getItem("game_results"));
+                if (!this.game_results[this.config.language_code]) {
+                    this.game_results[this.config.language_code] = [];
+                }
+            }
+        } catch (e) {
             this.game_results = {};
             this.game_results[this.config.language_code] = [];
-            localStorage.setItem("game_results", JSON.stringify(this.game_results));
-        } else {
-            this.game_results = JSON.parse(localStorage.getItem("game_results"));
-            if (!this.game_results[this.config.language_code]) {
-                this.game_results[this.config.language_code] = [];
-            }
         }
 
         //calculate stats
@@ -244,7 +316,11 @@ const app = Vue.createApp({
                 }
             }
         }, 1000);
-        if (LB) {
+        if (ACTIVITY) {
+            // inside Discord the page has no state: ask the server once logged in
+            activityReady().then(this.activityFirstLoad);
+            this.activityWatchdog();
+        } else if (LB) {
             this.restoreLb(LB_STATE);
         } else {
             this.loadFromLocalStorage();
@@ -272,10 +348,12 @@ const app = Vue.createApp({
     },
     methods: {
         async shareResults() {
-            // share text, e.g. "Casa 24 Wordle ES #123 3/6" + link + emoji grid
+            // share text, e.g. "Casa 24 Wordle ES #123 3/6" + link + emoji grid.
+            // Web: the system share sheet, else copy. Inside Discord: copy only (no new
+            // windows from the iframe). Can't copy: a window with the text to copy by hand.
             this.emoji_board = this.getEmojiBoard();
             var text_to_share = "Casa 24 Wordle " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + PUBLIC_ORIGIN + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
-            if (navigator.share) {
+            if (navigator.share && !ACTIVITY) {
                 try {
                     await navigator.share({
                         text: text_to_share,
@@ -283,17 +361,87 @@ const app = Vue.createApp({
                 } catch (error) {
                     console.log('Error sharing: ', error);
                 }
-            } else if (navigator.clipboard) {
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
                 try {
                     await navigator.clipboard.writeText(text_to_share);
                     this.showNotification(this.text("notification-copied", "Copied to clipboard"));
                 } catch (error) {
-                    console.log('Error copying: ', error);
+                    this.openShareText(text_to_share);
                 }
             } else {
-                console.log("No navigator.share or navigator.clipboard");
-                alert(this.text("notification-share-unsupported", "Sorry, your browser doesn't support sharing. Please copy the text and share it yourself."));
+                this.openShareText(text_to_share);
             }
+        },
+        openShareText(text) {
+            // the share text in a window, selected, to copy by hand
+            this.share_text = text;
+            this.share_open = true;
+            this.$nextTick(() => {
+                var area = document.querySelector("[data-share-text]");
+                if (area) { area.focus(); area.select(); }
+            });
+        },
+        openBoard() {
+            // Discord Activity: the leaderboard in a window of this page
+            this.show_stats_modal = false;
+            this.board_open = true;
+            this.loadBoard(this.board_tab || this.config.language_code);
+        },
+        loadBoard(tab) {
+            this.board_tab = tab;
+            this.board_loading = true;
+            this.board_error = false;
+            lbFetch("/api/leaderboard?tab=" + encodeURIComponent(tab), {
+                cache: "no-store",
+                headers: { "Accept": "application/json" },
+            }).then((response) => response.ok ? response.json() : null).then((data) => {
+                if (this.board_tab !== tab) { return; }  // another tab was picked meanwhile
+                this.board_loading = false;
+                if (!data || !Array.isArray(data.rows)) {
+                    this.board_error = true;
+                    return;
+                }
+                this.board_rows = data.rows.slice(0, 100);
+                this.board_me = data.me || null;
+            }).catch(() => {
+                if (this.board_tab === tab) {
+                    this.board_loading = false;
+                    this.board_error = true;
+                }
+            });
+        },
+        activityFirstLoad() {
+            // first state after the Discord login; retried until the server answers
+            this.loadState(true).then(() => {
+                if (!this.lb_ready && !SYNC.stopped) { setTimeout(this.activityFirstLoad, 3000); }
+            });
+        },
+        activityWatchdog() {
+            // discord-activity.js never ran (blocked or failed to load): say so, offer a reload
+            setTimeout(() => {
+                if (window.C24Activity || window.C24_LEAVING) { return; }
+                var overlay = document.getElementById("c24-activity-overlay");
+                if (!overlay) { return; }
+                overlay.setAttribute("data-state", "error");
+                var retry = overlay.querySelector("[data-activity-retry]");
+                if (retry) { retry.addEventListener("click", function () { window.location.reload(); }); }
+            }, 20000);
+        },
+        activityReauth() {
+            // Discord Activity: session refused (401). Log in again silently, once per page.
+            if (!ACTIVITY || SYNC.reauthed || !window.C24Activity || !window.C24Activity.reauth) {
+                return false;
+            }
+            SYNC.reauthed = true;
+            window.C24Activity.reauth().then((ok) => {
+                if (ok) {
+                    SYNC.stopped = false;
+                    LIVE.stopped = false;
+                    this.loadState(true);
+                    this.liveFetch();
+                }
+            });
+            return true;
         },
         get_time_until_next_day() {
             // returns time until the next day in Panama (UTC-5) formatted as "h m s"
@@ -454,6 +602,8 @@ const app = Vue.createApp({
                 this.showHelpModal = false;
                 this.show_stats_modal = false;
                 this.show_options_modal = false;
+                this.board_open = false;
+                this.share_open = false;
                 return;
             }
             // shortcuts (Ctrl+R, Cmd+C...) and IME composition are not typing;
@@ -469,7 +619,7 @@ const app = Vue.createApp({
             }
             key = this.normalizeKey(key);
 
-            if (this.game_over || this.revealing || this.lb_busy) {
+            if (this.game_over || this.revealing || this.lb_busy || !this.lb_ready) {
                 return;
             }
             // console.log('keyDown', this.active_cell, this.active_row, event.key);
@@ -627,6 +777,7 @@ const app = Vue.createApp({
             if (!state || !Array.isArray(state.guesses)) {
                 return;
             }
+            this.lb_ready = true;
             var same_day = state.day === this.lb_day;
             var n = Math.min(state.guesses.length, 6);
             if (same_day && n === this.active_row && !!state.done === this.game_over) {
@@ -664,7 +815,7 @@ const app = Vue.createApp({
             SYNC.at = now;
             SYNC.busy = true;
             var gen = SYNC.gen;
-            return fetch("/api/state?lang=" + encodeURIComponent(this.config.language_code), {
+            return lbFetch("/api/state?lang=" + encodeURIComponent(this.config.language_code), {
                 credentials: "same-origin",
                 cache: "no-store",
                 headers: { "Accept": "application/json" },
@@ -674,6 +825,7 @@ const app = Vue.createApp({
                 SYNC.busy = false;
                 if (result.status === 401 || result.status === 404 || result.status === 400) {
                     SYNC.stopped = true;  // logged out / feature off: the next guess handles it
+                    if (result.status === 401) { this.activityReauth(); }
                     return false;
                 }
                 // a guess started meanwhile: its answer is newer than this state
@@ -716,7 +868,7 @@ const app = Vue.createApp({
             this.lb_busy = true;
             SYNC.gen++;
             var lang = this.config.language_code;
-            fetch("/api/guess", {
+            lbFetch("/api/guess", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
@@ -763,7 +915,12 @@ const app = Vue.createApp({
             this.showTiles();
         },
         lbError(code) {
-            if (code === "login") {
+            if (code === "login" && ACTIVITY) {
+                // inside Discord: log in again silently (no login page in the iframe)
+                if (!this.activityReauth()) {
+                    this.showNotification(this.text("lb_error", "Something went wrong. Please try again."));
+                }
+            } else if (code === "login") {
                 // session expired: log in again, then come back to this game
                 var next = "/lb/" + this.config.language_code;
                 window.location.href = "/auth/discord/login?next=" + encodeURIComponent(next);
@@ -786,7 +943,7 @@ const app = Vue.createApp({
                 return;
             }
             LIVE.busy = true;
-            fetch("/api/live?lang=" + encodeURIComponent(this.config.language_code), {
+            lbFetch("/api/live?lang=" + encodeURIComponent(this.config.language_code), {
                 credentials: "same-origin",
                 cache: "no-store",
                 headers: { "Accept": "application/json" },
@@ -799,6 +956,7 @@ const app = Vue.createApp({
                     LIVE.delay = LIVE_EVERY;
                 } else if (result.status === 401 || result.status === 404 || result.status === 400) {
                     LIVE.stopped = true;  // logged out / feature off: stop asking
+                    if (result.status === 401) { this.activityReauth(); }
                     return;
                 } else {
                     LIVE.delay = Math.min(LIVE.delay * 2, LIVE_MAX);  // 429 rate or server trouble: back off

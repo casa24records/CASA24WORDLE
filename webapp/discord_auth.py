@@ -3,6 +3,9 @@
 identify(code, redirect_uri) trades the one-time code for an access token,
 asks Discord who the player is, and returns ONLY (id, username, avatar_hash).
 The token never leaves this module, is never stored and never logged.
+(The Discord Activity login, app.api_activity_token, calls exchange_code(code,
+None) + fetch_me + parse_me itself: there the token must go back to the player's
+browser once, for the SDK's authenticate(); it is still never stored or logged.)
 The server stores id, username and the avatar hash (only when it has Discord's
 format, for the live view's pictures; see store.clean_avatar). avatar_hash is
 also handed to the player's own browser (URL fragment after login, see
@@ -58,15 +61,20 @@ def _request_json(req):
         raise DiscordError("discord request failed: " + type(e).__name__) from None
 
 
-def exchange_code(code, redirect_uri):
-    """POST the code to Discord; returns the access token string."""
-    body = urllib.parse.urlencode({
+def exchange_code(code, redirect_uri=None):
+    """POST the code to Discord; returns the access token string.
+
+    redirect_uri=None (the Discord Activity: codes from the SDK's authorize())
+    leaves the field out entirely, like Discord's official Activity examples."""
+    fields = {
         "client_id": client_id(),
         "client_secret": client_secret(),
         "grant_type": "authorization_code",
         "code": code,
-        "redirect_uri": redirect_uri,
-    }).encode()
+    }
+    if redirect_uri is not None:
+        fields["redirect_uri"] = redirect_uri
+    body = urllib.parse.urlencode(fields).encode()
     req = urllib.request.Request(TOKEN_URL, data=body, method="POST", headers={
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json",
@@ -98,7 +106,14 @@ def identify(code, redirect_uri):
     avatar_hash is a string or None. The callback stores it only if it has
     Discord's format (else NULL) and passes it to the player's browser in the
     redirect fragment; it is never logged or put in a cookie."""
-    me = fetch_me(exchange_code(code, redirect_uri))
+    return parse_me(fetch_me(exchange_code(code, redirect_uri)))
+
+
+def parse_me(me):
+    """(discord_id, username, avatar_hash) from Discord's /users/@me object; the
+    rest (email, banner, ...) is dropped here. Raises DiscordError when unusable."""
+    if not isinstance(me, dict):
+        raise DiscordError("bad user object")
     discord_id = str(me.get("id") or "")
     username = str(me.get("username") or "").strip()[:32]
     avatar = me.get("avatar")

@@ -118,7 +118,7 @@ def test_menu_logged_in_shows_avatar_menu_and_guest_toggle():
     assert "data-guest-toggle" in html
     assert "c24-dc-btn" not in main_view(html)  # no big sign-in button
     assert '"username":"kolo_fan"' in html  # handed to index.js
-    assert 'var ME = "100000000000000001";' in html  # handed to the avatar script
+    assert '<script type="application/json" id="c24-dc-me">"100000000000000001"</script>' in html  # handed to the avatar script
 
 
 @pytest.mark.parametrize("query,marker", [("login=failed", "login-failed"), ("login=cancelled", "login-cancelled"),
@@ -136,7 +136,7 @@ def test_menu_notices(query, marker):
 @pytest.mark.parametrize("lang", ["es", "en"])
 def test_guest_pages_are_not_leaderboard(lb_off, lang):
     html = app.app.test_client().get(f"/{lang}").get_data(as_text=True)
-    assert "const LB = false;" in html
+    assert '"lb":false' in html
     assert 'id="c24-lb-state">null<' in html
     assert "data-lb-end" not in html
     assert "data-lb-hint" not in html  # leaderboard off: no hint
@@ -146,8 +146,8 @@ def test_leaderboard_game_page_renders_server_state():
     state = {"guesses": [{"word": "cosas", "colors": ["correct", "incorrect", "semicorrect", "incorrect", "incorrect"]}],
              "done": False, "won": False, "answer": None, "points": None, "rank": None}
     html = render_game("es", lb=True, lb_state=state, lb_enabled=True, lb_user=ME)
-    assert "const LB = true;" in html
-    assert 'const todays_word = "";' in html
+    assert '"lb":true' in html
+    assert '"todays_word":""' in html
     data = re.search(r'id="c24-lb-state">(.*?)</script>', html).group(1)
     assert json.loads(data) == state
     assert "data-lb-end" in html and "/leaderboard?tab=es" in html
@@ -179,7 +179,7 @@ def test_leaderboard_page_table_and_me():
     assert html.count('data-dc-id="') == 4  # header button + its menu + own row + profile line, nobody else
     assert "Jugador" in html  # Spanish tab, Spanish labels
     assert "data-lb-me" not in html  # already in the table
-    assert 'action="/api/me/delete"' in html and "window.confirm" in html  # in the avatar menu
+    assert 'action="/api/me/delete"' in html and "data-confirm=" in html and "confirm(" not in html  # in-page dialog (discord.js), never window.confirm
     assert 'action="/auth/logout"' in html
     assert 'action="/admin/hide"' not in html
     assert "no vemos tu contraseña" in html
@@ -222,11 +222,11 @@ def test_leaderboard_page_tabs_for_every_language():
 @pytest.mark.parametrize("lang", ["de", "ko", "ar"])
 def test_leaderboard_game_page_any_language(lang):
     html = render_game(lang, lb=True, lb_state=None, lb_enabled=True, lb_user=ME)
-    assert "const LB = true;" in html and 'const todays_word = "";' in html
+    assert '"lb":true' in html and '"todays_word":""' in html
     assert 'id="c24-live"' in html and "data-live-open" in html and "data-live-faces" in html
     assert "c24-badge c24-badge-lb" in html and "c24-trophy-badge" in html
     assert f"/leaderboard?tab={lang}" in html and "data-lb-end" in html
-    assert "data-dc-toggle" in html and 'var ME = "100000000000000001";' in html  # avatar + its script
+    assert "data-dc-toggle" in html and '<script type="application/json" id="c24-dc-me">"100000000000000001"</script>' in html  # avatar + its script
     assert "data-lb-hint" not in html  # the hint is only for guest games
 
 
@@ -559,7 +559,7 @@ def test_guest_game_has_no_live_view(lb_off, lang):
 def test_guest_game_has_no_live_view_when_enabled(lb_env, client, discord):
     login(client, discord)
     html = client.get("/es").get_data(as_text=True)
-    assert "const LB = false;" in html
+    assert '"lb":false' in html
     assert 'id="c24-live"' not in html and "data-live-open" not in html
 
 

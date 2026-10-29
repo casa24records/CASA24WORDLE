@@ -90,6 +90,16 @@
    key heights and modal heights. */
 :root { --vh: 1vh; }
 @supports (height: 100dvh) { :root { --vh: 1dvh; } }
+/* Safe areas (notch, home bar). Inside the Discord Activity, Discord's mobile app
+   sets --discord-safe-area-inset-*; everywhere else they are unset and the
+   browser's env() is used, so the web is unchanged. Defined on body too, in case
+   Discord sets its variables there. Use var(--c24-safe-*) instead of env(). */
+:root, body {
+    --c24-safe-top: var(--discord-safe-area-inset-top, env(safe-area-inset-top));
+    --c24-safe-right: var(--discord-safe-area-inset-right, env(safe-area-inset-right));
+    --c24-safe-bottom: var(--discord-safe-area-inset-bottom, env(safe-area-inset-bottom));
+    --c24-safe-left: var(--discord-safe-area-inset-left, env(safe-area-inset-left));
+}
 html { -webkit-text-size-adjust: 100%; }
 html, body { overscroll-behavior: none; }   /* no pull-to-refresh / rubber band */
 body {
@@ -247,8 +257,8 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     column-gap: 2px;
-    height: calc(52px + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 4px 0;
+    height: calc(52px + var(--c24-safe-top));
+    padding: var(--c24-safe-top) 4px 0;
 }
 .c24-header-menu { max-width: 640px; margin: 0 auto; }
 .c24-header-side { display: flex; align-items: center; }
@@ -287,8 +297,8 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     height: calc(var(--vh) * 100);
     max-width: 500px;
     margin: 0 auto;
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    padding-left: var(--c24-safe-left);
+    padding-right: var(--c24-safe-right);
 }
 /* The board area takes the height that is left; the board is sized from it
    (container query units), so tiles stay square on every screen. */
@@ -331,7 +341,7 @@ main .grid-cols-5 > div {
     display: flex;
     flex-direction: column;
     gap: var(--kgap);
-    padding: 0 8px max(8px, env(safe-area-inset-bottom));
+    padding: 0 8px max(8px, var(--c24-safe-bottom));
 }
 .c24-key-row { display: flex; gap: var(--kgap); }
 .c24-keyboard .key {
@@ -371,7 +381,7 @@ main .grid-cols-5 > div {
     }
     .c24-game .c24-header {
         grid-column: 1 / -1;
-        height: calc(40px + env(safe-area-inset-top));
+        height: calc(40px + var(--c24-safe-top));
     }
     .c24-game .c24-header-title { font-size: 1.5rem; }
     .c24-game .c24-logo { width: 26px; height: 26px; }
@@ -382,7 +392,7 @@ main .grid-cols-5 > div {
         grid-row: 2;
         align-self: center;
         --kh: clamp(24px, (var(--vh) * 100 - 40px - 16px - (var(--rows) - 1) * var(--kgap)) / var(--rows), 52px);
-        padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+        padding: 8px 8px max(8px, var(--c24-safe-bottom));
     }
 }
 
@@ -401,13 +411,13 @@ main .grid-cols-5 > div {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: var(--c24-safe-top) var(--c24-safe-right) var(--c24-safe-bottom) var(--c24-safe-left);
 }
 .c24-modal {
     position: relative;
     width: min(500px, 100% - 32px);
     max-height: calc(100vh - 32px);
-    max-height: calc(var(--vh) * 100 - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(var(--vh) * 100 - 32px - var(--c24-safe-top) - var(--c24-safe-bottom));
     overflow: auto;
     overscroll-behavior: contain;
 }
@@ -437,14 +447,14 @@ main .grid-cols-5 > div {
     z-index: 60;
     display: flex;
     justify-content: center;
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--c24-safe-top);
     pointer-events: none;
 }
 .c24-toast-box { position: relative; max-width: 20rem; text-align: center; }
 
 /* ---------- start screen ---------- */
 .c24-menu-app {
-    padding: 0 env(safe-area-inset-right) calc(3rem + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+    padding: 0 var(--c24-safe-right) calc(3rem + var(--c24-safe-bottom)) var(--c24-safe-left);
 }
 .c24-start {
     max-width: 24rem;
@@ -457,7 +467,7 @@ main .grid-cols-5 > div {
 .c24-primary { display: grid; gap: 0.75rem; }
 @media (max-height: 700px) {
     .c24-start { padding-top: 1rem; gap: 1rem; }
-    .c24-menu-app { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+    .c24-menu-app { padding-bottom: calc(1rem + var(--c24-safe-bottom)); }
 }
 @media (min-width: 640px) {
     .c24-start { max-width: 40rem; }
@@ -616,7 +626,7 @@ main .grid-cols-5 > div {
 .c24-lb {
     max-width: 40rem;
     margin: 0 auto;
-    padding: 1.25rem max(16px, env(safe-area-inset-right)) calc(2rem + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    padding: 1.25rem max(16px, var(--c24-safe-right)) calc(2rem + var(--c24-safe-bottom)) max(16px, var(--c24-safe-left));
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -889,7 +899,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 .c24-dc-toast {
     position: fixed;
     left: 50%;
-    bottom: max(16px, env(safe-area-inset-bottom));
+    bottom: max(16px, var(--c24-safe-bottom));
     z-index: 70;
     width: min(26rem, calc(100% - 32px));
     transform: translateX(-50%);
@@ -1061,14 +1071,14 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     margin: 0 auto;
     width: min(500px, 100%);
     max-height: min(70vh, 100vh - 48px);
-    max-height: min(calc(var(--vh) * 70), calc(var(--vh) * 100 - 48px - env(safe-area-inset-top)));
+    max-height: min(calc(var(--vh) * 70), calc(var(--vh) * 100 - 48px - var(--c24-safe-top)));
     background: var(--c24-surface);
     color: var(--c24-text);
     border: 1px solid var(--c24-line);
     border-bottom: 0;
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
-    padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+    padding: 0 max(4px, var(--c24-safe-right)) var(--c24-safe-bottom) max(4px, var(--c24-safe-left));
 }
 .c24-live-head {
     flex: none;
@@ -1189,7 +1199,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
         width: 240px;
         max-height: none;
         margin: 0;
-        padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+        padding: var(--c24-safe-top) 0 var(--c24-safe-bottom) var(--c24-safe-left);
         background: var(--c24-bg);
         border: 0;
         border-inline-end: 1px solid var(--c24-line);
@@ -1220,3 +1230,95 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     .c24-dc-btn:active { background: #3C45A5; }
     .c24-dc-pop-item:hover, .c24-dc-privacy-link:hover, .c24-privacy-close:hover { background: var(--c24-hover); }
 }
+
+
+/* ==========================================================================
+   DISCORD ACTIVITY (the game inside Discord; see discord-activity.js)
+   ========================================================================== */
+/* "Connecting to Discord..." / refused / error, over the game until the login is done */
+.c24-activity-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, var(--c24-safe-top)) max(16px, var(--c24-safe-right)) max(16px, var(--c24-safe-bottom)) max(16px, var(--c24-safe-left));
+    background: var(--c24-bg);
+    color: var(--c24-text);
+}
+.c24-activity-overlay[data-state="ready"] { display: none; }
+.c24-activity-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+    max-width: 22rem;
+    text-align: center;
+}
+.c24-activity-kolo { width: 72px; height: 72px; }
+.c24-activity-overlay[data-state="loading"] .c24-activity-kolo { animation: c24-activity-pulse 1.2s ease-in-out infinite; }
+@keyframes c24-activity-pulse { 50% { transform: scale(0.9); opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) {
+    .c24-activity-overlay[data-state="loading"] .c24-activity-kolo { animation: none; }
+}
+.c24-activity-msg { display: none; margin: 0; font-weight: 600; line-height: 1.4; }
+.c24-activity-msg span[lang="en"] { display: block; margin-top: 0.25rem; font-weight: 400; font-size: 0.9em; color: var(--c24-subtle); }
+.c24-activity-overlay[data-state="loading"] [data-when="loading"],
+.c24-activity-overlay[data-state="denied"] [data-when="denied"],
+.c24-activity-overlay[data-state="error"] [data-when="error"] { display: block; }
+.c24-activity-retry {
+    display: none;
+    min-height: 44px;
+    padding: 0 1.25rem;
+    border: 0;
+    border-radius: 10px;
+    background: var(--c24-correct-bg);
+    color: var(--c24-correct-fg);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+.c24-activity-overlay[data-state="denied"] .c24-activity-retry,
+.c24-activity-overlay[data-state="error"] .c24-activity-retry { display: inline-flex; align-items: center; }
+.c24-activity-retry:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+
+/* Picture-in-picture / grid (layout mode 1 or 2): a small tile in Discord.
+   Only the board, no header, keyboard, live view or windows. */
+.c24-pip .c24-header,
+.c24-pip .c24-keyboard,
+.c24-pip .c24-demo-bar,
+.c24-pip .c24-live,
+.c24-pip .c24-live-backdrop,
+.c24-pip .c24-backdrop,
+.c24-pip .c24-modal-wrap,
+.c24-pip .c24-toast { display: none !important; }
+.c24-pip .c24-game { display: flex; max-width: none; }
+.c24-pip .c24-board { --g: 3px; }
+
+/* leaderboard window (inside the game page) */
+.c24-board-title { display: flex; align-items: center; justify-content: center; gap: 0.4rem; margin: 0.25rem 2.5rem 0.75rem; }
+.c24-board-tabs { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+[data-activity-board] .c24-lb-me { margin-top: 0.75rem; }
+button.c24-lb-link { background: transparent; border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+
+/* share text to copy by hand */
+.c24-share-text {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--c24-line-strong);
+    border-radius: 8px;
+    background: var(--c24-input-bg);
+    color: var(--c24-text);
+    font: inherit;
+    font-size: 0.85rem;
+    line-height: 1.35;
+    resize: none;
+}
+
+/* in-page confirmation (delete my data), built by discord.js */
+.c24-confirm-text { margin: 0; font-size: 0.95rem; line-height: 1.45; }
+.c24-confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.c24-confirm-danger { color: #b3261e; }
+:root[data-theme="dark"] .c24-confirm-danger { color: #ff8a80; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .c24-confirm-danger { color: #ff8a80; } }

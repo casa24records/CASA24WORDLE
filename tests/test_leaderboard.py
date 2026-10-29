@@ -321,7 +321,7 @@ def test_lb_page_needs_login_and_hides_answer(lb_env, client, discord, rendered)
     r = client.get("/lb/es")
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
     html = r.get_data(as_text=True)
-    assert 'const todays_word = "";' in html
+    assert '"todays_word":""' in html
     name, ctx = rendered[-1]
     assert name == "game.html"
     assert ctx["lb"] is True and ctx["demo"] is False
@@ -581,7 +581,7 @@ def test_lb_page_renders_every_language(lb_env, client, discord, rendered, lang)
     name, ctx = rendered[-1]
     assert name == "game.html" and ctx["lb"] is True
     assert ctx["language"].language_code == lang and ctx["language"].daily_word == ""
-    assert 'const todays_word = "";' in r.get_data(as_text=True)  # answer never sent
+    assert '"todays_word":""' in r.get_data(as_text=True)  # answer never sent
 
 
 @pytest.mark.parametrize("lang", KEY_LANGS)

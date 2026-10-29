@@ -32,4 +32,32 @@
     };
 
     apply(stored());
+
+    // Page controls, wired here instead of onclick= / onchange= attributes (the
+    // Discord Activity's CSP blocks inline handlers). Delegated on document, so
+    // they also work inside the Vue apps, which re-create their DOM when mounting.
+    //   [data-theme-toggle]      button: light <-> dark (menu, leaderboard)
+    //   select[data-theme-select] Automatic / Light / Dark (game settings)
+    //   select[data-autosubmit]   submits its form on change (keyboard layout)
+    //   select[data-nav-select]   goes to the chosen option's same-site URL (Activity language)
+    document.addEventListener("click", function (e) {
+        var button = e.target.closest ? e.target.closest("[data-theme-toggle]") : null;
+        if (button) { window.casa24ToggleTheme(); }
+    });
+    document.addEventListener("change", function (e) {
+        var el = e.target;
+        if (!el || !el.hasAttribute) return;
+        if (el.hasAttribute("data-theme-select")) {
+            window.casa24SetTheme(el.value);
+        } else if (el.hasAttribute("data-autosubmit") && el.form) {
+            el.form.submit();
+        } else if (el.hasAttribute("data-nav-select") && /^\/(?!\/)/.test(el.value)) {
+            window.location.assign(el.value);
+        }
+    });
+    // the theme menu shows the saved choice (after the deferred Vue apps have mounted)
+    document.addEventListener("DOMContentLoaded", function () {
+        var selects = document.querySelectorAll("select[data-theme-select]");
+        for (var i = 0; i < selects.length; i++) selects[i].value = stored();
+    });
 })();

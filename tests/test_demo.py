@@ -13,7 +13,7 @@ from werkzeug.serving import make_server
 import app
 
 FAKE_PASSWORD = "test-pass-123"
-WORD_RE = re.compile(r'const todays_word = "([^"]*)";')
+WORD_RE = re.compile(r'"todays_word":"([^"]*)"')  # in the #c24-page JSON block
 
 
 def answer_of(html):
@@ -85,7 +85,7 @@ def test_right_password_and_game(enabled, client):
         r = client.get(f"/demo/{lang}")
         assert r.status_code == 200
         html = r.get_data(as_text=True)
-        assert "const DEMO = true" in html
+        assert '"demo":true' in html
         assert "c24-demo-bar" in html
         assert "no-store" in r.headers["Cache-Control"]
         assert answer_of(html) in pool(lang)
@@ -158,7 +158,7 @@ def test_new_password_logs_everyone_out(enabled, client, monkeypatch):
 
 def test_real_game_is_not_demo(enabled, client):
     html = client.get("/es").get_data(as_text=True)
-    assert "const DEMO = false" in html
+    assert '"demo":false' in html
     assert "c24-demo-bar" not in html
 
 

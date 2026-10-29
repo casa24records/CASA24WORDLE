@@ -17,9 +17,16 @@ function writeStorage(key, value) {
     try { localStorage.setItem(key, value); } catch (e) { }
 }
 
+function readJson(id) {
+    try { return JSON.parse(document.getElementById(id).textContent); } catch (e) { return null; }
+}
+
+// data from the server (JSON blocks in index.html; no inline scripts)
+var languages = readJson("c24-languages") || {};
+var todays_idx = String((readJson("c24-menu") || {}).todays_idx || "");
+
 // leaderboard settings from the server: {"enabled": bool, "user": {"id", "username"} | null}
-var lb_info = { enabled: false, user: null };
-try { lb_info = JSON.parse(document.getElementById("c24-lb").textContent) || lb_info; } catch (e) { }
+var lb_info = readJson("c24-lb") || { enabled: false, user: null };
 
 const app = Vue.createApp({
     delimiters: ['[[', ']]'],

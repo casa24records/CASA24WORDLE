@@ -26,7 +26,8 @@ import threading
 
 GAME_KEEP_DAYS = 2   # wordle_games rows older than this are deleted
 RATE_KEEP_MINUTES = 2
-RATE_BUCKETS = ("guess", "live", "state")  # separate per-minute counters per player
+RATE_BUCKETS = ("guess", "live", "state", "token")  # separate per-minute counters per player
+# ("token": one global key, "activity:token", for Discord Activity logins; no IPs kept)
 
 # Discord avatar hash: (a_)?<32 lowercase hex>. Anything else is stored as NULL.
 AVATAR_HASH_RE = re.compile(r"(a_)?[0-9a-f]{32}")
@@ -39,14 +40,16 @@ def clean_avatar(avatar):
 
 def _rate_key(discord_id, bucket):
     """Row key in the rate table: the ID for guesses, "<id>:live" for live polling,
-    "<id>:state" for /api/state (focus, day change and sync reloads)."""
+    "<id>:state" for /api/state (focus, day change and sync reloads), and
+    "activity:token" for all Discord Activity logins together."""
     if bucket not in RATE_BUCKETS:
         raise ValueError("unknown rate bucket")
     return discord_id if bucket == "guess" else discord_id + ":" + bucket
 
 
 def _rate_keys(discord_id):
-    return [_rate_key(discord_id, b) for b in RATE_BUCKETS]
+    """One player's counters ("token" is global, not a player's)."""
+    return [_rate_key(discord_id, b) for b in RATE_BUCKETS if b != "token"]
 
 
 def _utcnow():
