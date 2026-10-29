@@ -6,7 +6,10 @@
 // the whole launch, and this page borrows its session via window.parent.C24Activity.
 //
 // It exposes window.C24Activity for game.js = {session, ready, fetch, reauth,
-// log, url, setLang}:
+// log, url, setLang}. Links with data-c24-external (Terms / Privacy) and links to
+// other sites open through the shell's openExternal (SDK openExternalLink); the
+// Settings "Delete my data" form posts /api/me/delete with the session, then the
+// shell shows "data deleted" (dataDeleted()). Nothing here navigates the shell.
 //   - ready: the shell's login Promise;
 //   - fetch(url, opts): this page's fetch with "Authorization: Bearer <session>";
 //     a 401 asks the shell to log in again (silently), then retries ONCE;
@@ -53,6 +56,14 @@ function keptParams() {
     return out;
 }
 
+function otherSite(href) {
+    // an http(s) link to another site, else null
+    let url;
+    try { url = new URL(href, window.location.href); } catch (e) { return null; }
+    if (url.protocol !== "https:" && url.protocol !== "http:") { return null; }
+    return url.origin !== window.location.origin ? url.href : null;
+}
+
 function withDiscordQuery(href) {
     // same-site URL plus Discord's launch params it lacks (and embed=1); other sites untouched
     let url;
@@ -69,6 +80,14 @@ document.addEventListener("click", (e) => {
     if (!link) { return; }
     const href = link.getAttribute("href");
     if (!href || href.charAt(0) === "#") { return; }
+    // Terms / Privacy (data-c24-external = the public https address) and links to other
+    // sites open in the player's browser through Discord (SDK openExternalLink in the shell)
+    const external = link.getAttribute("data-c24-external") || otherSite(href);
+    if (external && host && typeof host.openExternal === "function") {
+        e.preventDefault();
+        host.openExternal(external);
+        return;
+    }
     const fixed = withDiscordQuery(href);
     if (fixed && fixed !== href) { link.setAttribute("href", fixed); }
 }, true);
@@ -173,6 +192,28 @@ window.C24Activity = {
         }
     },
 };
+
+// ---------- Settings: "Delete my data" (discord.js asks first, then fires "c24-confirmed") ----------
+
+document.addEventListener("c24-confirmed", (e) => {
+    const form = e.target;
+    if (!form || !form.hasAttribute || !form.hasAttribute("data-activity-delete")) { return; }
+    const status = form.querySelector("[data-activity-delete-status]");
+    const button = form.querySelector("button");
+    if (button) { button.disabled = true; }
+    if (status) { status.textContent = "…"; }
+    window.C24Activity.fetch("/api/me/delete", {
+        method: "POST", cache: "no-store", headers: { "Accept": "application/json" },
+    }).then((response) => {
+        if (!response.ok) { throw new Error("delete " + response.status); }
+        if (status) { status.textContent = ""; }
+        if (host && typeof host.dataDeleted === "function") { host.dataDeleted(); }
+    }).catch((err) => {
+        report("delete failed: " + (err && err.message ? err.message : "error"));
+        if (status) { status.textContent = form.getAttribute("data-error") || "Error"; }
+        if (button) { button.disabled = false; }
+    });
+});
 
 ready.then(() => { setState("ready"); });
 window.dispatchEvent(new Event("c24activity"));

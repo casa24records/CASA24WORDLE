@@ -1,0 +1,91 @@
+{#- Terms of Service (/terms). Contact, operator, city, date and the LICENSE link
+    come from app.py (LEGAL_*). -#}
+{% extends "legal.html" %}
+{% block title_es %}Términos del servicio{% endblock %}
+{% block title_en %}Terms of Service{% endblock %}
+
+{% block body_es %}
+<p>Estos términos aplican a Casa 24 Wordle, en el sitio web y como Activity de Discord, operado por <b>{{ operator }}</b> ({{ city }}). Al jugar, aceptas estos términos. Si no estás de acuerdo, no uses el juego.</p>
+
+<h3>1. El juego</h3>
+<p>Casa 24 Wordle es un juego gratuito: una palabra nueva cada día, igual para todos. Puedes jugar como invitado o entrar con Discord para aparecer en el ranking. No hay compras ni suscripciones.</p>
+
+<h3>2. Juego limpio</h3>
+<ul>
+    <li>Juega con tu propia cuenta de Discord y no compartas la respuesta para subir en el ranking.</li>
+    <li>No uses bots, scripts ni otros medios automáticos, y no intentes adivinar la respuesta atacando el sitio.</li>
+    <li>No intentes saltarte los límites de uso, acceder a datos de otros jugadores ni dañar o sobrecargar el servicio.</li>
+</ul>
+<p>Si vemos trampa o abuso, podemos quitar resultados, ocultar a un jugador del ranking o bloquear su acceso.</p>
+
+<h3>3. Nombres de usuario</h3>
+<p>En el ranking y en la lista de quién está jugando aparece tu nombre de usuario y tu foto de Discord. Podemos ocultar del ranking nombres o fotos ofensivos, sin aviso previo.</p>
+
+<h3>4. Contenido y propiedad intelectual</h3>
+<ul>
+    <li>Kolo, sus ilustraciones, el nombre y la marca Casa 24 son © {{ operator }}. No los uses sin permiso.</li>
+    <li>El código del juego es de código abierto bajo la <a href="{{ license_url }}">licencia MIT</a>. Las listas de palabras tienen sus propias licencias, indicadas en el repositorio.</li>
+    <li>Discord y su logo son marcas de Discord Inc. Este juego no está hecho ni respaldado por Discord. «Wordle» es una marca de su respectivo titular, que tampoco respalda este juego.</li>
+</ul>
+
+<h3>5. Discord</h3>
+<p>Si entras con Discord o juegas dentro de Discord, también aplican los <a href="https://discord.com/terms">Términos del servicio de Discord</a> y sus normas. Cómo usamos tus datos: <a href="{{ aq('/privacy?lang=es') }}">Política de privacidad</a>.</p>
+
+<h3>6. Disponibilidad y cambios</h3>
+<p>Hacemos lo posible para que el juego funcione siempre, pero puede fallar, detenerse o cambiar en cualquier momento (incluidas las reglas de puntos y el ranking). Podemos dejar de ofrecerlo.</p>
+
+<h3>7. Sin garantías y responsabilidad</h3>
+<p>El juego se ofrece «tal cual», sin garantías de ningún tipo. En la medida en que la ley lo permita, {{ operator }} no es responsable de daños derivados del uso del juego o de no poder usarlo, ni de la pérdida de partidas, rachas o puntos.</p>
+
+<h3>8. Ley aplicable</h3>
+<p>Estos términos se rigen por las leyes de la República de Panamá. Cualquier disputa se resolverá ante los tribunales de la Ciudad de Panamá, salvo que la ley de tu país disponga otra cosa.</p>
+
+<h3>9. Cambios a estos términos</h3>
+<p>Podemos actualizar estos términos; la fecha de arriba indica la última versión. Si sigues jugando después de un cambio, aceptas la nueva versión.</p>
+
+<h3>10. Contacto</h3>
+<p><a href="mailto:{{ contact }}">{{ contact }}</a></p>
+{% endblock %}
+
+{% block body_en %}
+<p>These terms apply to Casa 24 Wordle, on the website and as a Discord Activity, run by <b>{{ operator }}</b> ({{ city }}). By playing, you accept these terms. If you don't agree, please don't use the game.</p>
+
+<h3>1. The game</h3>
+<p>Casa 24 Wordle is a free game: a new word every day, the same for everyone. You can play as a guest or sign in with Discord to appear on the ranking. There are no purchases or subscriptions.</p>
+
+<h3>2. Fair play</h3>
+<ul>
+    <li>Play with your own Discord account and don't share the answer to climb the ranking.</li>
+    <li>Don't use bots, scripts or other automated means, and don't try to get the answer by attacking the site.</li>
+    <li>Don't try to get around rate limits, access other players' data, or harm or overload the service.</li>
+</ul>
+<p>If we see cheating or abuse, we may remove results, hide a player from the ranking or block their access.</p>
+
+<h3>3. Usernames</h3>
+<p>The ranking and the list of who is playing show your Discord username and picture. We may hide offensive names or pictures from the ranking without notice.</p>
+
+<h3>4. Content and intellectual property</h3>
+<ul>
+    <li>Kolo, his artwork, and the Casa 24 name and brand are © {{ operator }}. Don't use them without permission.</li>
+    <li>The game's code is open source under the <a href="{{ license_url }}">MIT License</a>. The word lists have their own licenses, listed in the repository.</li>
+    <li>Discord and its logo are trademarks of Discord Inc. This game is not made or endorsed by Discord. "Wordle" is a trademark of its owner, who doesn't endorse this game either.</li>
+</ul>
+
+<h3>5. Discord</h3>
+<p>If you sign in with Discord or play inside Discord, <a href="https://discord.com/terms">Discord's Terms of Service</a> and guidelines also apply. How we use your data: <a href="{{ aq('/privacy?lang=en') }}">Privacy Policy</a>.</p>
+
+<h3>6. Availability and changes</h3>
+<p>We do our best to keep the game running, but it may fail, stop or change at any time (including the points rules and the ranking). We may stop offering it.</p>
+
+<h3>7. No warranty and liability</h3>
+<p>The game is provided "as is", without warranties of any kind. To the extent the law allows, {{ operator }} is not liable for damages from using or being unable to use the game, or for lost games, streaks or points.</p>
+
+<h3>8. Governing law</h3>
+<p>These terms are governed by the laws of the Republic of Panama. Any dispute will be handled by the courts of Panama City, unless the law of your country says otherwise.</p>
+
+<h3>9. Changes to these terms</h3>
+<p>We may update these terms; the date above shows the latest version. If you keep playing after a change, you accept the new version.</p>
+
+<h3>10. Contact</h3>
+<p><a href="mailto:{{ contact }}">{{ contact }}</a></p>
+{% endblock %}

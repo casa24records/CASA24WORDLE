@@ -405,7 +405,9 @@ def test_query_ids_never_choose_the_player(lb_env, client, discord):
 def test_delete_my_data_with_bearer(lb_env, client, discord, mem):
     session = token_login(client, discord).get_json()["session"]
     r = app.app.test_client().post("/api/me/delete", headers={**bearer(session), "Origin": DISCORDSAYS})
-    assert r.status_code == 302 and mem.get_player(P1) is None
+    # the Activity's Settings posts with fetch: a JSON answer, no page to go to
+    assert r.status_code == 200 and r.get_json() == {"deleted": True} and mem.get_player(P1) is None
+    assert r.headers["Cache-Control"] == "no-store"
 
 
 # ---------- same origin: our host or exactly <client id>.discordsays.com ----------
@@ -561,6 +563,7 @@ export class DiscordSDK extends DiscordSDKMock {
                 user: { id: '1', username: 'x', discriminator: '0', avatar: null, public_flags: 0 },
                 scopes: ['identify'], expires: '2099-01-01', application: { id: clientId, description: '', name: 'c24' } })),
             setOrientationLockState: wrap('setOrientationLockState', () => null),
+            openExternalLink: wrap('openExternalLink', () => ({ opened: true })),
         });
     }
     ready() {
@@ -1310,3 +1313,36 @@ def test_vendored_sdk_fully_tracked():
         ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "webapp/static/vendor"],
         cwd=root, capture_output=True, text=True, check=True).stdout.split()
     assert not ignored, f"git ignores vendored files: {ignored[:10]}"
+
+
+def test_browser_settings_legal_links_and_delete_my_data(lb_env, server, page, discord, mem, monkeypatch):
+    """Discord's Developer Policy: privacy policy reachable and data deletion easy from
+    inside the app. Terms / Privacy open through the SDK's openExternalLink (via the
+    shell); "Delete my data" posts with the Bearer session; the shell never navigates."""
+    monkeypatch.setenv("PUBLIC_URL", "https://casa-24-wordle.vercel.app")
+    setup_activity(page, server)
+    page.goto(server + "/?" + ACT + "&lang=es")
+    frame = wait_ready(page)
+    shell_url = page.url
+    assert mem.get_player(P1) is not None
+    frame.evaluate(VM + ".show_options_modal = true")
+    frame.wait_for_selector("[data-legal-links] a[href*='/privacy']", state="visible")
+    frame.click("[data-legal-links] a[href*='/privacy']")
+    page.wait_for_function("window.__calls.indexOf('openExternalLink') >= 0")
+    assert page.evaluate("window.__args.openExternalLink") == {"url": "https://casa-24-wordle.vercel.app/privacy?lang=es"}
+    frame.click("[data-legal-links] a[href*='/terms']")
+    page.wait_for_function("window.__args.openExternalLink.url.indexOf('/terms') > 0")
+    assert page.evaluate("window.__args.openExternalLink.url") == "https://casa-24-wordle.vercel.app/terms?lang=es"
+    assert frame.url.endswith("/lb/es?embed=1") and page.url == shell_url  # nothing navigated
+    # delete my data: in-page confirm, then POST with the Bearer session
+    frame.click("[data-activity-delete] button")
+    frame.wait_for_selector("[data-c24-confirm] [data-confirm-yes]", state="visible")
+    frame.click("[data-c24-confirm] [data-confirm-yes]")
+    page.wait_for_function("document.getElementById('c24-activity-overlay').getAttribute('data-state') === 'deleted'")
+    assert mem.get_player(P1) is None and P1 not in all_store_text(mem)
+    assert page.is_visible("[data-activity-again]") and not page.is_visible("[data-activity-retry]")
+    assert page.url == shell_url and page.evaluate(SDK_COUNT) == 1
+    # play again: signs in again on the same SDK (a new, empty account)
+    page.click("[data-activity-again]")
+    page.wait_for_function("document.getElementById('c24-activity-overlay').getAttribute('data-state') === 'ready'")
+    assert mem.get_player(P1) is not None and page.evaluate(SDK_COUNT) == 1 and page.url == shell_url

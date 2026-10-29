@@ -8,4 +8,9 @@
     <loc>{{ base_url }}/{{ language }}</loc>
   </url>
   {% endfor %}
+  {% for name in legal_pages or [] %}
+  <url>
+    <loc>{{ base_url }}/{{ name }}</loc>
+  </url>
+  {% endfor %}
 </urlset>

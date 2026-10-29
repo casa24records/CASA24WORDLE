@@ -133,6 +133,13 @@
         </section>
 
         <p class="c24-lb-back"><a href="{{ aq('/') }}">← {{ L('lb_back', 'Menú', 'Menu') }}</a></p>
+        {#- Terms / Privacy: full texts in es and en (other languages read the English one).
+            Inside Discord, discord-activity.js opens data-c24-external with the SDK's openExternalLink. -#}
+        {% set legal_lang = ui if ui in ('es', 'en') else 'en' %}
+        <p class="c24-legal-foot" data-legal-links>
+            <a href="{{ aq('/terms?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/terms?lang={{ legal_lang }}">{{ L('legal_terms', 'Términos', 'Terms') }}</a>
+            · <a href="{{ aq('/privacy?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/privacy?lang={{ legal_lang }}">{{ L('legal_privacy', 'Privacidad', 'Privacy') }}</a>
+        </p>
     </main>
     {% set privacy_body %}
     <p>{{ L('lb_privacy', 'Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID, tu nombre de usuario y tu foto de perfil de Discord y tus resultados para mostrar el ranking y quién está jugando hoy. Los demás jugadores ven solo tus colores, nunca tus palabras.', 'Discord handles your login; we never see your password or email. We store your Discord ID, username and profile picture and your results to show the ranking and who is playing today. Other players see only your colors, never your words.') }}</p>

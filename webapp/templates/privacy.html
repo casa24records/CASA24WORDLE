@@ -1,0 +1,144 @@
+{#- Privacy Policy (/privacy). Must match what the code really does: app.py
+    ("DISCORD LEADERBOARD", "DISCORD ACTIVITY"), store.py, discord_auth.py.
+    Contact, operator, city and date come from app.py (LEGAL_*). -#}
+{% extends "legal.html" %}
+{% block title_es %}Política de privacidad{% endblock %}
+{% block title_en %}Privacy Policy{% endblock %}
+
+{% block body_es %}
+<p>Casa 24 Wordle es el juego diario de palabras de <b>{{ operator }}</b> ({{ city }}), que lo opera y es responsable de estos datos. Esta política explica qué datos usamos en el sitio web y en la Activity de Discord, y para qué. Contacto: <a href="mailto:{{ contact }}">{{ contact }}</a>.</p>
+
+<h3>En corto</h3>
+<ul>
+    <li>Como <b>invitado</b> no guardamos nada tuyo en nuestros servidores: tu partida y tus estadísticas viven solo en tu navegador.</li>
+    <li>Si entras con <b>Discord</b> (en la web o dentro de Discord) guardamos tu ID, tu nombre de usuario y tu foto de perfil de Discord, y tus resultados, para el ranking y la lista de quién está jugando hoy.</li>
+    <li>Nunca vemos tu contraseña ni tu correo. Sin anuncios, sin analítica, sin rastreadores, y no vendemos datos.</li>
+    <li>Puedes borrar tus datos cuando quieras con «Borrar mis datos».</li>
+</ul>
+
+<h3>1. Jugar como invitado</h3>
+<p>Sin cuenta, el juego funciona por completo en tu navegador. Tus intentos, estadísticas y preferencias se guardan en el almacenamiento local (localStorage) de tu navegador y nunca se envían a nuestro servidor. Las partidas como invitado no cuentan para el ranking y no se importan si luego entras con Discord. Para borrarlas, borra los datos de este sitio en tu navegador.</p>
+
+<h3>2. Entrar con Discord (leaderboard y Activity)</h3>
+<p>El inicio de sesión lo hace Discord con el permiso (scope) <b><code>identify</code></b>, el mínimo posible. Discord nos dice quién eres y nosotros guardamos solo:</p>
+<ul>
+    <li>tu <b>ID de usuario de Discord</b>, tu <b>nombre de usuario</b> y el identificador (hash) de tu <b>foto de perfil</b>; se actualizan cada vez que entras;</li>
+    <li>por cada partida terminada: idioma, fecha, si ganaste, cuántos intentos usaste, los puntos y la hora en que terminaste;</li>
+    <li>las palabras que intentaste en la partida del día, para que puedas seguirla en otro dispositivo o en Discord; <b>se borran a los 2 días</b>;</li>
+    <li>contadores por minuto de solicitudes (para evitar abusos), que se borran a los pocos minutos;</li>
+    <li>la fecha en que te registraste y una marca de «oculto» si un administrador quita tu nombre del ranking.</li>
+</ul>
+<p><b>Nunca recibimos tu correo ni tu contraseña.</b> El token de acceso que entrega Discord se usa una sola vez para saber quién eres y luego se descarta: no lo guardamos ni lo registramos. Dentro de la Activity de Discord ese token vuelve una vez a tu propia app de Discord (lo exige Discord para iniciar la sesión) y tampoco lo guardamos. No guardamos tu dirección IP ni tu navegador en nuestra base de datos.</p>
+
+<h3>3. Para qué los usamos</h3>
+<ul>
+    <li>Revisar tus intentos en el servidor (así nadie puede ver la respuesta antes de tiempo) y calcular tus puntos, rachas y puesto.</li>
+    <li>Mostrar el ranking público y la lista de quién está jugando hoy.</li>
+    <li>Mantener la misma partida en la web, en otros dispositivos y en Discord.</li>
+</ul>
+<p>No usamos tus datos para publicidad ni para perfiles, y no tomamos decisiones automáticas sobre ti aparte de los puntos del juego.</p>
+
+<h3>4. Qué ven los demás</h3>
+<p>El ranking (<a href="{{ aq('/leaderboard') }}">/leaderboard</a>) es público: muestra tu nombre de usuario de Discord, tus puntos, partidas ganadas y rachas. Mientras juegas, otros jugadores con sesión iniciada ven tu nombre de usuario, tu foto de Discord y <b>solo los colores</b> de tus intentos, <b>nunca tus palabras</b>. La foto se carga desde los servidores de Discord, y su dirección incluye tu ID de Discord.</p>
+
+<h3>5. Cookies y almacenamiento local</h3>
+<p>Solo usamos cookies necesarias para que el juego funcione; ninguna es de publicidad ni de analítica.</p>
+<ul>
+    <li><code>c24_lb</code>: tu sesión; contiene solo tu ID de Discord, firmado (30 días).</li>
+    <li><code>c24_oauth</code>: protege el inicio de sesión con Discord (10 minutos).</li>
+    <li><code>c24_avr</code>: evita repetir la carga de tu foto de perfil (1 día).</li>
+    <li><code>keyboard_layout_&lt;idioma&gt;</code>: la distribución de teclado que elegiste (1 año).</li>
+    <li><code>session</code>: solo para la «Vista de desarrollador» del equipo de Casa 24 (30 días).</li>
+</ul>
+<p>Dentro de la Activity de Discord no usamos cookies: la sesión vive en memoria mientras la Activity está abierta.</p>
+<p>En el almacenamiento local de tu navegador guardamos: tus partidas y estadísticas como invitado, el tema (claro/oscuro), el último idioma jugado y el idioma elegido en Discord, el modo de juego (invitado o leaderboard), si cerraste un aviso, y una copia de tu foto de Discord para el encabezado (se borra al cerrar sesión).</p>
+
+<h3>6. Proveedores</h3>
+<ul>
+    <li><b>Discord</b>: inicio de sesión, Activity y fotos de perfil (<a href="https://discord.com/privacy">política de Discord</a>).</li>
+    <li><b>Vercel</b>: alojamiento del sitio. Como cualquier servidor web, Vercel registra datos técnicos de las visitas (como la IP) según su propia política (<a href="https://vercel.com/legal/privacy-policy">política de Vercel</a>).</li>
+    <li><b>Neon</b>: base de datos donde se guarda el leaderboard (<a href="https://neon.com/privacy-policy">política de Neon</a>).</li>
+</ul>
+<p>Estos servicios pueden procesar datos fuera de Panamá (por ejemplo, en Estados Unidos). No compartimos tus datos con nadie más, salvo que la ley lo exija.</p>
+
+<h3>7. Cuánto tiempo los guardamos</h3>
+<p>Tu cuenta del leaderboard y tus resultados se guardan hasta que los borres (o los borremos a tu pedido). Las palabras de cada partida se borran a los 2 días y los contadores de solicitudes, a los pocos minutos.</p>
+
+<h3>8. Borrar tus datos y tus derechos</h3>
+<p>En <a href="{{ aq('/leaderboard') }}">/leaderboard</a>, toca tu foto de Discord y elige <b>«Borrar mis datos»</b>: borramos al instante tu cuenta, tus resultados, tus partidas guardadas y tus contadores, y cerramos tu sesión. También puedes escribirnos a <a href="mailto:{{ contact }}">{{ contact }}</a> para pedir una copia, una corrección o el borrado de tus datos. Si vuelves a entrar después, empiezas de cero.</p>
+
+<h3>9. Menores de edad</h3>
+<p>El juego no está dirigido a menores de 13 años (la edad mínima de Discord, o la que fije la ley de tu país). No recopilamos a sabiendas datos de menores de esa edad; si crees que lo hicimos, escríbenos y los borraremos.</p>
+
+<h3>10. Cambios</h3>
+<p>Si cambiamos esta política, actualizaremos esta página y la fecha de arriba. Si el cambio es importante, lo avisaremos en el juego.</p>
+{% endblock %}
+
+{% block body_en %}
+<p>Casa 24 Wordle is the daily word game of <b>{{ operator }}</b> ({{ city }}), which runs it and is responsible for this data. This policy explains what data we use on the website and in the Discord Activity, and why. Contact: <a href="mailto:{{ contact }}">{{ contact }}</a>.</p>
+
+<h3>In short</h3>
+<ul>
+    <li>As a <b>guest</b> we keep nothing about you on our servers: your game and stats live only in your browser.</li>
+    <li>If you sign in with <b>Discord</b> (on the web or inside Discord) we store your Discord ID, username and profile picture, and your results, for the ranking and the list of who is playing today.</li>
+    <li>We never see your password or email. No ads, no analytics, no trackers, and we don't sell data.</li>
+    <li>You can delete your data at any time with "Delete my data" ("Borrar mis datos").</li>
+</ul>
+
+<h3>1. Playing as a guest</h3>
+<p>Without an account, the game runs entirely in your browser. Your guesses, stats and preferences are kept in your browser's local storage (localStorage) and are never sent to our server. Guest games don't count for the ranking and are not imported if you sign in with Discord later. To erase them, clear this site's data in your browser.</p>
+
+<h3>2. Signing in with Discord (leaderboard and Activity)</h3>
+<p>Discord handles the sign-in with the <b><code>identify</code></b> scope, the smallest one available. Discord tells us who you are and we keep only:</p>
+<ul>
+    <li>your <b>Discord user ID</b>, your <b>username</b> and the identifier (hash) of your <b>profile picture</b>, refreshed each time you sign in;</li>
+    <li>for each finished game: language, date, whether you won, how many guesses you used, the points and when you finished;</li>
+    <li>the words you guessed in today's game, so you can continue it on another device or in Discord; <b>they are deleted after 2 days</b>;</li>
+    <li>per-minute request counters (to prevent abuse), deleted after a few minutes;</li>
+    <li>the date you joined and a "hidden" flag if an admin removes your name from the ranking.</li>
+</ul>
+<p><b>We never receive your email or your password.</b> The access token Discord issues is used once to learn who you are and is then discarded: we don't store or log it. Inside the Discord Activity that token goes back once to your own Discord app (Discord requires it to start the session), and we don't store it either. We don't store your IP address or browser details in our database.</p>
+
+<h3>3. What we use it for</h3>
+<ul>
+    <li>Checking your guesses on the server (so nobody can see the answer early) and computing your points, streaks and rank.</li>
+    <li>Showing the public ranking and the list of who is playing today.</li>
+    <li>Keeping the same game on the web, on your other devices and in Discord.</li>
+</ul>
+<p>We don't use your data for advertising or profiling, and we make no automated decisions about you other than the game's points.</p>
+
+<h3>4. What others can see</h3>
+<p>The ranking (<a href="{{ aq('/leaderboard') }}">/leaderboard</a>) is public: it shows your Discord username, points, wins and streaks. While you play, other signed-in players see your username, your Discord picture and <b>only the colors</b> of your guesses, <b>never your words</b>. The picture is loaded from Discord's servers, and its address includes your Discord ID.</p>
+
+<h3>5. Cookies and local storage</h3>
+<p>We only use cookies the game needs to work; none are for advertising or analytics.</p>
+<ul>
+    <li><code>c24_lb</code>: your session; it holds only your Discord ID, signed (30 days).</li>
+    <li><code>c24_oauth</code>: protects the Discord sign-in (10 minutes).</li>
+    <li><code>c24_avr</code>: avoids reloading your profile picture again (1 day).</li>
+    <li><code>keyboard_layout_&lt;language&gt;</code>: the keyboard layout you chose (1 year).</li>
+    <li><code>session</code>: only for the Casa 24 team's "Developer view" (30 days).</li>
+</ul>
+<p>Inside the Discord Activity we use no cookies: the session lives in memory while the Activity is open.</p>
+<p>In your browser's local storage we keep: your guest games and stats, the theme (light/dark), the last language played and the language chosen in Discord, the game mode (guest or leaderboard), whether you dismissed a hint, and a copy of your Discord picture for the header (removed when you log out).</p>
+
+<h3>6. Service providers</h3>
+<ul>
+    <li><b>Discord</b>: sign-in, the Activity and profile pictures (<a href="https://discord.com/privacy">Discord's policy</a>).</li>
+    <li><b>Vercel</b>: hosts the site. Like any web server, Vercel logs technical data about visits (such as the IP address) under its own policy (<a href="https://vercel.com/legal/privacy-policy">Vercel's policy</a>).</li>
+    <li><b>Neon</b>: the database that stores the leaderboard (<a href="https://neon.com/privacy-policy">Neon's policy</a>).</li>
+</ul>
+<p>These services may process data outside Panama (for example, in the United States). We don't share your data with anyone else unless the law requires it.</p>
+
+<h3>7. How long we keep it</h3>
+<p>Your leaderboard account and results are kept until you delete them (or we delete them at your request). Each game's words are deleted after 2 days and request counters after a few minutes.</p>
+
+<h3>8. Deleting your data and your rights</h3>
+<p>On <a href="{{ aq('/leaderboard') }}">/leaderboard</a>, tap your Discord picture and choose <b>"Delete my data" ("Borrar mis datos")</b>: we immediately delete your account, results, saved games and counters, and log you out. You can also email <a href="mailto:{{ contact }}">{{ contact }}</a> to ask for a copy, a correction or the deletion of your data. If you sign in again later, you start from zero.</p>
+
+<h3>9. Children</h3>
+<p>The game is not directed to children under 13 (Discord's minimum age, or the age set by the law of your country). We don't knowingly collect data from children under that age; if you think we did, email us and we will delete it.</p>
+
+<h3>10. Changes</h3>
+<p>If we change this policy, we will update this page and the date above. If the change is important, we will mention it in the game.</p>
+{% endblock %}

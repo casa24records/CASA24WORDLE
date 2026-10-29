@@ -379,6 +379,25 @@
                             </select>
                         </div>
 
+                        {#- Terms / Privacy. Inside Discord the game can't navigate away: discord-activity.js
+                            opens data-c24-external through the shell (SDK openExternalLink). -#}
+                        {% set legal_lang = language.language_code if language.language_code in ('es', 'en') else 'en' %}
+                        <p class="c24-legal-foot c24-legal-foot-settings" data-legal-links>
+                            <a href="{{ aq('/terms?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/terms?lang={{ legal_lang }}">{{ t('legal_terms', 'Terms') }}</a>
+                            · <a href="{{ aq('/privacy?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/privacy?lang={{ legal_lang }}">{{ t('legal_privacy', 'Privacy') }}</a>
+                        </p>
+                        {% if in_activity %}
+                        {#- Discord Activity: delete my data without leaving Discord (in-page confirm from
+                            discord.js, then discord-activity.js posts /api/me/delete with the Bearer session) -#}
+                        <form method="dialog" class="c24-activity-delete" data-activity-delete data-confirm-event
+                            data-confirm="{{ t('lb_delete_confirm', "Delete all your leaderboard data? This can't be undone.") }}"
+                            data-confirm-ok="{{ t('lb_delete', 'Delete my data') }}" data-confirm-cancel="{{ t('lb_cancel', 'Cancel') }}"
+                            data-error="{{ t('lb_error', 'Something went wrong') }}">
+                            <button type="submit" class="c24-activity-delete-btn">{{ t('lb_delete', 'Delete my data') }}</button>
+                            <span class="c24-activity-delete-status" data-activity-delete-status role="status"></span>
+                        </form>
+                        {% endif %}
+
                     </div>
                 </div>
             </div>

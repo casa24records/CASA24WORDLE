@@ -70,7 +70,10 @@
         "lb_live_open": "Sehen, wer heute spielt",
         "activity_pick_title": "Wähle deine Sprache",
         "activity_loading_game": "Spiel wird geladen…",
-        "activity_lang_button": "Sprache ändern"
+        "activity_lang_button": "Sprache ändern",
+        "legal_terms": "Bedingungen",
+        "legal_privacy": "Datenschutz",
+        "lb_cancel": "Abbrechen"
     },
     "right_to_left": "false",
     "help": {

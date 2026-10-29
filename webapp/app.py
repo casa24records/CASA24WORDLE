@@ -637,12 +637,63 @@ def activity_page():
     return activity_shell(request.args.get("lang"))
 
 
+# Terms of Service and Privacy Policy (public, needed for Discord App Verification /
+# Discovery). Texts: templates/terms.html and templates/privacy.html (Spanish and
+# English, full); the other 8 languages read the English one. Change the contact
+# address or the date HERE only: both pages and the tests read these constants.
+LEGAL_CONTACT_EMAIL = "casa24records@gmail.com"
+LEGAL_OPERATOR = "Casa 24 Records"
+LEGAL_CITY = {"es": "Ciudad de Panamá, Panamá", "en": "Panama City, Panama"}
+LEGAL_UPDATED = datetime.date(2026, 10, 29)
+LEGAL_LANGS = ("es", "en")
+LEGAL_LICENSE_URL = "https://github.com/casa24records/CASA24WORDLE/blob/main/LICENSE"
+LEGAL_PAGES = ("terms", "privacy")
+
+
+def legal_lang():
+    """es or en: ?lang= wins, else the browser's Accept-Language (anything else: en)."""
+    lang = request.args.get("lang")
+    if lang in LEGAL_LANGS:
+        return lang
+    return request.accept_languages.best_match(LEGAL_LANGS) or "en"
+
+
+def legal_page(name):
+    lang = legal_lang()
+    months = {"es": ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+                     "septiembre", "octubre", "noviembre", "diciembre"],
+              "en": ["January", "February", "March", "April", "May", "June", "July", "August",
+                     "September", "October", "November", "December"]}
+    d = LEGAL_UPDATED
+    updated = (f"{d.day} de {months['es'][d.month - 1]} de {d.year}" if lang == "es"
+               else f"{months['en'][d.month - 1]} {d.day}, {d.year}")
+    response = make_response(render_template(
+        f"{name}.html", ui=lang, page=name, updated=updated, updated_iso=d.isoformat(),
+        contact=LEGAL_CONTACT_EMAIL, operator=LEGAL_OPERATOR, city=LEGAL_CITY[lang],
+        license_url=LEGAL_LICENSE_URL,
+    ))
+    response.headers["Content-Language"] = lang
+    response.headers["Vary"] = "Accept-Language"
+    return response
+
+
+@app.route("/terms")
+def terms_page():
+    return legal_page("terms")
+
+
+@app.route("/privacy")
+def privacy_page():
+    return legal_page("privacy")
+
+
 # sitemap
 @app.route("/sitemap.xml")
 def site_map():
     response = make_response(
         render_template(
-            "sitemap.xml", languages=languages, base_url=request.url_root.rstrip("/")
+            "sitemap.xml", languages=languages, base_url=request.url_root.rstrip("/"),
+            legal_pages=LEGAL_PAGES,
         )
     )
     response.headers["Content-Type"] = "application/xml"
@@ -1417,6 +1468,11 @@ def lb_delete_me():
     if not pid:
         return _err("login", 401)
     st.delete_player(pid)  # results and games go with it (on delete cascade)
+    if request.headers.get("Authorization") or request.accept_mimetypes.best == "application/json":
+        # the Discord Activity's Settings (fetch with the Bearer session): no page to go to
+        response = jsonify({"deleted": True})
+        response.headers["Cache-Control"] = "no-store"
+        return response
     response = redirect("/?deleted=1")
     _clear_lb_cookie(response)
     response.headers["Cache-Control"] = "no-store"

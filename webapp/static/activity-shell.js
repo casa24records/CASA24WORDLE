@@ -56,7 +56,7 @@ let sdk = null;
 let handshakeDone = false;
 let session = null;
 let busy = false;
-let auth = "loading";        // loading | denied | error | ready
+let auth = "loading";        // loading | denied | error | deleted | ready
 let everReady = false;
 let reloadGame = false;      // a re-login failed: reload the game once it works again
 let lang = null;             // language of the game in the iframe (null: picker)
@@ -87,7 +87,7 @@ function render() {
     // overlay: refused/error > picker > "Conectando…" > "Cargando juego…" > the game
     let state = "ready";
     let step = "connect";
-    if (auth === "denied" || auth === "error") {
+    if (auth === "denied" || auth === "error" || auth === "deleted") {
         state = auth;
     } else if (lang === null) {
         state = "ready";  // the language picker (the login goes on behind it)
@@ -430,9 +430,28 @@ window.C24Activity = {
         return reauthing;
     },
     setLang(code) { if (langInfo(code) && code !== lang) { openGame(code); } },
+    openExternal(url) {
+        // our /terms and /privacy (or any other site) in the player's browser, through
+        // Discord (it asks the player first). Never a navigation of this page or the iframe.
+        let href;
+        try { href = new URL(String(url), window.location.href); } catch (e) { return Promise.resolve(false); }
+        if (href.protocol !== "https:" && href.protocol !== "http:") { return Promise.resolve(false); }
+        if (!sdk || !handshakeDone) { return Promise.resolve(false); }
+        return Promise.resolve(sdk.commands.openExternalLink({ url: href.href }))
+            .then((r) => !(r && r.opened === false), () => false);
+    },
+    dataDeleted() {
+        // "Delete my data" worked (POST /api/me/delete): forget the session and say so;
+        // "Play again" signs in again (a new, empty account) and reloads the game
+        session = null;
+        reloadGame = true;
+        setAuth("deleted");
+    },
 };
 
 if (overlay) {
+    const again = overlay.querySelector("[data-activity-again]");
+    if (again) { again.addEventListener("click", () => { connect(); }); }
     const retry = overlay.querySelector("[data-activity-retry]");
     if (retry) {
         retry.addEventListener("click", () => {

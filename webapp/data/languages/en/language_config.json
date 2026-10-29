@@ -77,7 +77,10 @@
         "lb_live_open": "See who is playing today",
         "activity_pick_title": "Choose your language",
         "activity_loading_game": "Loading game…",
-        "activity_lang_button": "Change language"
+        "activity_lang_button": "Change language",
+        "legal_terms": "Terms",
+        "legal_privacy": "Privacy",
+        "lb_cancel": "Cancel"
     },
     "right_to_left": "false",
     "help": {

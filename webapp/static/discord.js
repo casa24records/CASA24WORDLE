@@ -126,6 +126,12 @@
         confirmDialog(form.getAttribute("data-confirm"), form.getAttribute("data-confirm-ok"),
             form.getAttribute("data-confirm-cancel"), function (yes) {
                 if (!yes) { return; }
+                if (form.hasAttribute("data-confirm-event")) {
+                    // no page load (the Discord Activity's "Delete my data"): discord-activity.js
+                    // listens for "c24-confirmed" and posts with the Bearer session
+                    form.dispatchEvent(new CustomEvent("c24-confirmed", { bubbles: true }));
+                    return;
+                }
                 if (form.hasAttribute("data-dc-clear")) { save(null); }
                 form.__c24Confirmed = true;
                 HTMLFormElement.prototype.submit.call(form);  // no submit event: no second dialog

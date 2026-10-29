@@ -70,7 +70,10 @@
         "lb_live_open": "Кто играет сегодня",
         "activity_pick_title": "Выбери язык",
         "activity_loading_game": "Загрузка игры…",
-        "activity_lang_button": "Сменить язык"
+        "activity_lang_button": "Сменить язык",
+        "legal_terms": "Условия",
+        "legal_privacy": "Конфиденциальность",
+        "lb_cancel": "Отмена"
     },
     "right_to_left": "false",
     "help": {

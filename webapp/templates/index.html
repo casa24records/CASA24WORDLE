@@ -181,6 +181,8 @@
 
             <footer class="text-center text-xs text-neutral-500 pt-2">
                 <p class="font-bold">Casa 24 Records · Ciudad de Panamá</p>
+                <!-- Terms / Privacy (/terms, /privacy): one language shows (data-l follows <html lang>) -->
+                <p class="c24-legal-foot" data-legal-links v-pre>{% for code in ('es', 'en') %}<span data-l="{{ code }}" lang="{{ code }}"><a href="/terms?lang={{ code }}">{{ tx(code, 'legal_terms', 'Términos' if code == 'es' else 'Terms') }}</a> · <a href="/privacy?lang={{ code }}">{{ tx(code, 'legal_privacy', 'Privacidad' if code == 'es' else 'Privacy') }}</a></span>{% endfor %}</p>
             </footer>
         </main>
 

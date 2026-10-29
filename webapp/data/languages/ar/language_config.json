@@ -70,7 +70,10 @@
         "lb_live_open": "شاهد من يلعب اليوم",
         "activity_pick_title": "اختر لغتك",
         "activity_loading_game": "جارٍ تحميل اللعبة…",
-        "activity_lang_button": "تغيير اللغة"
+        "activity_lang_button": "تغيير اللغة",
+        "legal_terms": "الشروط",
+        "legal_privacy": "الخصوصية",
+        "lb_cancel": "إلغاء"
     },
     "right_to_left": "true",
     "help": {

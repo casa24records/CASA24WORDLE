@@ -70,7 +70,10 @@
         "lb_live_open": "Voir qui joue aujourd'hui",
         "activity_pick_title": "Choisis ta langue",
         "activity_loading_game": "Chargement du jeu…",
-        "activity_lang_button": "Changer de langue"
+        "activity_lang_button": "Changer de langue",
+        "legal_terms": "Conditions",
+        "legal_privacy": "Confidentialité",
+        "lb_cancel": "Annuler"
     },
     "right_to_left": "false",
     "help": {

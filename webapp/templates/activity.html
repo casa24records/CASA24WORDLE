@@ -43,7 +43,7 @@
         </div>
     </section>
 
-    <!-- connecting / loading / refused / error; "Try again" is the only button -->
+    <!-- connecting / loading / refused / error ("Try again") / data deleted ("Play again": signs in again) -->
     <div id="c24-activity-overlay" class="c24-activity-overlay" data-state="loading" data-step="connect" role="status" aria-live="polite">
         <div class="c24-activity-box">
             <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="" class="c24-activity-kolo">
@@ -51,7 +51,9 @@
             <p class="c24-activity-msg c24-step-game" data-when="loading" data-loading-game>Cargando juego…</p>
             <p class="c24-activity-msg" data-when="denied"><span lang="es">Para jugar en Discord necesitamos tu permiso (solo tu nombre de usuario).</span> <span lang="en">To play in Discord we need your permission (only your username).</span></p>
             <p class="c24-activity-msg" data-when="error"><span lang="es">No pudimos conectar con Discord. Intenta de nuevo, o cierra y vuelve a abrir la actividad.</span> <span lang="en">We couldn't connect to Discord. Try again, or close and reopen the activity.</span></p>
+            <p class="c24-activity-msg" data-when="deleted"><span lang="es">Listo: borramos tus datos del leaderboard.</span> <span lang="en">Done: your leaderboard data was deleted.</span></p>
             <button type="button" class="c24-activity-retry" data-activity-retry>Intentar de nuevo / Try again</button>
+            <button type="button" class="c24-activity-retry c24-activity-again" data-activity-again>Volver a jugar / Play again</button>
         </div>
     </div>
 </body>

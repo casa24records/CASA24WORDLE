@@ -70,7 +70,10 @@
         "lb_live_open": "Bugün kimlerin oynadığını gör",
         "activity_pick_title": "Dilini seç",
         "activity_loading_game": "Oyun yükleniyor…",
-        "activity_lang_button": "Dili değiştir"
+        "activity_lang_button": "Dili değiştir",
+        "legal_terms": "Koşullar",
+        "legal_privacy": "Gizlilik",
+        "lb_cancel": "İptal"
     },
     "right_to_left": "false",
     "help": {
