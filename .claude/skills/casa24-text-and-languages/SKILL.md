@@ -109,3 +109,4 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
 - Unknown codes such as `/it` redirect to `/`.
 - **To remove a language:** `git rm -r webapp/data/languages/<code>`. Nothing else is needed.
 - Removed languages can't be restored with one command any more (the `upstream` remote was removed). It would mean adding the original project back as a remote by hand. Ask the owner first.
+- New keys (2026-10-29): `legal_terms`, `legal_privacy` (all 10 languages; the pages themselves are es/en) and `lb_cancel` (was missing; inline fallback only).

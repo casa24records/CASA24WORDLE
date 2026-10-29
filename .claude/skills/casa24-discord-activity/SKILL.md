@@ -131,3 +131,6 @@ Symptom: in Discord a typed word was never sent (no POST /api/guess in the logs)
 - In Discord desktop, keys typed before clicking inside the Activity go to Discord's chat box — click the board first.
 Sync works both ways (Activity → web, web → Activity, both open with focus refresh); tests in `tests/test_activity.py` (`…physical_keyboard…`, `…on_screen_keys_and_both_sync_directions`, `…web_guess_then_activity_launch`, `…guess_error_is_shown_and_logged`).
 Known small issue: if a header button keeps focus after closing its window with Esc, Enter also reopens that window (guess still saved).
+
+## Going public (2026-10-29)
+See `docs/discord-publish-guide.md`. Unverified Activities: only the team, App Testers (≤50) and servers under 25 members. App Verification (team owner identity via Stripe + Terms/Privacy URLs + description/icon) lets anyone play; Discovery (art assets, tags, support server) is optional on top. Inside the Activity, Settings has Terms/Privacy (opened with the SDK `openExternalLink` through the shell — never navigate) and "Borrar mis datos" (Bearer DELETE → shell shows "datos borrados" + "Volver a jugar", which signs in again on the same SDK instance), as Discord's Developer Policy requires easy access to the privacy policy and deletion.
