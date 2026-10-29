@@ -1,6 +1,6 @@
 ---
 name: casa24-responsive
-description: Make Casa 24 Wordle work well on every screen — small/large phones, landscape, tablets, laptops, big desktops. Layout rules (dvh, board sized from leftover height, square tiles, key sizes, modals that scroll, safe areas), where each layout class lives (including the live view's sidebar/bottom-sheet breakpoints), what the 2026-10-26 fixes changed and what is still to do (Tailwind compile, WOFF2), NYT Wordle's measured layout, performance (Vue/Tailwind CDN, fonts, WebP, caching) and the sizes to test. Use for any mobile, desktop, responsive, layout, zoom, landscape, or page-speed question.
+description: Make Casa 24 Wordle work well on every screen — small/large phones, landscape, tablets, laptops, big desktops. Layout rules (dvh, board sized from leftover height, square tiles, key sizes, modals that scroll, safe areas), where each layout class lives (including the live view's sidebar/bottom-sheet breakpoints), what the 2026-10-26 fixes changed and what is still to do (WOFF2), the Discord Activity inside Discord (safe-area variables, PIP/grid layout modes, portrait lock), NYT Wordle's measured layout, performance (self-hosted Vue, compiled Tailwind, fonts, WebP, caching) and the sizes to test. Use for any mobile, desktop, responsive, layout, zoom, landscape, Activity layout, or page-speed question.
 ---
 
 # Responsive layout (phones → desktop)
@@ -23,13 +23,22 @@ Based on NYT Wordle, which was measured directly.
   - Close with Esc, and make the close button at least a 44px tap target.
   - On small phones, shrink the Kolo picture.
 - **Viewport meta:** `width=device-width, initial-scale=1, viewport-fit=cover`. **No `user-scalable=no`**: let low-vision players pinch-zoom. Stop double-tap zoom on keys with `touch-action: manipulation`.
-- **Safe areas:** `padding-bottom: max(8px, env(safe-area-inset-bottom))` on the keyboard, `env(safe-area-inset-top)` on the header, plus left and right insets in landscape.
+- **Safe areas:** `padding-bottom: max(8px, env(safe-area-inset-bottom))` on the keyboard, `env(safe-area-inset-top)` on the header, plus left and right insets in landscape. Inside the Discord Activity, Discord's own insets win (next section).
 - **Touch vs mouse:** put hover styles inside `@media (hover:hover) and (pointer:fine)` so they don't stick on phones. Add `-webkit-tap-highlight-color`, `user-select:none` on keys, a `:focus-visible` outline on keys, and `overscroll-behavior:none` on html/body (no pull-to-refresh).
 - **Physical keyboard:**
   - Lowercase `event.key`, so Shift and Caps Lock letters work (locale-aware for Turkish).
   - Ignore Ctrl/Meta/Alt and `isComposing`.
   - Blur the on-screen button after a click, so a physical Enter doesn't re-press the last tapped key.
 - **theme-color:** light and dark meta tags (`media="(prefers-color-scheme: …)"`), plus `color-scheme: light dark`. Install settings belong in `site.webmanifest`; `apple-mobile-web-app-capable` is deprecated.
+
+## Inside Discord (Activity)
+Same pages inside Discord's iframe (`casa24-discord-activity`). Extra layout rules:
+- **Safe areas:** Discord's mobile app sets `--discord-safe-area-inset-{top,bottom,left,right}`. `style.css` `:root` defines `--c24-safe-{top,right,bottom,left}` = `var(--discord-safe-area-inset-*, env(safe-area-inset-*))`; layout code uses those, so one rule works on the web and in Discord. Use them (not bare `env()`) in new layout CSS.
+- **Layout modes:** focused (0, normal), **PIP** (1, small floating window) and **grid** (2, tile in a call grid). `discord-activity.js` puts class `c24-pip` (and `data-layout-mode`) on `<html>` in PIP/grid; `style.css` then hides header, keyboard, demo bar, live view, modals and toasts, so only the board shows.
+- **Orientation:** the Portal locks phones and tablets to **portrait** before the page loads; landscape rules still matter for the web and desktop.
+- **Desktop Activity window** can be small and any shape: the existing dvh/container-query layout handles it; test at ~640×360 and ~400×700 too.
+- Accessibility: Tab and Escape must not be captured (Discord uses them).
+- Test in real Discord: `docs/discord-activity-manual.md` (Paso 15).
 
 ## Where things live
 All layout CSS is in the "LAYOUT" section of `webapp/static/style.css`; the class names are used in `game.html` / `index.html`.
@@ -78,14 +87,15 @@ From the audit (before → now):
 - Bugs fixed (tested in `tests/test_input_bugs.py`): Shift/Caps Lock letters, Ctrl/Cmd shortcuts and IME typing, typing in Settings fields, Turkish I/İ, a physical Enter re-pressing the last tapped key, the share button firing many times per tap, de/fr/tr alphabetical keyboards out of order.
 
 Performance done:
-- Vue is the pinned production build `vue@3.5.13` from jsdelivr, with `defer` (was the 2020 dev build 3.0.2 from unpkg).
+- Vue is the pinned production build `vue@3.5.13`, **self-hosted** at `static/vendor/vue.global.prod.js` since `d229fcf` (was jsdelivr; before that the 2020 dev build 3.0.2 from unpkg), with `defer`.
+- **Tailwind is compiled** (done 2026-10-28, `d229fcf`): `static/tailwind.css` (v3.4.17, minified) built by `scripts/build_css.py` with the standalone CLI; no more Play CDN, no unstyled flash. Rebuild after adding classes (`casa24-deploy`). Pixel-diffed: no visual change.
 - Kolo pictures are WebP only, with width/height set; the end-screen Kolo has `loading="lazy"`.
 - Word lists and config are raw UTF-8 JSON in `<script type="application/json" id="c24-data">` (`json_script()` in `app.py`): ar page 381 → 172 KB, ko 347 → 208 KB. The HTML itself can't be cached (it holds the daily word).
 - Every static URL has `?v=<hash>` (`asset()` in `app.py`) and `vercel.json` caches those for a year. Details: `casa24-deploy`.
 - VT323 is preloaded; its `@font-face` is inline in both templates' `<head>` so it uses the same versioned URL.
 
 ## Still to do
-- **Tailwind Play CDN** (`cdn.tailwindcss.com`) is development-only; it builds the CSS in the browser on every load. Fix: run the Tailwind standalone CLI in `scripts/vercel_build.py` to write one minified CSS file (no Node needed). **Waiting for the owner's OK to download the Tailwind CLI.** Until then the script tag must stay synchronous (no `defer`), or the page flashes unstyled.
+- Check the Activity in real Discord on phones (notch, Android buttons, PIP): `docs/discord-activity-manual.md`.
 - **VT323 is still TTF** (about 150 KB). WOFF2 needs `fontTools` and `brotli` in `.venv`. **Waiting for the owner's OK to install them.**
 - **The start screen may still scroll a little on phones** (about 780–886px of content at 375–390px wide). If the owner wants it on one screen, tighten `.c24-start` gaps and the `.c24-hero-kolo` height.
 - The index stats modal is English-only.
@@ -120,4 +130,4 @@ Full list: 320×568, 375×667, 390×844, 430×932, 844×390 (landscape), 768×10
 Only es and en have keyboard files; the rest are built by `_generate_alphabetical_keyboard()` in `app.py`. Key height shrinks with `--rows`, so vi and ko still fit (keys never go below 24px tall).
 
 ## Sources
-NYT Wordle live CSS/JS (Oct 2026); tailwindcss.com/docs/installation/play-cdn; web.dev/blog/viewport-units; MDN viewport meta, env(), ScreenOrientation.lock; dequeuniversity target-size (WCAG 2.5.8); web.dev/learn/design/interaction; vercel.com/docs/frameworks/backend/flask and caching docs; web.dev font and preload guides.
+NYT Wordle live CSS/JS (Oct 2026); docs.discord.com Activities → Mobile and Layout guides; web.dev/blog/viewport-units; MDN viewport meta, env(), ScreenOrientation.lock; dequeuniversity target-size (WCAG 2.5.8); web.dev/learn/design/interaction; vercel.com/docs/frameworks/backend/flask and caching docs; web.dev font and preload guides.

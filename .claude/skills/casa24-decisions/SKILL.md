@@ -1,6 +1,6 @@
 ---
 name: casa24-decisions
-description: Decisions the Casa 24 owner already made about the Wordle project (scope, languages, words, privacy, guest/leaderboard modes, Discord login, live view, database, branding, hosting) and why. Check this before proposing changes so settled questions are not re-asked or undone.
+description: Decisions the Casa 24 owner already made about the Wordle project (scope, languages, words, privacy, guest/leaderboard modes, Discord login, Discord Activity, web↔Discord sync, live view, database, branding, hosting) and why. Check this before proposing changes so settled questions are not re-asked or undone.
 ---
 
 # Decisions already made (October 2026)
@@ -85,6 +85,19 @@ How it works: `casa24-leaderboard` ("Every language"), `casa24-live-view`, `casa
 - Non-Latin scripts: VT323 can't draw Arabic, Korean, Cyrillic or Vietnamese, so those card names and the `/leaderboard` title use the body font. Arabic is RTL on its card, on `/leaderboard?tab=ar` and in the live mini boards.
 - Menu title shortens to "Casa 24" under 480px when the leaderboard is on (room for the Discord slot and trophy).
 
+## Discord Activity and sync (decided 2026-10-28)
+How it works: `casa24-discord-activity`; owner's Portal guide: `docs/discord-activity-manual.md`.
+- **Play inside Discord as an Activity** (Embedded App SDK, no bot), from the **same repo, pages and deploy** as the website. Detected by `frame_id` + `instance_id` + `platform`; without them the website is unchanged.
+- **One Discord app only, "Casa 24 Wordle"** (`1564412150519169067`). The plan's separate "dev" app and preview URL mapping were **dropped**. The app moves to a Discord Team **Casa 24** so members can test before distribution.
+- **Main-only flow, push triggered by the owner:** small commits, the full test suite before every push, straight to `main` (production) **only when the owner says so**; the owner configures the Discord Portal **first** (everything except the switch), then says "push", then turns on URL Mapping + Enable Activities. Production is verified after each push and reverted if something breaks.
+- **Automatic login inside Discord** (authorize → server token exchange → authenticate). No login button; the only button is "Intentar de nuevo" after the player cancels Discord's permission modal. Scope stays **`identify` only**. The first-launch Discord modal is accepted as unavoidable.
+- **No guest mode inside Discord:** everyone plays with their account and counts for the ranking.
+- **Guild Install only** (no User Install). **Individual games** (no shared/multiplayer board).
+- **Sync rule: the server is the single source of truth for a logged-in player's game; the website and the Activity only paint it.** Same game across web, other devices and Discord (`GET /api/state`, `attempt`/409, reload on focus/visibility/every minute/Panama midnight). The leaderboard counts a game once.
+- **Everything self-hosted** (Vue, Discord SDK pinned to 2.5.0, compiled Tailwind): the owner approved the downloads (done in `d229fcf`). Don't add CDNs or external fonts.
+- **No new env vars** for the Activity.
+- Turning it off is a Portal action (untick Enable Activities), no code.
+
 ## Privacy
 - The original author's Google Analytics, Bing verification tag and feedback link were removed. **Add no trackers or analytics** without asking.
 
@@ -93,7 +106,7 @@ How it works: `casa24-leaderboard` ("Every language"), `casa24-live-view`, `casa
 - **Random Kolo on the end screen** (decided 2026-10-26): each game shows one Kolo picked at random, 12 for a win and 2 for a loss (Baby Kolo, Kolo Toilet). The owner allowed the alcohol art (Chill Kolo, DJ Kolo) and Kolo Toilet; this replaces the earlier "avoid alcohol art" rule. **Kolo ft. Pikachu is never used** (trademark). List and how to change it: `casa24-branding`.
 - Gilroy needs a webfont license, so it is git-ignored. VT323 is the pixel font.
 - **Kolo pictures are WebP only** (decided by the owner, 2026-10-26): all Kolo PNGs were deleted. The one exception is `kolo-hero.png`, kept for link previews (og:image). Don't bring PNGs back; `brand_assets.py` writes WebP.
-- **Pending the owner's OK** (both need a download/install): compiling Tailwind with the Tailwind CLI instead of the Play CDN, and converting VT323 to WOFF2 (needs fontTools + brotli). Ask before downloading either. Details: `casa24-responsive`.
+- **Tailwind is compiled** (owner approved, done 2026-10-28 in `d229fcf`; no more Play CDN). **Still pending the owner's OK:** converting VT323 to WOFF2 (needs fontTools + brotli). Ask before installing. Details: `casa24-responsive`.
 - Dark mode exists: it follows the device by default and can be picked in Settings or on the menu.
 
 ## Hosting

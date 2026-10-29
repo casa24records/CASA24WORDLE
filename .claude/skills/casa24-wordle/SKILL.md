@@ -1,6 +1,6 @@
 ---
 name: casa24-wordle
-description: Start here for anything about Casa 24 Wordle — what the game is, how it is built, guest vs leaderboard (Discord) modes and their routes, the live view (who is playing today), what happens when a player presses Enter (game flow, repeated guesses, win/lose end screen), the one-word-per-day rule, and which casa24-* skill covers words, text/accents, branding/dark mode/Kolo/animations, testing, deployment, git/GitHub, or past decisions.
+description: Start here for anything about Casa 24 Wordle — what the game is, how it is built, guest vs leaderboard (Discord) modes and their routes, playing inside Discord (Activity), web↔Discord sync (server is the source of truth), the live view (who is playing today), what happens when a player presses Enter (game flow, repeated guesses, win/lose end screen), the one-word-per-day rule, and which casa24-* skill covers words, text/accents, branding/dark mode/Kolo/animations, testing, deployment, git/GitHub, or past decisions.
 ---
 
 # Casa 24 Wordle (overview)
@@ -8,7 +8,8 @@ description: Start here for anything about Casa 24 Wordle — what the game is, 
 Casa 24 Records' daily word game. Published from `main`; feature work happens on its own branch (see `casa24-git-and-github`). Hosted on Vercel only. The owner is a beginner developer: explain changes in plain language, keep them small, commit after each step.
 
 ## What it is
-- Flask app `webapp/app.py` + Vue 3.5 (jsdelivr) and Tailwind (Play CDN) from CDNs, no build step of our own, in `webapp/templates/` and `webapp/static/`.
+- Flask app `webapp/app.py` + Vue 3.5.13 and Tailwind, **all served from our own origin** since `d229fcf` (Vue in `webapp/static/vendor/`, Tailwind compiled to `webapp/static/tailwind.css` by `scripts/build_css.py`; no CDNs, so it also works inside Discord). Templates in `webapp/templates/`, scripts/styles in `webapp/static/`.
+- **Also a Discord Activity** (play inside Discord, same pages and deploy, detected by `frame_id` + `instance_id` + `platform` in the URL; automatic Discord login, no guest mode there): `casa24-discord-activity`. - **Rule: for leaderboard games the server is the single source of truth; the web page and the Activity only paint it** (`GET /api/state`, `attempt`/409 on `/api/guess`).
 - 10 languages in `webapp/data/languages/`: en, es, ar, fr, pt, ru, de, tr, vi, ko. Casa 24 words only in **es** and **en**.
 - **One word per language per day, the same for every player.** It changes at midnight Panama time (UTC-5). About 1 day in 5 the es/en word is a Casa 24 word. Details: `casa24-daily-word`.
 - **Two ways to play:**
@@ -28,10 +29,12 @@ Casa 24 Records' daily word game. Published from `main`; feature work happens on
   - `/lb/<lang>` (any of the 10; unknown codes go to `/lb/es`): the game in leaderboard mode, same `game.html` with `lb=True`, a line trophy badge, the avatar menu and the live view's people button in the header (sidebar instead from 1024px). Not logged in → Discord login first.
   - `/leaderboard?tab=<lang>|all`: public ranking page (`leaderboard.html`), one tab per language (10) + Combinado; compact line under the table (avatar + @username, or the sign-in button) and the privacy link; "Borrar mis datos" is in the avatar popover.
   - `/auth/discord/login?next=…`, `/auth/discord/callback`, `/auth/logout` (POST): Discord login; the signed `c24_lb` cookie holds only the Discord ID. After login the redirect carries `#dc=<avatar hash>`, which the page keeps in localStorage `c24_dc_avatar` for the header; since 2026-10-27 the server also stores the hash for the live view. Cancel → `/?login=cancelled`, other errors → `/?login=failed`.
-  - `/api/guess` (POST, JSON `{lang, guess}`): checks and colors one guess.
+  - `/api/guess` (POST, JSON `{lang, guess, attempt}`): checks and colors one guess; 409 `stale` + `state` when the game moved on elsewhere.
+  - `/api/state?lang=<lang>` (GET, logged in): today's game as the server sees it (same shape as the page embed); the web and the Activity repaint from it.
   - `/api/live?lang=<lang>` (GET, logged in, any of the 10): other players today, colors only; polled every 8 s by `game.js`. See `casa24-live-view`.
   - `/api/me/delete` (POST): "Delete my data", removes the player and all results.
   - `/admin/hide` (POST): admins (`ADMIN_DISCORD_IDS`) hide a name on the ranking.
+- Discord Activity: the same routes opened through `https://1564412150519169067.discordsays.com` with `?frame_id&instance_id&platform…` (query kept on every navigation), plus `POST /api/activity/token` for the automatic login and `GET /api/leaderboard` for the in-game ranking window. `/` with Activity params goes straight to `/lb/<lang>` and guest `/<lang>` becomes `/lb/<lang>` (no guest mode in Discord). See `casa24-discord-activity`.
 
 ## What happens on Enter (`keyDown` in `webapp/static/game.js`)
 1. Row not full: "partial word" notification. Typing is ignored while `game_over` or while tiles flip (`revealing`).
@@ -45,10 +48,10 @@ Animations and Kolo pictures: `casa24-branding`.
 
 **Leaderboard mode** (`LB` is true in `game.html`; the page has no answer, `todays_word` is empty):
 1. Row not full: same "partial word" notification. Typing also waits while a guess is on its way (`lb_busy`).
-2. `submitLb()`: the repeat check runs in the browser first (same notification). Then `POST /api/guess`.
-3. The server resolves accents, checks the word, refuses repeats/finished games, saves the guess and returns the colors (and, once the game is over, the answer, points and rank). Errors become the usual notifications (`invalid_word`, `repeat`); `login` sends the player to Discord again; anything else shows `lb_error`.
+2. `submitGuess()`: the repeat check runs in the browser first (same notification). Then `POST /api/guess` with `attempt` = the row being filled.
+3. The server resolves accents, checks the word, refuses repeats/finished games, saves the guess and returns the colors (and, once the game is over, the answer, points and rank). If another device (or Discord) already played that row, it answers 409 `stale` with its `state` and the page just repaints (`paintState()`). Errors become the usual notifications (`invalid_word`, `repeat`); `login` sends the player to Discord again; anything else shows `lb_error`.
 4. `applyLbGuess()` puts the server's spelling and colors in the row, then calls the same `commitRow()` as a guest game, so the flip, keyboard colors, bounce and `gameWon`/`gameLost` are identical.
-5. Nothing goes to localStorage. A reload rebuilds the board from the server (`restoreLb()` with the `c24-lb-state` JSON). The end window shows rank and points as big numbers (`.c24-lb-big`) and a trophy "View leaderboard" link instead of the local stats. A finished guest game (any language) shows a small, dismissible hint: a trophy link to `/lb/<lang>` when logged in, else short text + the Discord sign-in button.
+5. Nothing goes to localStorage. A reload rebuilds the board from the server (`restoreLb()` with the `c24-lb-state` JSON). Without reloading, `loadState()` (`GET /api/state`) repaints on focus / visible tab, every 60 s, and at Panama midnight (new empty board). Details: `casa24-leaderboard` ("Sync between devices"). The end window shows rank and points as big numbers (`.c24-lb-big`) and a trophy "View leaderboard" link instead of the local stats. A finished guest game (any language) shows a small, dismissible hint: a trophy link to `/lb/<lang>` when logged in, else short text + the Discord sign-in button.
 
 ## Which skill to use
 | Task | Skill |
@@ -63,6 +66,7 @@ Animations and Kolo pictures: `casa24-branding`.
 | Mobile/desktop layout, screen sizes, zoom, landscape, page speed | `casa24-responsive` |
 | Leaderboard: Discord login, scoring, ranking, storage (Neon Postgres), privacy, admin hide | `casa24-leaderboard` |
 | Live view: who is playing today, sidebar/sheet, mini boards, polling, `/api/live` | `casa24-live-view` |
+| Playing inside Discord (Activity): SDK, Portal, CSP, auto login, turning it on/off | `casa24-discord-activity` (owner guide: `docs/discord-activity-manual.md`) |
 | Developer view / demo (`/demo`): env var and password `casa24-deploy`, run locally `casa24-test-and-preview`, why `casa24-decisions` (how it works: above) | `casa24-deploy` |
 | Why things are the way they are (decisions already made) | `casa24-decisions` |
 
@@ -79,8 +83,11 @@ webapp/templates/        index.html (start screen), game.html (game, also Develo
                          demo_login.html (Developer view password page), leaderboard.html (/leaderboard),
                          _discord.html (shared Discord macros: sign-in button, logo, trophy, avatar, header menu,
                          privacy link + dialog, toasts, #dc= avatar script; imported by index/game/leaderboard)
-webapp/static/           game.js, index.js, theme.js, style.css, images/kolo/ (WebP), fonts/, favicon/
-scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py, casa24/ (seed word CSVs)
+webapp/static/           game.js, index.js, theme.js, style.css, tailwind.css (compiled; source src/tailwind.input.css),
+                         vendor/ (vue.global.prod.js, discord-embedded-app-sdk-2.5.0/), discord-activity.js (Activity only), discord.js, leaderboard.js,
+                         images/kolo/ (WebP), fonts/, favicon/
+scripts/                 merge_words.py, validate_words.py, brand_assets.py, screenshots.py, vercel_build.py, build_css.py (Tailwind), casa24/ (seed word CSVs)
+docs/                    discord-activity-plan.md, discord-activity-checklist.md, discord-activity-manual.md (owner's Portal guide)
 tests/                   pytest + Playwright
 vercel.json              year-long caching for /static/ URLs with ?v= (see casa24-deploy)
 pyproject.toml, .vercelignore, .python-version   Vercel setup

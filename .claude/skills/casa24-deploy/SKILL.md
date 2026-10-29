@@ -1,6 +1,6 @@
 ---
 name: casa24-deploy
-description: Put Casa 24 Wordle online — Vercel setup that already exists (pyproject entrypoint, build step, vercelignore, vercel.json caching with ?v= asset URLs), first deploy steps, env vars (Discord, SECRET_KEY, Neon DATABASE_URL), GitHub auto-deploys, Discord redirect URIs, costs, adding a casa24records.com subdomain at GoDaddy, and troubleshooting. Vercel is the only host. Use for any hosting, domain, or deployment question. Never deploy or touch DNS without the owner's explicit go-ahead.
+description: Put Casa 24 Wordle online — Vercel setup that already exists (pyproject entrypoint, build step, vercelignore, vercel.json caching with ?v= asset URLs), vendored Vue/Discord SDK and the Tailwind rebuild (scripts/build_css.py), first deploy steps, env vars (Discord, SECRET_KEY, Neon DATABASE_URL, optional PUBLIC_URL), GitHub auto-deploys, Discord Developer Portal settings (redirect URIs, Activity URL mapping, Enable Activities), costs, adding a casa24records.com subdomain at GoDaddy, and troubleshooting. Vercel is the only host. Use for any hosting, domain, or deployment question. Never deploy or touch DNS without the owner's explicit go-ahead.
 ---
 
 # Deploy
@@ -28,8 +28,11 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
   - **Rule:** every static link in a template must use `{{ asset('…') }}`, never `url_for('static', …)` or a hand-written `/static/…` (only exception: the `KOLO_BASE` folder prefix). `test_vercel_ready.py` fails otherwise. An unversioned URL would either never be cached long, or, if someone widened the rule, keep an old copy for a year.
   - `og:image` uses `request.url_root.rstrip('/')` + `asset('images/kolo/kolo-hero.png')`.
 - `json_script()` in `app.py` puts the word lists into the page as raw UTF-8 JSON (much smaller Arabic/Korean pages). The HTML itself is never cached long, because it holds the daily word.
-- Outside libraries: **Vue 3.5.13** production build from `cdn.jsdelivr.net` (deferred). **Tailwind still comes from the Play CDN** (`cdn.tailwindcss.com`, development-only); compiling it in `scripts/vercel_build.py` with the Tailwind CLI is pending the owner's OK to download the CLI (see `casa24-responsive`).
-- `.vercelignore` excludes tests, `.venv`, `.claude`, helper scripts (all of `scripts/` except `vercel_build.py`), the **private alias files**, and the Gilroy fonts (commercial).
+- **No CDNs since `d229fcf` (2026-10-28):** everything is served from our own origin (required inside the Discord Activity, whose CSP blocks other hosts; also faster). Sources and SHA-256 in `CREDITS.md`.
+  - **Vue 3.5.13**: `webapp/static/vendor/vue.global.prod.js` (deferred, via `asset()`).
+  - **Discord Embedded App SDK 2.5.0**: `webapp/static/vendor/discord-embedded-app-sdk-2.5.0/` (ESM, ~70 `.mjs` importing each other **without `?v=`**: the folder name carries the version; a new version = a new folder, never overwrite). Loaded only inside the Activity (`casa24-discord-activity`).
+  - **Tailwind v3.4.17, compiled** to `webapp/static/tailwind.css` (committed). **After adding Tailwind classes to a template or `static/*.js`, run `.venv/bin/python scripts/build_css.py`** and commit the new CSS: Vercel does **not** run it. The script downloads the pinned standalone CLI once into `.cache/tailwind/` (git-ignored), checks its SHA-256, and reads `tailwind.config.js` (content globs + a `safelist` for classes built in JS) and `webapp/static/src/tailwind.input.css`. Class missing on the page after a change → you forgot to rebuild, or the class is built from strings in JS (add it to `safelist`).
+- `.vercelignore` excludes tests, `.venv`, `.claude`, helper scripts (all of `scripts/` except `vercel_build.py`, including `build_css.py`), the Tailwind inputs (`.cache/`, `tailwind.config.js`, `webapp/static/src/`), the **private alias files**, and the Gilroy fonts (commercial).
 - Environment variables (Vercel → Casa 24 → casa24-wordle → Settings → Environment Variables). All of these are set for **Production, Preview and Development** (2026-10-26). **Only the owner types secret values, in the dashboard** (an automated write of secrets from Claude was blocked; don't plan to do it). Never write values in the repo, docs or chat; names only.
   | Name | What | Needed for |
   |---|---|---|
@@ -39,6 +42,8 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
   | `DISCORD_CLIENT_SECRET` | that app's client secret | leaderboard |
   | `DATABASE_URL` | Neon pooled connection URL, added by the Neon integration (it also adds `PG*` / `POSTGRES_*` names the app doesn't read) | leaderboard |
   | `ADMIN_DISCORD_IDS` | optional, comma-separated Discord **user** IDs that may hide names (not set yet; it's the owner's user ID, not the app ID) | hiding names |
+  | `PUBLIC_URL` | optional, e.g. `https://casa-24-wordle.vercel.app`: the public address used in share links (`public_url()`); unset → the address the visitor used | only if share links ever show a wrong host (e.g. `discordsays.com` inside the Activity) |
+  - **The Discord Activity needs no new env vars** (it reuses `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `SECRET_KEY`, `DATABASE_URL`).
   - If any of `SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DATABASE_URL` is missing in an environment, the leaderboard is off there (routes 404, no menu switch); the guest game still works.
   - Env changes only apply to **new** deployments: redeploy after editing.
   - Local: the owner runs `vercel env pull .env.local --scope casa-24`; `app.py` reads `.env.local` only when not on Vercel. `.env.local` is git- and Vercel-ignored. `.env.example` lists the names.
@@ -47,7 +52,15 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
   - `https://casa-24-wordle.vercel.app/auth/discord/callback`
   - `https://casa24-wordle-git-leaderboard-discord-casa-24.vercel.app/auth/discord/callback`
   - `http://127.0.0.1:5050/auth/discord/callback` (local)
+  - plus the placeholder `https://127.0.0.1` that Discord's Activity guide asks for (the Activity's code exchange sends no `redirect_uri`).
   - Adding a custom domain or testing another branch preview → add its callback there first. Scope is `identify` only; no bot.
+- **Discord Activity settings** (Developer Portal → Casa 24 Wordle; the owner does them; step-by-step Spanish guide `docs/discord-activity-manual.md`; code side `casa24-discord-activity`):
+  - App owned by the Discord Team **Casa 24** (non-distributed Activities open only for the owner and Team members).
+  - Installation → **Guild Install only** (scope `applications.commands`, no `bot`), installed in the Casa 24 server.
+  - Activities → Settings → Supported Platforms **Web/Desktop, iOS, Android**; Default Orientation Lock **Portrait** (phone, tablet).
+  - **The switch, only after the Activity code is on `main`:** Activities → URL Mappings **`/` → `casa-24-wordle.vercel.app`** (no `https://`), then **Enable Activities** (creates the "Launch" command; never delete it).
+  - **Turn off without code:** untick Enable Activities (or delete the `/` mapping). The website is unaffected.
+  - **Flow (owner, 2026-10-28):** one app, no dev app or preview mapping; the owner configures the Portal first, then says "push"; Claude runs the suite, pushes to `main`, verifies production; then the owner flips the switch.
 - **Changing the demo password:** edit `DEMO_PASSWORD` in Vercel, then redeploy (env changes only apply to new deployments). `SECRET_KEY` is set, so people already in Developer view stay logged in (up to 30 days). Changing `SECRET_KEY` logs everyone out of **both** Developer view and the leaderboard.
   - CLI alternative (only when asked): `vercel env rm DEMO_PASSWORD production`, then `vercel env add DEMO_PASSWORD production` (it prompts for the value, so it never lands in shell history), same for `preview`.
 - Share links, meta tags and `/sitemap.xml` use the visitor's own address (`request.url_root`, `window.location.origin`), so no domain setting is needed.
@@ -82,5 +95,7 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
 | Discord: "Invalid OAuth2 redirect_uri" | that domain's `/auth/discord/callback` is missing from the Discord app's Redirects |
 | Leaderboard 404 / no mode switch on one environment | a leaderboard env var (or `DATABASE_URL`) missing for that environment, or not redeployed. More: `casa24-leaderboard` |
 | Pushed to `main` and production changed | expected: GitHub auto-deploys `main` |
+| A Tailwind class has no effect after a change | `webapp/static/tailwind.css` not rebuilt: run `scripts/build_css.py` and commit (or add JS-built classes to `safelist`) |
+| Discord Activity blank / not in App Launcher | Portal URL Mapping or Enable Activities (see `docs/discord-activity-manual.md`, troubleshooting table) |
 
 Before any deploy, run `.venv/bin/python -m pytest -q tests`. `test_vercel_ready.py` simulates the Vercel import.
