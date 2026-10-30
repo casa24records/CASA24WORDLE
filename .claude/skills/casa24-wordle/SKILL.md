@@ -31,7 +31,7 @@ Casa 24 Records' daily word game. Published from `main`; feature work happens on
   - `/auth/discord/login?next=…`, `/auth/discord/callback`, `/auth/logout` (POST): Discord login; the signed `c24_lb` cookie holds only the Discord ID. After login the redirect carries `#dc=<avatar hash>`, which the page keeps in localStorage `c24_dc_avatar` for the header; since 2026-10-27 the server also stores the hash for the live view. Cancel → `/?login=cancelled`, other errors → `/?login=failed`.
   - `/api/guess` (POST, JSON `{lang, guess, attempt}`): checks and colors one guess; 409 `stale` + `state` when the game moved on elsewhere.
   - `/api/state?lang=<lang>` (GET, logged in): today's game as the server sees it (same shape as the page embed); the web and the Activity repaint from it.
-  - `/api/live?lang=<lang>` (GET, logged in, es/en; other codes 400 `bad_lang`): other players today, colors only; polled every 8 s by `game.js`. See `casa24-live-view`.
+  - `/api/live?lang=<lang>` (GET, logged in, es/en; other codes 400 `bad_lang`): other players today, colors only; polled every 3 s by `game.js` (inside Discord, friends who join the Activity also show at once). See `casa24-live-view`.
   - `/api/me/delete` (POST): "Delete my data", removes the player and all results.
   - `/admin/hide` (POST): admins (`ADMIN_DISCORD_IDS`) hide a name on the ranking.
 - Discord Activity, through `https://1564412150519169067.discordsays.com`:

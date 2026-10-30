@@ -46,18 +46,25 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
   - `bad_lang` 400
   - `rate` 429
   - `store` 503
-- **Rate limit:** its own bucket, **20 per minute** per player (`LIVE_RATE_LIMIT_PER_MINUTE`), stored in `wordle_rate` under the key `"<id>:live"`. So polling never uses up the 30/minute guess budget.
+- **Rate limit:** its own bucket, **40 per minute** per player (20 until 2026-10-30) (`LIVE_RATE_LIMIT_PER_MINUTE`), stored in `wordle_rate` under the key `"<id>:live"`. So polling never uses up the 30/minute guess budget.
 - `Cache-Control: no-store`.
 - Code: `api_live`, `_live_player`, `lb_avatar_url` in `webapp/app.py`; `store.live()` in `webapp/store.py`.
 - `done` / `won` also cover a game that was won or used 6 guesses but has no result row yet.
 
 ## Polling (`game.js`)
-- The first request goes out right after the board renders, then one **every 8 s** (`LIVE_EVERY`).
+- The first request goes out right after the board renders, then one **every 3 s** (`LIVE_EVERY`; was 8 s until 2026-10-30, owner: "as live as it can be").
 - **Paused while the tab is hidden** (`visibilitychange`); it asks again right away when the tab is visible again.
-- **429, 5xx or a network error:** the wait doubles, up to **60 s** (`LIVE_MAX`). It goes back to 8 s after a success.
+- **429, 5xx or a network error:** the wait doubles, up to **60 s** (`LIVE_MAX`). It goes back to 3 s after a success.
 - **401, 404 or 400:** polling stops for this page.
 - The client also checks the data: `avatar_url` must match a Discord CDN pattern (else default avatar), username is cut to 32 characters, and unknown colors become empty cells.
-- Why polling: Vercel serverless has no WebSockets, and one indexed query every 8 s is cheap.
+- Why polling: Vercel serverless has no WebSockets, and one indexed query every 3 s is cheap.
+- **Inside Discord, joins are instant (2026-10-30):** the shell forwards Discord's participant list (`ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE`); a friend who joins the same Activity gets a card at once (`is-pending`, empty board, avatar ring breathes) and `/api/live` is asked right away for their colors. Details: `casa24-discord-activity`.
+
+## Motion (2026-10-30)
+- The list is a `<transition-group name="c24-pop" tag="ul">` keyed by **username**: newcomers pop in (scale 0.8 → 1 with a small overshoot), leavers fade, the rest slide (`.c24-pop-move`).
+- Each mini-board cell is keyed by its color (`k + c`), so it flips (`c24-cell-flip`) only when its color changes: a friend's guess visibly lands.
+- All of it only after the first answer is on screen (`live_settled` → `.is-live` on the list), so the first load doesn't pop as a whole and layout tests measure settled cards. `prefers-reduced-motion` turns it off.
+- Header badge and sheet count use `live_total` (server count + pending Discord cards).
 
 ## Database
 - `CREATE INDEX IF NOT EXISTS wordle_games_lang_day ON wordle_games (lang, day, updated_at DESC)`.
@@ -69,7 +76,7 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
 - `webapp/app.py`: `/api/live` and the constants `LIVE_RATE_LIMIT_PER_MINUTE`, `LIVE_LIMIT`, `LIVE_RECENT_SECONDS`.
 - `webapp/store.py`: `live()`, `clean_avatar`, `AVATAR_HASH_RE`, rate buckets (`RATE_BUCKETS`, `_rate_key`), `SQL_LIVE`, schema.
 - `webapp/templates/game.html`: invite card (`data-live-invite`, Activity only), people button (`.c24-live-btn`, `data-live-open`, facepile `data-live-faces` / people icon `v-else`) and `<aside id="c24-live" class="c24-live">`, only `{% if lb %}`.
-- `webapp/static/game.js`: `LIVE_*` constants, `liveCells`, `livePlayer`, methods `liveFetch`, `liveSchedule`, `liveVisibility`, `applyLive`, `toggleLive`, `closeLive`, `inviteFriends`.
+- `webapp/static/game.js`: `LIVE_*` constants, `liveCells`, `livePlayer`, `liveParticipant`, computed `live_cards` / `live_total`, methods `liveFetch`, `liveSchedule`, `liveVisibility`, `applyLive`, `applyParticipants`, `toggleLive`, `closeLive`, `inviteFriends`.
 - `webapp/static/style.css`: section "live view" plus the `--c24-live` token.
 - Texts: `lb_live_title`, `lb_live_empty`, `lb_live_now`, `lb_live_open`, `lb_live_won` (ganó/won), `lb_live_lost` (perdió/lost; both 2026-10-29), `activity_invite` in the es and en `language_config.json`.
 
@@ -101,7 +108,7 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
 - **Change how many players show:** `LIVE_LIMIT` in `app.py`. The client also caps the list at 50 in `applyLive`.
 - **Change the "en vivo" window:** `LIVE_RECENT_SECONDS` in `app.py` (5 minutes).
 - **Hide a player from the live view:** use admin hide (`casa24-leaderboard`). It hides them from the rankings and the live view together. There is no live-only hide.
-- **Change the facepile:** markup in `game.html` (`live_players.slice(0, 3)`), styles `.c24-facepile`, `.c24-face`, `.c24-live-btn.has-faces` and the `max-width: 399px` rule (2 faces) next to the header-bar rules in `style.css`. Re-run `test_live_facepile_header_fits`.
+- **Change the facepile:** markup in `game.html` (`live_cards.slice(0, 3)`), styles `.c24-facepile`, `.c24-face`, `.c24-live-btn.has-faces` and the `max-width: 399px` rule (2 faces) next to the header-bar rules in `style.css`. Re-run `test_live_facepile_header_fits`.
 - **Change the card look:** `--c24-card-w/-h/-gap` on `.c24-live`, `.c24-live-card`, `.c24-live-avatar`, `.c24-live-grid` in the live section; re-run `tests/test_live_rail.py`.
 - **Change breakpoints:** the `min-width: 860px and min-height: 501px` media query in the style.css live section (and the Discord `min-width: 860px` block near the end of the Activity section). Then re-run the layout tests (see `casa24-responsive`).
 

@@ -82,8 +82,11 @@ const TILE_BASE = "uppercase font-bold select-none text-white";
 const COLOR_RANK = { "incorrect": 1, "semicorrect": 2, "correct": 3 };
 
 // Live view (leaderboard game only): who else is playing today, colors only.
-// Polls GET /api/live every 8 s while the tab is visible; a 429 doubles the wait (max 60 s).
-const LIVE_EVERY = 8000;
+// Polls GET /api/live every 3 s while the tab is visible; a 429 doubles the wait (max 60 s).
+// Inside Discord, the shell also says who is in the Activity the moment they join
+// (C24Activity.onParticipants): their card shows at once, with an empty board until
+// /api/live (asked right away) has their colors.
+const LIVE_EVERY = 3000;
 const LIVE_MAX = 60000;
 const LIVE_COLORS = { "correct": "is-correct", "semicorrect": "is-semicorrect", "incorrect": "is-incorrect" };
 const LIVE_AVATAR_RE = /^https:\/\/cdn\.discordapp\.com\/(avatars\/\d{1,20}\/(a_)?[0-9a-f]{32}\.png|embed\/avatars\/[0-5]\.png)(\?size=\d{2,4})?$/;
@@ -113,6 +116,26 @@ function livePlayer(p) {
         done: p.done === true,
         won: p.won === true,
         live: p.live === true,
+    };
+}
+
+function liveParticipant(p) {
+    // someone in this Discord Activity not in /api/live yet: avatar + empty board
+    var avatar = "https://cdn.discordapp.com/embed/avatars/0.png";
+    try {
+        // the same picture the server will send (app.py lb_avatar_url), so nothing flickers
+        avatar = p.avatar
+            ? "https://cdn.discordapp.com/avatars/" + p.id + "/" + p.avatar + ".png?size=64"
+            : "https://cdn.discordapp.com/embed/avatars/" + Number((BigInt(p.id) >> BigInt(22)) % BigInt(6)) + ".png";
+    } catch (e) { }
+    return {
+        username: String(p.username || "").slice(0, 32),
+        avatar_url: LIVE_AVATAR_RE.test(avatar) ? avatar : "https://cdn.discordapp.com/embed/avatars/0.png",
+        cells: liveCells([]),
+        done: false,
+        won: false,
+        live: true,
+        pending: true,
     };
 }
 
@@ -242,8 +265,10 @@ const app = Vue.createApp({
             lb_day: (LB_STATE && LB_STATE.day) || null,  // the server's Panama date for this game
             lb_local_day: panamaDate(),                 // this device's Panama date (midnight check)
             live_players: [],   // live view: other players today (colors only)
+            live_participants: [],  // Discord Activity: others in this Activity now (no board yet)
             live_count: 0,
             live_loaded: false, // first answer arrived (shows the empty state)
+            live_settled: false, // first cards are on screen: from now on joins pop in (style.css .is-live)
             live_open: false,   // narrow screens: the bottom sheet is open
             lb_ready: !ACTIVITY, // Discord Activity: the first state from the server has been painted
             board_open: false,  // Discord Activity: leaderboard window
@@ -290,6 +315,16 @@ const app = Vue.createApp({
 
         acceptable_characters() {
             return INPUT_CHARS.join("");
+        },
+        live_cards() {
+            // live view cards: the server's players (with boards), then anyone in this
+            // Discord Activity the server doesn't list yet (empty board, shown at once)
+            var known = new Set(this.live_players.map((p) => p.username));
+            var extra = this.live_participants.filter((p) => !known.has(p.username));
+            return this.live_players.concat(extra);
+        },
+        live_total() {
+            return this.live_count + this.live_cards.length - this.live_players.length;
         },
     },
     created() {
@@ -350,8 +385,9 @@ const app = Vue.createApp({
             this.show_stats_modal = true;
         }
         if (LB) {
-            // live view: first ask after the board has rendered, then every 8 s while visible
+            // live view: first ask after the board has rendered, then every 3 s while visible
             document.addEventListener("visibilitychange", this.liveVisibility);
+            if (ACTIVITY) { activityReady().then(() => { window.C24Activity.onParticipants(this.applyParticipants); }); }
             this.$nextTick(() => { setTimeout(this.liveFetch, 0); });
             // sync: the page already has fresh state; reload when the player comes back
             SYNC.at = Date.now();
@@ -1017,6 +1053,17 @@ const app = Vue.createApp({
             this.live_players = players;
             this.live_count = Number.isInteger(data.count) && data.count >= 0 ? data.count : players.length;
             this.live_loaded = true;
+            if (!this.live_settled) { setTimeout(() => { this.live_settled = true; }, 0); }
+        },
+        applyParticipants(list) {
+            // Discord: someone joined or left this Activity. Show them now, then ask
+            // /api/live right away for their board.
+            var before = this.live_participants.map((p) => p.username).join(",");
+            this.live_participants = list.map(liveParticipant);
+            if (this.live_participants.map((p) => p.username).join(",") !== before) {
+                LIVE.delay = LIVE_EVERY;
+                this.liveFetch();
+            }
         },
         toggleLive() {
             if (this.live_open) {

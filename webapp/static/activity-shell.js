@@ -24,6 +24,11 @@
 // Invite: the game posts {type: "c24-invite"}; this page opens Discord's invite
 // dialog (sdk.commands.openInviteDialog, no extra OAuth scope).
 //
+// Live view: who is in this Activity right now (ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE,
+// no extra OAuth scope) is passed to the game page the moment it changes
+// (postMessage {type: "c24-participants", participants: [{id, username, avatar}]},
+// yourself left out), so a friend's card shows up without waiting for /api/live.
+//
 // Layout mode (PIP / grid) is subscribed here and passed to the game page
 // (postMessage {type: "c24-layout", mode, platform}); portrait lock is set here. Discord's
 // safe-area variables exist only on this document: the iframe sits inside them
@@ -66,6 +71,8 @@ let lang = null;             // language of the game in the iframe (null: not ch
 let picking = false;         // the language picker is on screen
 let frameLoaded = false;
 let layoutMode = 0;
+let selfId = null;           // your Discord id (from authenticate): left out of the participants
+let participants = [];       // others in this Activity right now (id, username, avatar hash)
 let resolveReady;
 const ready = new Promise((resolve) => { resolveReady = resolve; });
 
@@ -179,6 +186,7 @@ if (frame) {
         if (!frame.getAttribute("src")) { return; }  // the empty frame before the first game
         frameLoaded = true;
         sendLayout();
+        sendParticipants();
         render();
         // the keyboard types into the board (Tab/Esc are never captured here)
         focusGame();
@@ -244,6 +252,7 @@ window.addEventListener("message", (e) => {
         invite();
     } else if (data.type === "c24-layout-request") {
         sendLayout();
+        sendParticipants();
     } else if (data.type === "c24-log" && typeof data.message === "string") {
         // the game's errors, into Discord's debug logs (the SDK forwards this console)
         console.warn("Casa 24 game: " + data.message.slice(0, 300));
@@ -277,6 +286,38 @@ function onLayout(event) {
     document.documentElement.classList.toggle("c24-pip", mode === 1 || mode === 2);
     document.documentElement.setAttribute("data-layout-mode", String(mode));
     sendLayout();
+}
+
+// ---------- who is in this Activity (passed to the game page's live view) ----------
+
+const PARTICIPANT_ID_RE = /^\d{1,20}$/;
+const AVATAR_HASH_RE = /^(a_)?[0-9a-f]{32}$/;
+
+function sendParticipants() {
+    if (!frame || !frame.contentWindow || !frame.getAttribute("src")) { return; }
+    try {
+        frame.contentWindow.postMessage({ type: "c24-participants", participants: participants },
+            window.location.origin);
+    } catch (e) { }
+}
+
+function onParticipants(event) {
+    // keep only what the cards need: id, username and the avatar hash
+    const list = event && Array.isArray(event.participants) ? event.participants : [];
+    const seen = new Set();
+    participants = [];
+    for (const p of list) {
+        if (!p || typeof p.id !== "string" || !PARTICIPANT_ID_RE.test(p.id)) { continue; }
+        if (p.id === selfId || seen.has(p.id) || typeof p.username !== "string" || !p.username) { continue; }
+        seen.add(p.id);
+        participants.push({
+            id: p.id,
+            username: p.username.slice(0, 32),
+            avatar: typeof p.avatar === "string" && AVATAR_HASH_RE.test(p.avatar) ? p.avatar : null,
+        });
+        if (participants.length >= 50) { break; }
+    }
+    sendParticipants();
 }
 
 // ---------- login ----------
@@ -327,7 +368,8 @@ async function login() {
         return false;
     }
     try {
-        await withTimeout(sdk.commands.authenticate({ access_token: data.access_token }), AUTHENTICATE_MS);
+        const authed = await withTimeout(sdk.commands.authenticate({ access_token: data.access_token }), AUTHENTICATE_MS);
+        if (authed && authed.user && typeof authed.user.id === "string") { selfId = authed.user.id; }
     } catch (e) {
         data = null;
         setAuth("error");
@@ -342,6 +384,11 @@ function extras() {
     // optional commands: an older Discord client may not know them (4002 / 4004)
     try {
         sdk.subscribe("ACTIVITY_LAYOUT_MODE_UPDATE", onLayout).catch(() => { });
+    } catch (e) { }
+    try {
+        // live view: who is here now, then every join / leave as it happens
+        sdk.commands.getInstanceConnectedParticipants().then(onParticipants).catch(() => { });
+        sdk.subscribe("ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE", onParticipants).catch(() => { });
     } catch (e) { }
     try {
         if (sdk.platform === "mobile") {

@@ -6,7 +6,7 @@
 // the whole launch, and this page borrows its session via window.parent.C24Activity.
 //
 // It exposes window.C24Activity for game.js = {session, ready, fetch, reauth,
-// log, url, setLang, invite}. Links with data-c24-external (Terms / Privacy) and links to
+// log, url, setLang, invite, onParticipants}. Links with data-c24-external (Terms / Privacy) and links to
 // other sites open through the shell's openExternal (SDK openExternalLink); the
 // Settings "Delete my data" form posts /api/me/delete with the session, then the
 // shell shows "data deleted" (dataDeleted()). Nothing here navigates the shell.
@@ -121,10 +121,31 @@ function applyLayout(info) {
     document.documentElement.classList.toggle("c24-plat-desktop", platform === "desktop");
 }
 
+// ---------- who is in this Activity, from the shell (live view) ----------
+
+const PARTICIPANT_ID_RE = /^\d{1,20}$/;
+const AVATAR_HASH_RE = /^(a_)?[0-9a-f]{32}$/;
+let participants = null;            // null until the shell has said anything
+const participantListeners = [];
+
+function applyParticipants(list) {
+    if (!Array.isArray(list)) { return; }
+    participants = list.filter((p) => p && typeof p.id === "string" && PARTICIPANT_ID_RE.test(p.id)
+        && typeof p.username === "string" && p.username).slice(0, 50).map((p) => ({
+        id: p.id,
+        username: p.username.slice(0, 32),
+        avatar: typeof p.avatar === "string" && AVATAR_HASH_RE.test(p.avatar) ? p.avatar : null,
+    }));
+    for (const cb of participantListeners) {
+        try { cb(participants.slice()); } catch (e) { }
+    }
+}
+
 window.addEventListener("message", (e) => {
     if (e.origin !== window.location.origin || e.source !== window.parent) { return; }
     const data = e.data || {};
     if (data.type === "c24-layout") { applyLayout(data); }
+    else if (data.type === "c24-participants") { applyParticipants(data.participants); }
 });
 
 // ---------- the session, borrowed from the shell ----------
@@ -192,6 +213,12 @@ window.C24Activity = {
         if (host && window.parent) {
             window.parent.postMessage({ type: "c24-lang", code: String(code) }, window.location.origin);
         }
+    },
+    onParticipants(cb) {
+        // live view: cb([{id, username, avatar}]) now (if known) and on every join / leave
+        if (typeof cb !== "function") { return; }
+        participantListeners.push(cb);
+        if (participants) { try { cb(participants.slice()); } catch (e) { } }
     },
     invite() {
         // Discord's "invite friends to this Activity" window, opened by the shell

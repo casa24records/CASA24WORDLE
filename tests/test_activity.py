@@ -843,6 +843,48 @@ def test_browser_first_launch_follows_discord_locale(lb_env, server, page, disco
     assert page.evaluate("window.__args.authorize.scope") == ["identify"]
 
 
+FRIEND = {"id": "222222222222222222", "username": "amiga", "discriminator": "0",
+          "avatar": "a" * 32, "flags": 0, "bot": False}
+
+
+def test_browser_friend_joining_pops_up_in_live_view(lb_env, server, page, discord, mem):
+    """Live view: someone joins the Activity -> their card shows at once (empty board,
+    "is-pending") and /api/live is asked right away; yourself never; leaving removes it."""
+    _, _, api = setup_activity(page, server)
+    page.set_viewport_size({"width": 1280, "height": 800})
+    page.goto(server + "/?" + ACT + "&lang=es")
+    frame = wait_ready(page)
+    assert "subscribe:ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE" in page.evaluate("window.__calls")
+    frame.wait_for_function(VM + ".live_loaded === true")
+    assert frame.locator(".c24-live-card").count() == 0
+    live_before = len([a for a in api if a[0] == "/api/live"])
+    me = {"id": "1", "username": "x", "discriminator": "0", "avatar": None, "flags": 0, "bot": False}
+    page.evaluate("p => window.__sdk.emitEvent('ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE', {participants: p})",
+                  [me, FRIEND])
+    card = frame.locator(".c24-live-card.is-pending")
+    card.wait_for(state="attached", timeout=2000)  # no waiting for the 3 s poll
+    assert frame.locator(".c24-live-card").count() == 1
+    assert card.get_attribute("title") == "@amiga"
+    assert card.locator("img").get_attribute("src") == \
+        f"https://cdn.discordapp.com/avatars/{FRIEND['id']}/{'a' * 32}.png?size=64"
+    assert card.locator(".c24-live-grid > .is-empty").count() == 30
+    frame.wait_for_function(VM + ".live_total === 1")
+    for _ in range(20):  # asked right away, not on the next 3 s tick
+        if len([a for a in api if a[0] == "/api/live"]) > live_before:
+            break
+        page.wait_for_timeout(50)
+    assert len([a for a in api if a[0] == "/api/live"]) > live_before
+    # the friend leaves the Activity: the waiting card goes
+    page.evaluate("p => window.__sdk.emitEvent('ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE', {participants: p})", [me])
+    frame.wait_for_function("document.querySelectorAll('.c24-live-card').length === 0", timeout=2000)
+    # junk from the SDK never reaches the page
+    page.evaluate("""() => window.__sdk.emitEvent('ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE', {participants: [
+        {id: 'x<img>', username: 'bad'}, {id: '3', username: ''}, {id: '4', username: 'ok', avatar: 'javascript:1'}]})""")
+    frame.wait_for_selector(".c24-live-card", state="attached")
+    assert frame.locator(".c24-live-card").count() == 1
+    assert frame.locator(".c24-live-card img").get_attribute("src").startswith("https://cdn.discordapp.com/embed/avatars/")
+
+
 def test_browser_locale_timeout_shows_picker(lb_env, server, page, discord):
     setup_activity(page, server, mocks_js="{userSettingsGetLocale: () => new Promise(() => {})}")
     page.goto(server + "/?" + ACT)

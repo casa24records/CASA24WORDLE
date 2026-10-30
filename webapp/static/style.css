@@ -1322,6 +1322,24 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     :root:not([data-theme="light"]) .c24-live-grid > .is-incorrect { border-color: var(--c24-line-strong); }
 }
 .c24-live-close:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+/* "Live" motion: a friend who joins pops in, one who leaves fades out, the others slide
+   to their new place (Vue <transition-group name="c24-pop">). A cell is keyed by its
+   color, so it flips only when that color changes (a friend's new guess landing).
+   Only after the first cards are on screen (.is-live), so the page doesn't pop as a whole.
+   A card from Discord's participant list with no board yet ("is-pending") breathes. */
+.is-live > .c24-pop-enter-active { transition: transform 0.32s cubic-bezier(0.2, 1.5, 0.4, 1), opacity 0.2s ease-out; }
+.is-live > .c24-pop-enter-from { opacity: 0; transform: scale(0.8); }
+.is-live > .c24-pop-leave-active { transition: transform 0.2s ease-in, opacity 0.2s ease-in; }
+.is-live > .c24-pop-leave-to { opacity: 0; transform: scale(0.9); }
+.is-live > .c24-pop-move { transition: transform 0.3s ease; }
+.is-live .c24-live-grid > .is-correct, .is-live .c24-live-grid > .is-semicorrect, .is-live .c24-live-grid > .is-incorrect { animation: c24-cell-flip 0.35s ease-out; }
+@keyframes c24-cell-flip { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.c24-live-card.is-pending .c24-live-avatar { animation: c24-live-breathe 1.6s ease-in-out infinite; }
+@keyframes c24-live-breathe { 50% { box-shadow: 0 0 0 3px var(--c24-live); } }
+@media (prefers-reduced-motion: reduce) {
+    .is-live > .c24-pop-enter-active, .is-live > .c24-pop-leave-active, .is-live > .c24-pop-move { transition: none; }
+    .is-live .c24-live-grid > span, .c24-live-card.is-pending .c24-live-avatar { animation: none; }
+}
 /* "Invite friends" (Discord only): the first card, same size, a 64px green circle + a
    two-line uppercase label */
 .c24-live-invite {

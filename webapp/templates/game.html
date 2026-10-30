@@ -90,11 +90,11 @@
                          With players: a small "facepile" (up to 3 avatars) + the count, so it's
                          visible without hunting; with nobody yet: the people icon. -->
                     <button type="button" class="c24-icon-btn c24-live-btn" data-live-open
-                        v-bind:class="{ 'has-faces': live_players.length > 0 }"
+                        v-bind:class="{ 'has-faces': live_cards.length > 0 }"
                         aria-label="{{ t('lb_live_open', 'See who is playing today') }}" aria-controls="c24-live"
                         v-bind:aria-expanded="live_open ? 'true' : 'false'" v-on:click="toggleLive">
-                        <span v-if="live_players.length > 0" class="c24-facepile" data-live-faces aria-hidden="true" v-cloak>
-                            <img v-for="(p, n) in live_players.slice(0, 3)" v-bind:key="n + ':' + p.username"
+                        <span v-if="live_cards.length > 0" class="c24-facepile" data-live-faces aria-hidden="true" v-cloak>
+                            <img v-for="p in live_cards.slice(0, 3)" v-bind:key="p.username"
                                 class="c24-face" v-bind:src="p.avatar_url" alt="" width="22" height="22"
                                 decoding="async" referrerpolicy="no-referrer">
                         </span>
@@ -106,7 +106,7 @@
                             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                             <path d="M21 21v-2a4 4 0 0 0 -3 -3.85"></path>
                         </svg>
-                        <span v-if="live_count > 0" class="c24-live-badge" aria-hidden="true" v-cloak>[[ live_count > 99 ? '99+' : live_count ]]</span>
+                        <span v-if="live_total > 0" class="c24-live-badge" aria-hidden="true" v-cloak>[[ live_total > 99 ? '99+' : live_total ]]</span>
                     </button>
                     {% endif %}
                     <button type="button" class="c24-icon-btn" data-help-open aria-label="{{ t('help_label', 'How to play') }}"
@@ -207,7 +207,7 @@
             aria-labelledby="c24-live-title">
             <div class="c24-live-head">
                 <h2 id="c24-live-title" class="c24-live-title">{{ t('lb_live_title', 'Playing today') }}
-                    <span v-if="live_count > 0" class="c24-live-count" v-cloak>[[ live_count ]]</span></h2>
+                    <span v-if="live_total > 0" class="c24-live-count" v-cloak>[[ live_total ]]</span></h2>
                 <button type="button" class="c24-close c24-live-close" data-live-close
                     aria-label="{{ t('lb_dismiss', 'Close') }}" v-on:click="closeLive">×</button>
             </div>
@@ -220,14 +220,17 @@
                 <span class="c24-live-invite-text">{{ t('activity_invite', 'Invite friends') }}</span>
             </button>
             {% endif %}
-            <p v-if="live_loaded && live_players.length === 0" class="c24-live-empty" v-cloak>{{ t('lb_live_empty', 'No one else is playing right now') }}</p>
-            <ul class="c24-live-list" v-cloak>
-                <li v-for="(p, n) in live_players" v-bind:key="n + ':' + p.username" class="c24-live-card"
+            <p v-if="live_loaded && live_cards.length === 0" class="c24-live-empty" v-cloak>{{ t('lb_live_empty', 'No one else is playing right now') }}</p>
+            <!-- keyed by username: a friend who joins pops in, one who leaves fades out,
+                 reorders slide (style.css .c24-pop-*) -->
+            <transition-group name="c24-pop" tag="ul" class="c24-live-list" v-bind:class="{ 'is-live': live_settled }" v-cloak>
+                <li v-for="(p, n) in live_cards" v-bind:key="p.username" class="c24-live-card"
+                    v-bind:class="{ 'is-pending': p.pending }"
                     v-bind:title="'@' + p.username" v-bind:aria-labelledby="'c24-live-p' + n">
                     <img class="c24-live-avatar" v-bind:src="p.avatar_url" alt="" width="64" height="64"
                         loading="lazy" decoding="async" referrerpolicy="no-referrer">
                     <div class="c24-live-grid" aria-hidden="true">
-                        <span v-for="(c, k) in p.cells" v-bind:key="k" v-bind:class="c"></span>
+                        <span v-for="(c, k) in p.cells" v-bind:key="k + c" v-bind:class="c"></span>
                     </div>
                     <!-- visually hidden: the card's accessible name ("@name, en vivo, ganó") -->
                     <p class="c24-live-info" v-bind:id="'c24-live-p' + n"><span class="c24-live-name">@[[ p.username ]]</span><span
@@ -235,7 +238,7 @@
                         v-if="p.done && p.won" class="c24-live-result is-won">, {{ t('lb_live_won', 'won') }}</span><span
                         v-else-if="p.done" class="c24-live-result is-lost">, {{ t('lb_live_lost', 'lost') }}</span></p>
                 </li>
-            </ul>
+            </transition-group>
         </aside>
         {% endif %}
 

@@ -687,7 +687,7 @@ def test_live_polling_pauses_when_hidden_and_backs_off(server, page):
         page.clock.run_for(ms)
         page.wait_for_timeout(150)  # let the faked response arrive
 
-    advance(8100)
+    advance(3100)
     assert len(calls) == 2
     # hidden tab: no requests at all
     page.evaluate("""() => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => true});
@@ -699,20 +699,20 @@ def test_live_polling_pauses_when_hidden_and_backs_off(server, page):
                              document.dispatchEvent(new Event('visibilitychange')); }""")
     page.wait_for_timeout(150)
     assert len(calls) == 3
-    # 429: the wait doubles (16 s), then success brings it back to 8 s
+    # 429: the wait doubles (6 s), then success brings it back to 3 s
     state["status"] = 429
-    advance(8100)
+    advance(3100)
     assert len(calls) == 4
-    advance(8100)
+    advance(3100)
     assert len(calls) == 4
     state["status"] = 200
-    advance(8000)
+    advance(3000)
     assert len(calls) == 5
-    advance(8100)
+    advance(3100)
     assert len(calls) == 6
     # logged out (401): polling stops
     state["status"] = 401
-    advance(8100)
+    advance(3100)
     assert len(calls) == 7
     advance(120000)
     assert len(calls) == 7
