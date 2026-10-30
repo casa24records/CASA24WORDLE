@@ -569,7 +569,7 @@ def test_lb_route_renders_live_view(lb_env, client, discord):
 def test_live_text_keys_in_es_and_en():
     for lang in ("es", "en"):
         text = app.Language(lang, app.language_codes_5words[lang]).config["text"]
-        for key in ("lb_live_title", "lb_live_empty", "lb_live_now", "lb_live_open"):
+        for key in ("lb_live_title", "lb_live_empty", "lb_live_now", "lb_live_open", "lb_live_won", "lb_live_lost"):
             assert text.get(key, "").strip(), (lang, key)
 
 
@@ -614,7 +614,15 @@ def test_live_sidebar_on_desktop(server, page):
     assert page.locator(".c24-live-card").count() == len(LIVE_PLAYERS)
     assert page.locator(".c24-live-grid").first.locator("span").count() == 30
     first = page.locator(".c24-live-card").first
-    assert "@dj_montuno" in first.inner_text() and page.is_visible(".c24-live-dot")
+    # NYT-style card: only the avatar and the mini board show; name and status are its accessible name
+    assert first.get_attribute("title") == "@dj_montuno"
+    assert page.get_by_role("listitem", name="@dj_montuno, en vivo").count() == 1
+    assert page.get_by_role("listitem", name="@heisen, ganó").count() == 1
+    assert page.get_by_role("listitem", name="@sneaky, perdió").count() == 1
+    assert first.locator(".c24-live-info").bounding_box()["width"] <= 1  # visually hidden
+    assert page.locator(".c24-live-dot").count() == 0
+    assert page.locator(".c24-live-head").bounding_box()["width"] <= 1  # heading kept for screen readers only
+    assert page.get_by_role("complementary", name=re.compile("^Jugando hoy")).count() == 1
     assert first.locator(".is-correct").count() == 4 and first.locator(".is-semicorrect").count() == 1
     img = first.locator("img")
     assert img.get_attribute("referrerpolicy") == "no-referrer" and img.get_attribute("alt") == ""
@@ -710,7 +718,7 @@ def test_live_polling_pauses_when_hidden_and_backs_off(server, page):
     assert len(calls) == 7
 
 
-LIVE_SIZES = [(320, 568), (390, 844), (844, 390), (768, 1024), (1024, 768), (1366, 768), (1920, 1080)]
+LIVE_SIZES = [(320, 568), (390, 844), (844, 390), (768, 1024), (860, 600), (1024, 768), (1366, 768), (1920, 1080)]
 
 
 @pytest.mark.parametrize("width,height", LIVE_SIZES)
@@ -731,7 +739,7 @@ def test_live_layout_fits_without_overlap(server, page, width, height):
     keys = page.locator(".c24-keyboard").bounding_box()
     assert board["y"] >= 0 and board["y"] + board["height"] <= height + 0.5
     assert keys["y"] + keys["height"] <= height + 0.5
-    sidebar = width >= 1024 and height > 500
+    sidebar = width >= 860 and height > 500
     assert page.is_visible("#c24-live") == sidebar
     assert page.is_visible("[data-live-open]") == (not sidebar)
     if sidebar:

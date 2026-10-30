@@ -396,16 +396,53 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 /* board width cap (NYT-like): 350px, 330px on phones */
 .c24-game { --cap: 350px; }
 @media (max-width: 480px) { .c24-game { --cap: 330px; } }
-/* wider than a phone (tablets, desktops, Discord desktop): the keyboard sits right
-   under the board and the pair is centered below the header (NYT). Phones keep the
-   keyboard at the bottom, where thumbs are. The area still shrinks on short screens. */
-@media (min-width: 481px) {
-    .c24-board-area {
-        flex: 0 1 auto;
-        height: calc((var(--cap) - 20px) * 1.2 + 45px);
-        margin-top: auto;
+/* ---------- NYT proportions: one tile unit --t (tablets, desktops, Discord desktop) ----------
+   Wider than a phone, board and keyboard are one group under the header, sized from
+   one unit t = the tile (NYT ratios, owner 2026-10-29): key 0.66t wide x 0.87t tall,
+   Enter/⌫ 1.5 keys, board->keyboard gap 0.38t, top padding 0.25t, so the keyboard is
+   ~1.4x the board's width. t = min(62px cap, height-fit, width-fit):
+     height-fit: 0.25t + (6t + 5 gaps) + 0.38t + 3 key rows + 2 row gaps fit under the
+       header (minus the bottom padding/safe area). Two forms because keys never go
+       under 24px tall: h1 when keys are 0.87t, h2 when the 24px floor applies;
+       the right one is always the smaller.
+     width-fit: a 10-key row (10 x 0.66t + 9 gaps) fits the column minus 16px.
+   --hdr mirrors the header heights above (48 phones, 52, 60 from 768px, 40 in short
+   landscape). Phones (< 481px portrait) and landscape phones keep their own layouts. */
+.c24-game {
+    --hdr: calc(52px + var(--c24-safe-top));
+    --krow: 8px;
+    --padb: max(8px, var(--c24-safe-bottom));
+    --t-avail: calc(var(--vh) * 100 - var(--hdr) - var(--padb) - 25px - 2 * var(--krow));
+    --t-h1: calc(var(--t-avail) / 9.24);
+    --t-h2: calc((var(--t-avail) - 72px) / 6.63);
+    --t-w: calc((min(100vw, 500px) - var(--c24-safe-left) - var(--c24-safe-right) - 16px - 9 * var(--kgap)) / 6.6);
+    --t: min(62px, var(--t-h1), var(--t-h2), var(--t-w));
+    --kw: max(26px, var(--t) * 0.66);
+}
+@media (max-width: 480px) { .c24-game { --hdr: calc(48px + var(--c24-safe-top)); } }
+@media (min-width: 768px) { .c24-game { --hdr: calc(60px + var(--c24-safe-top)); } }
+@media (orientation: landscape) and (max-height: 500px) {
+    .c24-game { --hdr: calc(40px + var(--c24-safe-top)); --krow: 6px; }
+}
+@media (min-width: 481px) and (min-height: 501px), (min-width: 481px) and (orientation: portrait) {
+    .c24-game .c24-board-area {
+        flex: none;
+        height: calc(6 * var(--t) + 25px);
+        margin-top: calc(var(--t) * 0.25);
     }
-    .c24-game .c24-keyboard { margin-bottom: auto; }
+    .c24-game .c24-board { --w: calc(5 * var(--t) + 20px); }
+    .c24-game .c24-keyboard {
+        --kh: max(24px, var(--t) * 0.87);
+        width: max-content;
+        max-width: calc(100% - 16px);
+        margin: calc(var(--t) * 0.38) auto 0;
+        padding: 0;
+        gap: var(--krow);
+    }
+    .c24-game .c24-key-row { justify-content: center; }
+    .c24-game .c24-keyboard .key { flex: 0 1 auto; width: var(--kw); font-size: max(12px, var(--t) * 0.3); }
+    .c24-game .c24-keyboard .key[data-char="⇨"],
+    .c24-game .c24-keyboard .key[data-char="⌫"] { width: calc(var(--kw) * 1.5); font-size: max(16px, var(--t) * 0.36); }
 }
 /* board tiles: font follows the tile size (beats the text-2xl class set in game.js) */
 main .grid-cols-5 > div {
@@ -1120,9 +1157,9 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 .c24-lb-hint .c24-dc-btn { text-decoration: none; }
 /* ---------- live view (leaderboard game): who else plays today, colors only ----------
    One <aside class="c24-live">: a bottom sheet on phones, tablets and landscape phones
-   (opened by the people button .c24-live-btn), a fixed left sidebar from 1024px wide
-   (and 501px tall). The game column stays centered: at 1024px it starts at 262px,
-   right of the 240px sidebar. */
+   (opened by the people button .c24-live-btn), a fixed left rail of 147px cards from
+   860px wide (web: and 501px tall). The game column stays centered; the rail lives in
+   the left gutter (at 860px it ends at 163px, the column starts at 180px). */
 .c24-live-btn { position: relative; }
 .c24-live-badge {
     position: absolute;
@@ -1217,66 +1254,66 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     letter-spacing: 0;
 }
 .c24-live-empty { margin: 0; padding: 0.75rem 12px 1.25rem; font-size: 0.85rem; color: var(--c24-subtle); }
+/* NYT-style cards (rail and sheet alike), 147 x 80: a 64px round avatar and the 6 x 5
+   mini board, nothing else visible. The sheet lays them out in a wrapping grid. */
+.c24-live { --c24-card-w: 147px; --c24-card-h: 80px; --c24-card-gap: 9px; }
 .c24-live-list {
     flex: 1 1 auto;
     min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--c24-card-w));
+    grid-auto-rows: var(--c24-card-h);
+    justify-content: center;
+    gap: var(--c24-card-gap);
     margin: 0;
-    padding: 0 4px 8px;
+    padding: 0 8px 12px;
     list-style: none;
     overflow-y: auto;
     overscroll-behavior: contain;
 }
 .c24-live-card {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border-top: 1px solid var(--c24-line);
+    justify-content: space-between;
+    width: var(--c24-card-w);
+    height: var(--c24-card-h);
+    padding: 0 9px 0 7px;
+    border: 1px solid var(--c24-line);
+    border-radius: 8px;
+    background: transparent;
 }
-.c24-live-card:first-child { border-top: 0; }
 .c24-live-avatar {
     flex: none;
-    width: 34px;
-    height: 34px;
+    width: 64px;
+    height: 64px;
     border-radius: 9999px;
     object-fit: cover;
     background: var(--c24-hover);
 }
-.c24-live-info { flex: 1 1 auto; min-width: 0; }
-.c24-live-name {
-    margin: 0;
-    font-size: 0.9rem;
-    font-weight: 700;
+/* name + status: read by screen readers (the card's accessible name), never shown */
+.c24-live-info {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
     white-space: nowrap;
+    border: 0;
 }
-.c24-live-status { display: flex; align-items: center; gap: 0.4rem; min-height: 1.1rem; margin: 2px 0 0; font-size: 0.72rem; color: var(--c24-subtle); }
-.c24-live-now { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--c24-live); }
-.c24-live-dot { width: 8px; height: 8px; border-radius: 9999px; background: var(--c24-live); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c24-live) 30%, transparent); }
-.c24-live-result {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 9999px;
-    font-size: 0.72rem;
-    font-weight: 800;
-    line-height: 1;
-}
-.c24-live-result.is-won { background: var(--c24-correct-bg); color: var(--c24-correct-fg); }
-.c24-live-result.is-lost { background: var(--c24-absent-bg); color: var(--c24-absent-fg); }
 /* the 6 x 5 mini board: colored squares, nothing written in them */
 .c24-live-grid {
-    --s: 10px;
+    --s: 9px;
     flex: none;
     display: grid;
     grid-template-columns: repeat(5, var(--s));
     grid-auto-rows: var(--s);
-    gap: 2px;
+    gap: 2px 1.75px;
 }
-.c24-live-grid > span { border-radius: 2px; border: 1px solid var(--c24-line-strong); opacity: 0.55; }
+.c24-live-grid > span { border-radius: 1px; border: 1px solid var(--c24-line-strong); opacity: 0.7; }
 .c24-live-grid > .is-correct { background: var(--c24-correct-bg); border-color: var(--c24-correct-bg); opacity: 1; }
 .c24-live-grid > .is-semicorrect { background: var(--c24-present-bg); border-color: var(--c24-present-bg); opacity: 1; }
 .c24-live-grid > .is-incorrect { background: var(--c24-absent-bg); border-color: var(--c24-absent-bg); opacity: 1; }
@@ -1285,21 +1322,23 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     :root:not([data-theme="light"]) .c24-live-grid > .is-incorrect { border-color: var(--c24-line-strong); }
 }
 .c24-live-close:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
-/* "Invite friends" (Discord only): the first card, a round green icon + label */
+/* "Invite friends" (Discord only): the first card, same size, a 64px green circle + a
+   two-line uppercase label */
 .c24-live-invite {
     flex: none;
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-height: 52px;
-    margin: 0 8px 8px;
-    padding: 8px 10px;
+    gap: 6px;
+    width: var(--c24-card-w);
+    height: var(--c24-card-h);
+    margin: 0 auto var(--c24-card-gap);
+    padding: 0 6px 0 7px;
     border: 1px solid var(--c24-line);
-    border-radius: 12px;
-    background: var(--c24-surface);
+    border-radius: 8px;
+    background: transparent;
     color: var(--c24-text);
     font: inherit;
-    text-align: start;
+    text-align: center;
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -1309,34 +1348,41 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 64px;
+    height: 64px;
     border-radius: 9999px;
     background: var(--c24-correct-bg);
     color: var(--c24-correct-fg);
 }
-.c24-live-invite-text { min-width: 0; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.c24-live-invite-text {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+}
 .c24-live-invite:focus-visible, .c24-live-card:focus-visible { outline: 3px solid var(--c24-orange); outline-offset: 2px; }
-/* wide screens: an always-visible rail of cards in the left gutter (no button, no sheet).
-   Its width comes from the gutter, so the game column never moves or shrinks
-   (at 1024px the rail is 238px and ends 12px left of the column); it starts under
-   the full-width header. */
-@media (min-width: 1024px) and (min-height: 501px) {
-    :root {
-        --c24-rail-w: clamp(160px, (100vw - 500px) / 2 - 24px, 280px);
-        --c24-rail-x: 12px;
-        --c24-rail-top: calc(60px + var(--c24-rail-x));
-    }
+@media (hover: hover) and (pointer: fine) {
+    .c24-live-invite:hover { background: var(--c24-hover); }
+}
+/* the rail (≥860px: web when taller than 500px, Discord desktop at any height): fixed in the
+   left gutter, 16px from the edge and 10px under the header, one column of cards that
+   scrolls inside when long. It never moves or shrinks the centered board/keyboard. */
+@media (min-width: 860px) and (min-height: 501px) {
+    :root { --c24-rail-top: calc(60px + 10px); }
     .c24-live, .c24-live.is-open {
         display: flex;
         flex-direction: column;
         position: fixed;
         z-index: 30;
         top: calc(var(--c24-rail-top) + var(--c24-safe-top));
-        bottom: calc(var(--c24-rail-x) + var(--c24-safe-bottom));
-        left: calc(var(--c24-rail-x) + var(--c24-safe-left));
+        bottom: calc(8px + var(--c24-safe-bottom));
+        left: calc(16px + var(--c24-safe-left));
         right: auto;
-        width: var(--c24-rail-w);
+        width: var(--c24-card-w);
         max-height: none;
         margin: 0;
         padding: 0;
@@ -1345,41 +1391,12 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
         border-radius: 0;
         box-shadow: none;
     }
-    .c24-live-head { min-height: 40px; padding: 0 4px; }
-    .c24-live-invite { margin: 0 0 8px; }
-    .c24-live-empty { padding: 0.5rem 4px; }
+    .c24-live-head { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .c24-live-invite { margin: 0 0 var(--c24-card-gap); }
+    .c24-live-empty { padding: 0 2px; font-size: 0.8rem; }
+    .c24-live-list { flex: 0 1 auto; grid-template-columns: var(--c24-card-w); padding: 0; scrollbar-width: none; }
+    .c24-live-list::-webkit-scrollbar { display: none; }
     .c24-live-btn, .c24-live-close, .c24-live-backdrop { display: none !important; }
-}
-/* NYT-style player cards wherever the list is rail-narrow (≤ 300px; the phone sheet is
-   wider): rounded card, big round avatar next to the 6 x 5 mini board, name and
-   status under them. */
-.c24-live-list { container-type: inline-size; }
-@container (max-width: 300px) {
-    .c24-live-list > .c24-live-card {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-areas: "avatar grid" "info info";
-        align-items: center;
-        gap: 8px 12px;
-        margin-bottom: 8px;
-        padding: 12px;
-        border: 1px solid var(--c24-line);
-        border-radius: 14px;
-        background: var(--c24-surface);
-    }
-    .c24-live-card .c24-live-avatar { grid-area: avatar; width: 56px; height: 56px; }
-    .c24-live-card .c24-live-grid { grid-area: grid; justify-self: end; --s: 12px; }
-    .c24-live-card .c24-live-info { grid-area: info; }
-    .c24-live-card .c24-live-name { font-size: 0.95rem; }
-    .c24-live-card .c24-live-status { font-size: 0.8rem; }
-}
-@container (max-width: 190px) {
-    .c24-live-card .c24-live-avatar { width: 44px; height: 44px; }
-    .c24-live-card .c24-live-grid { --s: 10px; }
-    .c24-live-list > .c24-live-card { padding: 10px; gap: 8px; }
-}
-@media (hover: hover) and (pointer: fine) {
-    .c24-live-card:hover { background: var(--c24-hover); }
 }
 /* narrow phones: the menu header holds avatar + trophy + info on the left;
    the info button steps aside so the title keeps its room */
@@ -1548,41 +1565,53 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
     flex-direction: column;
     max-width: 500px;
 }
-/* board and keyboard together, centered under the header (the area shrinks on short panels) */
+/* board and keyboard: the NYT unit-t group of the web's tablets/desktops (see "NYT
+   proportions" above), at every panel size, right under the header */
 :root.c24-embed:not(.c24-plat-mobile) .c24-board-area {
-    flex: 0 1 auto;
-    height: calc((var(--cap) - 20px) * 1.2 + 45px);
-    margin: auto 0 0;
+    flex: none;
+    height: calc(6 * var(--t) + 25px);
+    margin: calc(var(--t) * 0.25) 0 0;
 }
+:root.c24-embed:not(.c24-plat-mobile) .c24-board { --w: calc(5 * var(--t) + 20px); }
 :root.c24-embed:not(.c24-plat-mobile) .c24-keyboard {
-    --kh: var(--kh-stack);
-    margin: 0 auto auto;
-    align-self: stretch;
-    padding: 0 8px max(8px, var(--c24-safe-bottom));
+    --kh: max(24px, var(--t) * 0.87);
+    width: max-content;
+    max-width: calc(100% - 16px);
+    margin: calc(var(--t) * 0.38) auto 0;
+    align-self: center;
+    padding: 0;
+    gap: var(--krow);
 }
-/* short panels: the compact 40px header of the landscape rule, without its grid */
-@media (max-height: 500px) {
-    :root.c24-embed:not(.c24-plat-mobile) .c24-keyboard { padding-bottom: 6px; --kshare: 28; }
-    :root.c24-embed:not(.c24-plat-mobile) .c24-board { --bpad: 8px; }
-    :root.c24-embed:not(.c24-plat-mobile) .c24-board-area { height: calc((var(--cap) - 20px) * 1.2 + 33px); }
-}
-@media (min-width: 860px) {
-    :root.c24-embed:not(.c24-plat-mobile) {
-        --c24-rail-w: clamp(150px, (100vw - 500px) / 2 - 16px, 280px);
-        --c24-rail-x: 8px;
-        --c24-rail-top: var(--c24-rail-x);
+:root.c24-embed:not(.c24-plat-mobile) .c24-key-row { justify-content: center; }
+:root.c24-embed:not(.c24-plat-mobile) .c24-keyboard .key { flex: 0 1 auto; width: var(--kw); font-size: max(12px, var(--t) * 0.3); }
+:root.c24-embed:not(.c24-plat-mobile) .c24-keyboard .key[data-char="⇨"],
+:root.c24-embed:not(.c24-plat-mobile) .c24-keyboard .key[data-char="⌫"] { width: calc(var(--kw) * 1.5); font-size: max(16px, var(--t) * 0.36); }
+/* Discord desktop from 768px wide: the header spans the whole panel like NYT (the
+   landscape-phone rule above would otherwise shrink it to the column on short panels) */
+@media (min-width: 768px) {
+    :root.c24-embed:not(.c24-plat-mobile) .c24-game .c24-header-bar {
+        width: 100vw;
+        margin-inline: calc(50% - 50vw);
+        padding: 0 12px 0 16px;
+        box-sizing: border-box;
     }
+}
+/* live rail in Discord desktop: from 860px wide at any height (the web needs >500px tall).
+   Same rail as the web (live view section): 147px cards, 16px from the left, 10px under
+   the header (40px compact header on short panels, 60px from 501px tall). */
+@media (min-width: 860px) {
+    :root.c24-embed:not(.c24-plat-mobile) { --c24-rail-top: calc(40px + 10px); }
     :root.c24-embed:not(.c24-plat-mobile) .c24-live,
     :root.c24-embed:not(.c24-plat-mobile) .c24-live.is-open {
         display: flex;
         flex-direction: column;
         position: fixed;
         z-index: 30;
-        top: var(--c24-rail-top);
-        bottom: var(--c24-rail-x);
-        left: var(--c24-rail-x);
+        top: calc(var(--c24-rail-top) + var(--c24-safe-top));
+        bottom: calc(8px + var(--c24-safe-bottom));
+        left: calc(16px + var(--c24-safe-left));
         right: auto;
-        width: var(--c24-rail-w);
+        width: var(--c24-card-w);
         max-height: none;
         margin: 0;
         padding: 0;
@@ -1591,17 +1620,18 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
         border-radius: 0;
         box-shadow: none;
     }
-    :root.c24-embed:not(.c24-plat-mobile) .c24-live-head { min-height: 40px; padding: 0 4px; }
-    :root.c24-embed:not(.c24-plat-mobile) .c24-live-invite { margin: 0 0 8px; }
-    :root.c24-embed:not(.c24-plat-mobile) .c24-live-empty { padding: 0.5rem 4px; }
-    :root.c24-embed:not(.c24-plat-mobile) .c24-live-list { padding: 0 0 4px; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-head { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-invite { margin: 0 0 var(--c24-card-gap); }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-empty { padding: 0 2px; font-size: 0.8rem; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-list { flex: 0 1 auto; grid-template-columns: var(--c24-card-w); padding: 0; scrollbar-width: none; }
+    :root.c24-embed:not(.c24-plat-mobile) .c24-live-list::-webkit-scrollbar { display: none; }
     :root.c24-embed:not(.c24-plat-mobile) .c24-live-btn,
     :root.c24-embed:not(.c24-plat-mobile) .c24-live-close,
     :root.c24-embed:not(.c24-plat-mobile) .c24-live-backdrop { display: none !important; }
 }
-/* the full-width header shows from 768px wide when taller than 500px: the rail starts under it */
+/* the full-width 60px header shows when taller than 500px: the rail starts 10px under it */
 @media (min-width: 860px) and (min-height: 501px) {
-    :root.c24-embed:not(.c24-plat-mobile) { --c24-rail-top: calc(60px + var(--c24-rail-x)); }
+    :root.c24-embed:not(.c24-plat-mobile) { --c24-rail-top: calc(60px + 10px); }
 }
 /* very narrow panels: the web's 4px key gaps and side padding (10-key rows ≥ 26px) */
 @media (max-width: 359px) {
@@ -1637,6 +1667,11 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
 .c24-pip .c24-toast { display: none !important; }
 .c24-pip .c24-game { display: flex; max-width: none; }
 .c24-pip .c24-board { --g: 3px; }
+/* the board alone fills the tile (not the unit-t group of Discord desktop) */
+:root.c24-embed.c24-pip .c24-board-area { flex: 1 1 auto; height: auto; margin: 0; }
+:root.c24-embed.c24-pip .c24-board {
+    --w: min(var(--cap), 100cqw - 20px, (100cqh - var(--bpad, 20px) - 5 * var(--g)) / 1.2 + 4 * var(--g));
+}
 
 /* leaderboard window (inside the game page) */
 .c24-board-title { display: flex; align-items: center; justify-content: center; gap: 0.4rem; margin: 0.25rem 2.5rem 0.75rem; }

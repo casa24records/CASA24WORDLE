@@ -198,9 +198,10 @@
 
         {% if lb %}
         <!-- Live view: other players' boards today, colors only (never letters; GET /api/live).
-             ≥1024px wide (Discord desktop ≥860px): a rail of cards in the left gutter, the game
-             column stays centered. Narrower or landscape phones: a bottom sheet opened from
-             the people button in the header. -->
+             ≥860px wide (web: and >500px tall; Discord desktop: any height): an NYT-style rail of
+             small cards in the left gutter (avatar + mini board only; name and status are for
+             screen readers and the title tooltip), the game column stays centered. Narrower or
+             landscape phones: the same cards in a bottom sheet opened from the header button. -->
         <div v-show="live_open" class="c24-live-backdrop" v-on:click="closeLive" v-cloak></div>
         <aside id="c24-live" class="c24-live" data-live v-bind:class="{ 'is-open': live_open }"
             aria-labelledby="c24-live-title">
@@ -213,27 +214,26 @@
             {% if in_activity %}
             <!-- Discord only: opens Discord's invite window (game.js inviteFriends → the shell's SDK) -->
             <button type="button" class="c24-live-invite" data-live-invite v-on:click="inviteFriends">
-                <span class="c24-live-invite-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"
-                    viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                <span class="c24-live-invite-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"
+                    viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" fill="none" stroke-linecap="round"
                     stroke-linejoin="round" focusable="false"><circle cx="9" cy="7" r="4"></circle><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"></path><path d="M19 8v6"></path><path d="M16 11h6"></path></svg></span>
                 <span class="c24-live-invite-text">{{ t('activity_invite', 'Invite friends') }}</span>
             </button>
             {% endif %}
             <p v-if="live_loaded && live_players.length === 0" class="c24-live-empty" v-cloak>{{ t('lb_live_empty', 'No one else is playing right now') }}</p>
             <ul class="c24-live-list" v-cloak>
-                <li v-for="(p, n) in live_players" v-bind:key="n + ':' + p.username" class="c24-live-card">
-                    <img class="c24-live-avatar" v-bind:src="p.avatar_url" alt="" width="34" height="34"
+                <li v-for="(p, n) in live_players" v-bind:key="n + ':' + p.username" class="c24-live-card"
+                    v-bind:title="'@' + p.username" v-bind:aria-labelledby="'c24-live-p' + n">
+                    <img class="c24-live-avatar" v-bind:src="p.avatar_url" alt="" width="64" height="64"
                         loading="lazy" decoding="async" referrerpolicy="no-referrer">
-                    <div class="c24-live-info">
-                        <p class="c24-live-name">@[[ p.username ]]</p>
-                        <p class="c24-live-status">
-                            <span v-if="p.live" class="c24-live-now"><span class="c24-live-dot" aria-hidden="true"></span>{{ t('lb_live_now', 'live') }}</span>
-                            <span v-if="p.done" class="c24-live-result" v-bind:class="p.won ? 'is-won' : 'is-lost'">[[ p.won ? '✓' : '✗' ]]</span>
-                        </p>
-                    </div>
                     <div class="c24-live-grid" aria-hidden="true">
                         <span v-for="(c, k) in p.cells" v-bind:key="k" v-bind:class="c"></span>
                     </div>
+                    <!-- visually hidden: the card's accessible name ("@name, en vivo, ganó") -->
+                    <p class="c24-live-info" v-bind:id="'c24-live-p' + n"><span class="c24-live-name">@[[ p.username ]]</span><span
+                        v-if="p.live" class="c24-live-now">, {{ t('lb_live_now', 'live') }}</span><span
+                        v-if="p.done && p.won" class="c24-live-result is-won">, {{ t('lb_live_won', 'won') }}</span><span
+                        v-else-if="p.done" class="c24-live-result is-lost">, {{ t('lb_live_lost', 'lost') }}</span></p>
                 </li>
             </ul>
         </aside>

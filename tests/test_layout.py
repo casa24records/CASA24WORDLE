@@ -189,6 +189,34 @@ def test_activity_desktop_fits_without_overlap(server, page, width, height):
         assert page.is_visible("[data-live-invite]")
 
 
+@pytest.mark.parametrize("variant,width,height", [
+    ("act", 1000, 493), ("guest", 1366, 768), ("lb", 1366, 768), ("guest", 1600, 813), ("guest", 768, 1024)])
+def test_nyt_proportions_on_tablets_and_desktops(server, page, variant, width, height):
+    """One tile unit t (NYT ratios): keys 0.66t x 0.87t, Enter/⌫ 1.5 keys, keyboard
+    ~1.41x the board, 0.38t between them, the pair centered under the header."""
+    page.set_viewport_size({"width": width, "height": height})
+    open_game(page, server, variant)
+    m = page.evaluate(MEASURE)
+    check_layout(m, width, height)
+    size = f"{variant} {width}x{height}"
+    t = m["tiles"][0]["width"]
+    board, kb = m["board"], m["keyboard"]
+    letter = page.locator(".c24-keyboard .key[data-char='q']").bounding_box()
+    enter = page.locator(".c24-keyboard .key[data-char='⇨']").bounding_box()
+    assert 1.3 <= kb["width"] / board["width"] <= 1.55, (size, kb["width"], board["width"])
+    assert 0.6 <= letter["width"] / t <= 0.75, (size, letter["width"], t)
+    if letter["height"] > 24.5:  # (keys never go under 24px tall)
+        assert 0.8 <= letter["height"] / t <= 0.95, (size, letter["height"], t)
+    assert 1.4 <= enter["width"] / letter["width"] <= 1.6, size
+    assert abs((board["x"] + board["width"] / 2) - width / 2) <= 2, size
+    assert abs((kb["x"] + kb["width"] / 2) - width / 2) <= 2, size
+    assert abs(kb["y"] - (board["y"] + board["height"]) - 0.38 * t) <= 6, size
+    # near the top under the header (NYT), not pinned apart or centered in a big gap
+    header_bottom = m["header"]["y"] + m["header"]["height"]
+    assert board["y"] - header_bottom <= 0.25 * t + 6, size
+    assert t <= 62.5, size
+
+
 def test_activity_phone_keeps_bottom_sheet(browser, server):
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
     page = ctx.new_page()

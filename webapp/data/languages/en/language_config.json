@@ -74,6 +74,8 @@
         "lb_live_empty": "No one else is playing right now",
         "lb_live_now": "live",
         "lb_live_open": "See who is playing today",
+        "lb_live_won": "won",
+        "lb_live_lost": "lost",
         "activity_pick_title": "Choose your language",
         "activity_loading_game": "Loading game…",
         "activity_lang_button": "Change language",

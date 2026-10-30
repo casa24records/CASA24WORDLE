@@ -1070,13 +1070,13 @@ def test_browser_desktop_panel_stays_stacked_with_sidebar(lb_env, browser, serve
             assert abs(tile["width"] - tile["height"]) <= 1 and tile["width"] >= 20, size
             keys = frame.evaluate("[...document.querySelectorAll('.c24-keyboard .key')].map(k => "
                                   "{ const r = k.getBoundingClientRect(); return [r.width, r.height]; })")
-            assert min(w for w, _ in keys) >= 24 and min(h for _, h in keys) >= 26, size
+            assert min(w for w, _ in keys) >= 24 and min(h for _, h in keys) >= 24, size
             sidebar = width >= 860
             assert frame.is_visible("#c24-live") == sidebar, size
             assert frame.is_visible("[data-live-open]") == (not sidebar), size
             if sidebar:
                 side = frame.locator("#c24-live").bounding_box()
-                assert 150 <= side["width"] <= 280 and side["height"] >= height - 80, size
+                assert 140 <= side["width"] <= 280 and side["height"] >= height - 80, size
                 for other in (head, board, kb):
                     assert not boxes_overlap(side, other), size
                 # the game column stays centered in the panel; the rail sits left of it

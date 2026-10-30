@@ -1,6 +1,6 @@
 ---
 name: casa24-live-view
-description: Casa 24 Wordle's live view in leaderboard mode — who else has today's word open (Spanish or English), shown as an NYT-style left rail of cards on desktop (plus an "Invite friends" card inside Discord) or a header facepile/"people" button + bottom sheet, with Discord avatar, @username, live dot, ✓/✗ and a 6×5 mini board of colors only. Covers who appears (presence from opening the game, 0-guess players for 5 minutes) and who can see it, privacy (never words or the answer), the GET /api/live contract, polling and backoff, the DB index and avatar column, files, tests and common tasks. Use for any live view, who is playing, jugando hoy, sidebar, mini boards, polling or /api/live question.
+description: Casa 24 Wordle's live view in leaderboard mode — who else has today's word open (Spanish or English), shown as an NYT-style left rail of 147×80 cards on desktop (plus an "Invite friends" card inside Discord) or a header facepile/"people" button + bottom sheet with the same cards; each card shows only the Discord avatar and a 6×5 mini board of colors (the @username, live and won/lost status are screen-reader text and a tooltip). Covers who appears (presence from opening the game, 0-guess players for 5 minutes) and who can see it, privacy (never words or the answer), the GET /api/live contract, polling and backoff, the DB index and avatar column, files, tests and common tasks. Use for any live view, who is playing, jugando hoy, sidebar, mini boards, polling or /api/live question.
 ---
 
 # Live view: "Jugando hoy" / "Playing today"
@@ -9,12 +9,13 @@ Built 2026-10-27 on branch `live-view`, like NYT Wordle's Discord activity. Owne
 
 ## What players see
 - **Where:**
-  - **≥1024px wide and >500px tall** on the web (`@media (min-width: 1024px) and (min-height: 501px)`), and **≥860px in Discord desktop** (`:root.c24-embed:not(.c24-plat-mobile)`): an always-visible fixed **left rail of NYT-style cards** in the left gutter (2026-10-29). Width `--c24-rail-w: clamp(160px, (100vw - 500px) / 2 - 24px, 280px)` (Discord: `clamp(150px, … - 16px, 280px)`), starting under the 60px header. It **never shrinks or moves the centered board/keyboard** (the old body padding is gone; `test_rail_never_moves_or_shrinks_the_board`). No button and no sheet.
+  - **≥860px wide and >500px tall** on the web (`@media (min-width: 860px) and (min-height: 501px)`), and **≥860px at any height in Discord desktop** (`:root.c24-embed:not(.c24-plat-mobile)`): an always-visible fixed **left rail** (refined 2026-10-29), one column of cards 147px wide (`--c24-card-w`), **16px from the left edge, 10px under the header** (`--c24-rail-top`), scrolling inside when long. It **never shrinks or moves the centered board/keyboard** (`test_rail_never_moves_or_shrinks_the_board`). No button and no sheet; the "Jugando hoy" heading stays only for screen readers. (Earlier the same day: from 1024px with a variable width `--c24-rail-w`; removed.)
   - **Inside Discord only, the first card is "Invitar amigos / Invite friends"** (`.c24-live-invite`, `data-live-invite`, text `activity_invite`): `inviteFriends()` in `game.js` → `C24Activity.invite()` → the shell opens Discord's invite window (see `casa24-discord-activity`).
-  - **Everywhere else** (phones, tablets, landscape phones): a header button in the leaderboard game (first of the right-hand actions, before help) with an orange count badge (`99+` max). **With players (owner, 2026-10-28): a facepile** of the first **3** avatars (22px, overlapping by 8px, `.c24-facepile` / `.c24-face`, `data-live-faces`; only **2 under 400px**) so it's visible without hunting; **with nobody yet: the "people" SVG icon**. The button grows (`.c24-live-btn.has-faces`, min 44px). It opens a **bottom sheet** (max 500px wide, max 70% of the height) over a backdrop. Esc, the × button, a tap on the backdrop, or the button again closes it.
-- **Each card:** round avatar (34px in the sheet; in the rail a rounded card with a 56px avatar next to the mini board, name and status below, via `@container (max-width: 300px)`; `loading=lazy`, `referrerpolicy=no-referrer`), `@username` (ellipsis), a green **"en vivo" / "live" dot** when the last guess or visit was ≤5 minutes ago, **✓** (won) or **✗** (lost) once the player is done, and a **6×5 mini grid of colored squares** using the tile color tokens. **Nothing is written in the squares.**
+  - **Everywhere else** (phones, tablets, landscape phones): a header button in the leaderboard game (first of the right-hand actions, before help) with an orange count badge (`99+` max). **With players (owner, 2026-10-28): a facepile** of the first **3** avatars (22px, overlapping by 8px, `.c24-facepile` / `.c24-face`, `data-live-faces`; only **2 under 400px**) so it's visible without hunting; **with nobody yet: the "people" SVG icon**. The button grows (`.c24-live-btn.has-faces`, min 44px). It opens a **bottom sheet** (max 500px wide, max 70% of the height) over a backdrop, with the **same cards in a wrapping grid** (two per row at 390px). Esc, the × button, a tap on the backdrop, or the button again closes it.
+- **Each card (NYT "Playing now" style, 2026-10-29; team: "solo el profile y el grid"):** 147×80, 1px border, 8px radius, 9px apart; a **64px round avatar** (`loading=lazy`, `referrerpolicy=no-referrer`, `alt=""`) and the **6×5 mini grid** of 9px colored squares using the tile color tokens. **Nothing else is visible:** no @name, no live dot, no ✓/✗, no title. **Nothing is written in the squares.**
+- **Accessible name:** a visually hidden `<p class="c24-live-info">` inside each card holds "@name, en vivo, ganó" (`.c24-live-name`, `.c24-live-now` when last guess or visit ≤5 minutes ago, `.c24-live-result` `is-won`/`is-lost` once done, texts `lb_live_now`, `lb_live_won`, `lb_live_lost`); the `<li>` points to it with `aria-labelledby="c24-live-p<n>"` and has `title="@name"` (mouse tooltip).
 - **Empty state:** "Nadie más está jugando ahora" / "No one else is playing right now" (`lb_live_empty`), shown after the first answer.
-- Title "Jugando hoy" with the count.
+- Title "Jugando hoy" with the count (shown on the sheet; visually hidden on the rail).
 
 ## Who appears
 Leaderboard players with a game **today** (Panama date) in the **same language** (es or en):
@@ -70,7 +71,7 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
 - `webapp/templates/game.html`: invite card (`data-live-invite`, Activity only), people button (`.c24-live-btn`, `data-live-open`, facepile `data-live-faces` / people icon `v-else`) and `<aside id="c24-live" class="c24-live">`, only `{% if lb %}`.
 - `webapp/static/game.js`: `LIVE_*` constants, `liveCells`, `livePlayer`, methods `liveFetch`, `liveSchedule`, `liveVisibility`, `applyLive`, `toggleLive`, `closeLive`, `inviteFriends`.
 - `webapp/static/style.css`: section "live view" plus the `--c24-live` token.
-- Texts: `lb_live_title`, `lb_live_empty`, `lb_live_now`, `lb_live_open`, `activity_invite` in the es and en `language_config.json`.
+- Texts: `lb_live_title`, `lb_live_empty`, `lb_live_now`, `lb_live_open`, `lb_live_won` (ganó/won), `lb_live_lost` (perdió/lost; both 2026-10-29), `activity_invite` in the es and en `language_config.json`.
 
 ## Tests
 - `tests/test_live.py` (backend):
@@ -87,9 +88,10 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
   - SQL shape and the avatar URL helper
 - `tests/test_leaderboard_ui.py` `test_live_*` / `test_*live_view*`:
   - LB game renders the live view; the guest game doesn't
-  - text keys exist in es and en
-  - Playwright with a faked `/api/live`: desktop sidebar, phone sheet, empty state, polling pauses and backs off
-  - layout fits with no overlap at several sizes
+  - text keys exist in es and en (incl. `lb_live_won`/`lb_live_lost`)
+  - Playwright with a faked `/api/live`: desktop sidebar (title tooltip, accessible names like "@heisen, ganó", no `.c24-live-dot`), phone sheet, empty state, polling pauses and backs off
+  - layout fits with no overlap at several sizes (`LIVE_SIZES`, incl. 860×600; rail when `width >= 860 and height > 500`)
+  - `tests/test_live_rail.py` (new 2026-10-29, 9 tests): cards are avatar + grid only (147×80 ±, 64px round avatar, 30 cells, info visually hidden) at 1366×768 web, 1000×493 Discord and 860×600, light and dark; rail 16px left / 10px under the header; rail scrolls inside when long; phone sheet wraps the same cards; Discord phone invite card same size as a player card
   - rail and invite card: `tests/test_layout.py` (`test_rail_never_moves_or_shrinks_the_board`, `test_rail_shows_cards_even_with_nobody_playing`, `test_activity_phone_keeps_bottom_sheet`)
   - facepile (2026-10-28): `test_live_facepile_on_phone_opens_sheet_with_loaded_avatars`, `test_live_people_icon_when_nobody_plays`, `test_live_facepile_header_fits` (es/en at several sizes; helper `open_lb_mobile`)
 - Run: `.venv/bin/python -m pytest -q tests/test_live.py tests/test_leaderboard_ui.py tests/test_layout.py`.
@@ -100,7 +102,8 @@ Only **logged-in leaderboard players**, on the `/lb/<lang>` pages. The guest gam
 - **Change the "en vivo" window:** `LIVE_RECENT_SECONDS` in `app.py` (5 minutes).
 - **Hide a player from the live view:** use admin hide (`casa24-leaderboard`). It hides them from the rankings and the live view together. There is no live-only hide.
 - **Change the facepile:** markup in `game.html` (`live_players.slice(0, 3)`), styles `.c24-facepile`, `.c24-face`, `.c24-live-btn.has-faces` and the `max-width: 399px` rule (2 faces) next to the header-bar rules in `style.css`. Re-run `test_live_facepile_header_fits`.
-- **Change breakpoints:** the `min-width: 1024px and min-height: 501px` media query in the style.css live section (and the Discord `min-width: 860px` block near the end of the Activity section). Then re-run the layout tests (see `casa24-responsive`).
+- **Change the card look:** `--c24-card-w/-h/-gap` on `.c24-live`, `.c24-live-card`, `.c24-live-avatar`, `.c24-live-grid` in the live section; re-run `tests/test_live_rail.py`.
+- **Change breakpoints:** the `min-width: 860px and min-height: 501px` media query in the style.css live section (and the Discord `min-width: 860px` block near the end of the Activity section). Then re-run the layout tests (see `casa24-responsive`).
 
 ## Header at narrow widths (2026-10-29)
 The leaderboard game uses the 2-area header (brand left, actions right: people/facepile, help, trophy, stats, settings, avatar; see `casa24-responsive`). Where the actions need the room, only the "Casa 24" text hides (`.c24-title-text`; on `/lb/` pages at ≤480px, inside the Activity at ≤419px); Kolo, the badge and all buttons stay. Re-run `test_live_facepile_header_fits` and `tests/test_layout.py` after changes.

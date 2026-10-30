@@ -24,7 +24,7 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 - The original Tailwind classes (`bg-white`, `text-neutral-500`, `border-gray-300`, ...) are remapped to tokens in the "base" section. A newly used Tailwind color class needs a mapping there, or it will look wrong in dark mode.
 - **Browser bar color** (`theme-color` meta in both templates): light `#f4efe6` (cream), dark `#0f1a12`. Change them together with `--c24-bg` if the background changes.
 - **Hover** styles go only inside `@media (hover: hover) and (pointer: fine)` at the end of `style.css`, so they don't stick after a tap on phones.
-- **`--c24-live`** (the green "en vivo" dot and label in the live view): light `#1f8a46`, dark `#4cc477`. It is in **all three theme blocks** (`:root`, the dark media query, `:root[data-theme="dark"]`); keep the two dark values identical.
+- **`--c24-live`** (was the green "en vivo" dot of the live view; **unused since 2026-10-29**, when the cards lost their visible status): light `#1f8a46`, dark `#4cc477`. It is in **all three theme blocks** (`:root`, the dark media query, `:root[data-theme="dark"]`); keep the two dark values identical.
 - **Dark-mode keys:** unused keys (`#5d6d61`) must be *lighter* than ruled-out letters (`#2b312d`), or players can't tell them apart.
 
 ## Header
@@ -34,6 +34,8 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 - **People button on the leaderboard game (where there is no rail):** a **facepile** of up to 3 round avatars (2 under 400px; `.c24-face`, 22px, a 2px `--c24-bg` ring so they separate) when others are playing, else a **"people" line SVG icon** (same stroke style as the other header icons, no emoji); both in `.c24-live-btn` with a small orange count badge, opening the live view sheet (owner, 2026-10-28).
 - **Focus ring** (keys, icon buttons): 3px Casa 24 orange + a thin inner ring in the text color, because orange alone is only 2.3:1 on cream.
 - **Nothing may overlap** at any width (320, 375, 390, 844×390 landscape, 768, 1366).
+- **Discord desktop ≥768px wide (2026-10-29):** the header bar spans the full panel like NYT (also on short panels such as 1000×493).
+- **Board and keys (2026-10-29):** from 481px wide (and in Discord desktop) sizes follow NYT's proportions from one tile unit (keys 0.66 × 0.87 of a tile, key font 0.3 of a tile); details in `casa24-responsive`.
 
 ## Start screen styles
 `.c24-hero-kolo`, `.c24-today`, `.c24-play` / `.c24-play-main` (filled green, the player's language) / `.c24-play-alt` (outlined, the other of Español/English) in `style.css`. **`.c24-section-title` and `.c24-chip` were removed** with the "Más idiomas" chips; don't bring them back. Card names use VT323 (`.c24-play-name`, 2rem, uppercase). `.c24-play-demo` is the dashed, transparent "🔒 Developer view" card (team only, shown when `DEMO_PASSWORD` is set). They only use `--c24-*` tokens, so dark mode works automatically. Developer view's own styles (`.c24-demo-bar`, `.c24-demo-lang`, `.c24-demo-btn`, the password page `.c24-demo-login*`) are in the "demo mode" section at the end of `style.css`, also token-only (the one fixed color is the wrong-password red `#d9534f`). Keep the start screen compact; a test checks the page stays under 2,000 px tall.
@@ -49,11 +51,11 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
 
 ## Live view styles
 The "live view" section of `style.css` (after the leaderboard styles; feature: `casa24-live-view`, layout: `casa24-responsive`). Token-only:
-- `.c24-live` (rail ≥1024px web / ≥860px Discord desktop: transparent, floating in the left gutter, NYT-style **rounded cards** on `--c24-surface` with a `--c24-line` border, 14px radius, 56px avatar next to the mini board; otherwise a bottom sheet on `--c24-surface` with rounded top corners and a shadow), `.c24-live-backdrop` (black, 35%).
-- **Invite card** (Discord only, first in the rail, 2026-10-29): `.c24-live-invite`, a rounded card with a round green icon `.c24-live-invite-icon` (`--c24-correct-bg`) and the uppercase label `activity_invite`.
-- Title `.c24-live-title` (small uppercase, `--c24-subtle`) with a count pill `.c24-live-count` (`--c24-hover`).
-- Cards `.c24-live-card` (sheet): round 34px avatar `.c24-live-avatar`, bold `@name` with ellipsis, status line: `.c24-live-now` + `.c24-live-dot` in `--c24-live`, and `.c24-live-result` (✓ on the correct-tile green, ✗ on the absent gray).
-- Mini board `.c24-live-grid`: 6×5 squares (10px in the sheet; 12px in rail cards, 10px in very narrow rails), using the tile tokens `--c24-correct-bg`, `--c24-present-bg`, `--c24-absent-bg`; empty cells are outlined at 55% opacity. In dark mode the absent squares get a `--c24-line-strong` border so they stand out. **Never put letters in them.**
+- `.c24-live` (rail ≥860px: transparent, floating in the left gutter, 16px from the edge, no title shown; otherwise a bottom sheet on `--c24-surface` with rounded top corners, a shadow and the title), `.c24-live-backdrop` (black, 35%).
+- **Cards `.c24-live-card` = NYT "Playing now" (refined 2026-10-29, team: "solo el profile y el grid"), same in rail and sheet:** 147×80 (`--c24-card-w`, `--c24-card-h` on `.c24-live`), transparent, 1px `--c24-line` border, 8px radius, 9px apart (`--c24-card-gap`; the sheet wraps them in a grid). Inside: a **64px round avatar** `.c24-live-avatar` (`--c24-hover` while loading) and the mini board, **nothing else visible**. The @name and live/won/lost status are in the visually hidden `.c24-live-info` (screen readers) plus `title="@name"`. **The live dot and ✓/✗ badges are gone** (`.c24-live-dot`, `.c24-live-result` styles removed); the `--c24-live` token is still defined in the three theme blocks but no longer used.
+- **Invite card** (Discord only, first in the rail/sheet, 2026-10-29): `.c24-live-invite`, **same size and border as a player card**, a 64px green circle `.c24-live-invite-icon` (`--c24-correct-bg`, 30px line icon) and the label `activity_invite` (12px, bold, uppercase, up to 2 lines); `--c24-hover` on hover.
+- Title `.c24-live-title` (small uppercase, `--c24-subtle`) with a count pill `.c24-live-count` (`--c24-hover`), sheet only.
+- Mini board `.c24-live-grid`: 6×5 squares of 9px (gaps 2px × 1.75px, 1px radius), using the tile tokens `--c24-correct-bg`, `--c24-present-bg`, `--c24-absent-bg`; empty cells are outlined at 70% opacity. In dark mode the absent squares get a `--c24-line-strong` border so they stand out. **Never put letters in them.**
 - Header button badge `.c24-live-badge`: orange (`--c24-orange`) with ink text.
 
 ## Dark mode: `webapp/static/theme.js`

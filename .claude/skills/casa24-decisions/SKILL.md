@@ -67,13 +67,13 @@ How it works: `casa24-leaderboard` (login flow, avatar, UI); look: `casa24-brand
 
 ## Live view (decided 2026-10-27)
 How it works: `casa24-live-view`.
-- **While playing the leaderboard game you see who else is playing today's word** (same language), like NYT Wordle's Discord activity: avatar, @username, live dot, ✓/✗ and a mini board.
+- **While playing the leaderboard game you see who else is playing today's word** (same language), like NYT Wordle's Discord activity. Since 2026-10-29 each card shows **only the avatar and the mini board** (see "Game layout" below); @username and live/won/lost are screen-reader text and a tooltip.
 - **Colors only, never letters.** The server computes the colors; words and the answer are never sent.
 - **Discord players only:** only logged-in leaderboard players see it, and only they appear in it. Guest games never leave the browser.
 - **Discord avatars are shown, so the avatar hash is now stored** (`wordle_players.avatar`, Discord's format only, refreshed at login, removed by "Borrar mis datos"). This replaces the earlier "we never store your photo" rule.
 - **Privacy text updated** (`lb_privacy`, `lb_avatar_note`): we store ID, username, profile picture and results for the ranking and "who is playing today"; others see only your colors.
 - **The avatar URL exposes the player's Discord ID** (`cdn.discordapp.com/avatars/<id>/<hash>.png`). Accepted: Discord IDs are public inside Discord. If this ever matters, proxy the images through our domain.
-- Live = polling every 8 s (no WebSockets on Vercel serverless). Desktop: a fixed left rail of cards from 1024px (860px in Discord desktop); a header people button/facepile + bottom sheet elsewhere. The "Casa 24" header text hides on narrow screens to fit the buttons.
+- Live = polling every 8 s (no WebSockets on Vercel serverless). Desktop: a fixed left rail of cards from 860px wide (web: and taller than 500px; Discord desktop: any height; was 1024px on the web until 2026-10-29); a header people button/facepile + bottom sheet elsewhere. The "Casa 24" header text hides on narrow screens to fit the buttons.
 - **Presence (owner, 2026-10-29):** players appear as soon as they open today's leaderboard game, even with 0 guesses (shown while seen in the last 5 minutes). Presence never creates a result.
 
 ## ~~All languages on the menu and the leaderboard~~ (2026-10-28, superseded 2026-10-29)
@@ -90,6 +90,10 @@ How it works: `casa24-text-and-languages`, `casa24-leaderboard`; plan and resear
 ## Game layout (decided 2026-10-29)
 How it works: `casa24-responsive`, `casa24-branding`.
 - **NYT Wordle structure, Casa 24 look:** a slim 2-area header (brand left, icons right), a capped centered board, the keyboard right under it, and the live view as a **left rail of cards that never shrinks or moves the board**. Same `game.html` / `style.css` for the website and the Discord Activity. Must fit with no vertical scroll from Discord PIP (240×180) to 1920×1080.
+- **Refined 2026-10-29: NYT proportions and NYT cards.** Owner: "las dimensiones no son iguales, tiene que verse como New York Times"; a team member: "UI de Playing Now más como el de Wordle, solo el profile y el grid".
+  - From 481px wide (tablets, web desktop) and in Discord desktop, board and keyboard come from **one tile unit** (max 62px): keys 0.66 × 0.87 of a tile (Enter/⌫ 1.5 keys), keyboard about 1.4× the board's width, centered just under the board (no longer pinned to the bottom), board just under the header. Phones and landscape phones unchanged; PIP shows the board alone.
+  - Discord desktop from 768px wide: the header spans the whole panel, like NYT.
+  - Live cards: **only the round profile picture and the 6×5 mini grid** (147×80, 64px avatar); no visible name, live dot, ✓/✗ or "Jugando hoy" title on the rail. The name and status stay for screen readers and as a tooltip. The invite card has the same size. The rail sits 16px from the left, 10px under the header, from **860px wide** (was 1024px on the web). Phones: same cards in the bottom sheet.
 
 ## Discord Activity and sync (decided 2026-10-28)
 How it works: `casa24-discord-activity`; owner's Portal guide: `docs/discord-activity-manual.md`.
