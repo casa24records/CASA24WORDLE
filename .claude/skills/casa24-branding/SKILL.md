@@ -17,7 +17,8 @@ description: Change Casa 24 Wordle's look — brand colors, light/dark mode, Kol
   - correct: green, white text
   - wrong spot: orange, **dark** text, because white on orange fails contrast
   - absent: gray
-- **Share grid:** 🟩 🟧 ⬜, set in `game.js` `emoji_board`.
+- **Share grid:** 🟩 🟧 ⬜, set in `game.js` `emoji_board` (only in the copied Share text).
+- **End window result grid: never emoji** (owner, 2026-10-30: emoji "se ve feo", must look clean). Drawn as flat 20px squares, 4px apart, 3px radius, in the board's tile colors (`--c24-correct-bg`, `--c24-present-bg`, `--c24-absent-bg`; dark mode adds a 1px inset line to the gray ones): `#emoji_board.c24-result-grid` in `game.html`, rows from the computed `result_rows` (parsed from `emoji_board`), styles next to `.c24-result` in `style.css`. Test: `assert_clean_result_grid` in `tests/test_smoke_browser.py`.
 - **Surface tokens** (`--c24-bg`, `--c24-surface`, `--c24-text`, `--c24-subtle`, `--c24-line`, `--c24-key-bg`, ...): light values are in `:root`. Dark values appear **twice** and must stay identical:
   - `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` (automatic)
   - `:root[data-theme="dark"]` (forced)

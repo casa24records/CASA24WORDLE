@@ -316,6 +316,13 @@ const app = Vue.createApp({
         acceptable_characters() {
             return INPUT_CHARS.join("");
         },
+        result_rows() {
+            // end window: the emoji board (still used for Share) as rows of color classes,
+            // drawn as flat squares in the game's own colors (emoji look glossy and off-brand)
+            var kinds = { "🟩": "is-correct", "🟧": "is-semicorrect", "⬜": "is-incorrect" };
+            return String(this.emoji_board || "").split("\n").map((line) =>
+                Array.from(line).map((ch) => kinds[ch]).filter(Boolean)).filter((row) => row.length > 0);
+        },
         live_cards() {
             // live view cards: the server's players (with boards), then anyone in this
             // Discord Activity the server doesn't list yet (empty board, shown at once)

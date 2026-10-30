@@ -421,8 +421,13 @@
                     <!-- a random Kolo celebrates a win or mourns a loss -->
                     <img v-if="game_over && kolo_image" :src="kolo_url()" alt="Kolo" class="c24-kolo mb-2"
                         loading="lazy" decoding="async">
-                    <p class="text-md text-center whitespace-pre-line" id="emoji_board" v-html="emoji_board">
-                    </p>
+                    <!-- the result in the game's colors (Share still copies the emoji version) -->
+                    <div v-if="result_rows.length" id="emoji_board" class="c24-result-grid" role="img"
+                        v-bind:aria-label="emoji_board">
+                        <div v-for="(row, r) in result_rows" v-bind:key="r" class="c24-result-row">
+                            <span v-for="(c, k) in row" v-bind:key="k" v-bind:class="c"></span>
+                        </div>
+                    </div>
                     <p v-if="attempts=='0'" class="text-center text-sm text-gray-600">
                         {{ language.config.text.no_attempts }}
                     </p>

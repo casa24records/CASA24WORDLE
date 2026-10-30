@@ -217,6 +217,7 @@ def test_kolo_after_win(server, page):
     assert "/kolo/win/" in src and src.split("?v=")[0].endswith(".webp"), src
     assert page.locator(".c24-result").inner_text().strip() == "You won!"
     assert page.locator(KOLO_IMG).count() == 1
+    assert_clean_result_grid(page, 1)
     saved = page.evaluate("JSON.parse(localStorage.getItem('en') || '{}').kolo_image")
     assert saved and src.split("?v=")[0].endswith("/kolo/" + saved), (saved, src)  # saved, not re-picked
 
@@ -242,7 +243,22 @@ def test_kolo_after_loss(server, page):
     assert "/kolo/lose/" in src and src.split("?v=")[0].endswith(".webp"), src
     assert page.locator(".c24-result").inner_text().strip() == "Perdiste"
     assert page.locator(KOLO_IMG).count() == 1
+    assert_clean_result_grid(page, 6)
     assert errors == []
+
+
+def assert_clean_result_grid(page, rows):
+    """End window: the result is drawn as flat colored squares (no emoji text);
+    Share still uses the emoji version."""
+    grid = page.locator("#emoji_board")
+    assert grid.inner_text().strip() == ""
+    assert grid.locator(".c24-result-row").count() == rows
+    cells = grid.locator(".c24-result-row > span")
+    assert cells.count() == rows * 5
+    classes = set(cells.evaluate_all("els => els.map(e => e.className)"))
+    assert classes <= {"is-correct", "is-semicorrect", "is-incorrect"}, classes
+    board = page.evaluate(f"{VM}.emoji_board")
+    assert grid.get_attribute("aria-label") == board and set(board) <= set("🟩🟧⬜\n")
 
 
 VM = "document.querySelector('#app').__vue_app__._container._vnode.component.proxy"
