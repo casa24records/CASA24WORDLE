@@ -28,7 +28,6 @@
         "demo_title": "Developer view",
         "demo_intro": "For the Casa 24 team: the same game, with buttons to restart with another word and to fill in the word. Doesn't count in your stats.",
         "lb_view": "View leaderboard",
-        "lb_login": "Sign in with Discord",
         "lb_logout": "Log out",
         "lb_privacy": "Discord handles your login; we never see your password or email. We store your Discord ID, username and profile picture and your results to show the ranking and who is playing today. Other players see only your colors, never your words.",
         "lb_guest_note": "Guest games don't count toward the ranking.",
@@ -53,13 +52,12 @@
         "lb_delete": "Delete my data",
         "lb_delete_confirm": "Delete all your leaderboard data? This can't be undone.",
         "lb_hide": "Hide",
-        "lb_back": "Menu",
+        "lb_back": "Play",
         "lb_signin": "Sign in with Discord",
         "lb_login_cancelled": "You cancelled the Discord sign-in.",
         "lb_avatar_note": "Other players see your Discord picture in the list of who is playing today.",
         "lb_account": "Your Discord account",
         "lb_privacy_title": "Privacy",
-        "lb_play_guest": "Play as guest (doesn't count)",
         "lb_rank_label": "Rank",
         "lb_points_label": "points",
         "lb_point_label": "point",
@@ -82,9 +80,7 @@
         "stats_label": "Statistics",
         "board_label": "Game board",
         "board_row": "Row",
-        "keyboard_label": "Keyboard",
-        "landing_tagline": "One word a day. Six tries.",
-        "landing_or_guest": "or play as guest"
+        "keyboard_label": "Keyboard"
     },
     "help": {
         "title": "How to Play",

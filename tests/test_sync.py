@@ -10,6 +10,7 @@ state (409, focus/visibility, Panama day change) with faked /api/* routes.
 import datetime
 import json
 import threading
+from urllib.parse import urlparse
 
 import pytest
 
@@ -236,7 +237,8 @@ def test_7_panama_day_change_new_empty_game(lb_env, client, discord, mem, today,
 def test_8_guest_web_pages_write_nothing(lb_env, client, discord, mem):
     # (platform=tv is not a Discord Activity: still the guest game; inside the
     # Activity /es redirects to the leaderboard game, see test_activity.py)
-    paths = ["/", "/es", "/en", "/es?frame_id=abc&instance_id=i&platform=tv", "/leaderboard"]
+    paths = ["/es", "/en", "/es?frame_id=abc&instance_id=i&platform=tv", "/leaderboard"]
+    assert client.get("/", follow_redirects=True).status_code == 200  # "/" opens the guest game
     for path in paths:
         assert client.get(path).status_code == 200, path
     assert client.get("/api/state?lang=es").status_code == 401
@@ -244,9 +246,9 @@ def test_8_guest_web_pages_write_nothing(lb_env, client, discord, mem):
     # logged in: guest pages still write nothing
     login(client, discord)
     before = repr(mem.dump())
-    # (signed in, "/" sends you to /lb/<lang> since 2026-11-04; /?menu=1 is the landing)
+    # (signed in, "/" sends you to /lb/<lang> since 2026-11-04; no start page)
     assert client.get("/").status_code == 302
-    for path in ["/?menu=1"] + paths[1:]:
+    for path in paths:
         assert client.get(path).status_code == 200, path
     assert repr(mem.dump()) == before
 
@@ -465,8 +467,31 @@ def test_browser_guest_save_key_ignores_query(server, page, monkeypatch):
     assert page.locator("main .grid-cols-5").first.inner_text().lower().startswith("c")
 
 
-def test_menu_notice_cleanup_keeps_other_params(server, page):
-    page.goto(server + "/?login=cancelled&frame_id=abc&platform=desktop")
+@pytest.mark.parametrize("path,marker,rest", [
+    ("/es?login=failed&x=1", "login-failed", "?x=1"),
+    ("/en?x=1&login=cancelled&y=2", "login-cancelled", "?x=1&y=2"),
+    ("/es?deleted=1", "deleted", ""),
+])
+def test_game_notice_cleanup_keeps_other_params(lb_env, server, page, path, marker, rest):
+    """The one-time notices ("/" forwards ?login=… / ?deleted=1 into the game since
+    2026-11-04) show as a toast; discord.js removes only those params from the address
+    and the toast closes itself."""
+    page.goto(server + path)
     page.wait_for_function("document.querySelector('#app') && window.Vue")
-    page.wait_for_function("!/login=/.test(location.search)")
-    assert page.evaluate("location.search") == "?frame_id=abc&platform=desktop"
+    assert page.locator(f'[data-c24-toast][data-notice="{marker}"]').count() == 1
+    page.wait_for_function("!/(login|deleted)=/.test(location.search)")
+    assert page.evaluate("location.search") == rest
+    assert urlparse(page.url).path == path.split("?")[0]
+    page.wait_for_selector("[data-c24-toast]", state="detached", timeout=9000)
+    # a reload doesn't bring it back
+    page.reload()
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    assert page.locator("[data-c24-toast]").count() == 0
+
+
+def test_game_notice_close_button(lb_env, server, page):
+    page.goto(server + "/es?login=failed")
+    page.wait_for_selector('[data-notice="login-failed"]')
+    assert page.get_attribute('[data-notice="login-failed"]', "role") == "alert"
+    page.click("[data-c24-toast-close]")
+    assert page.locator("[data-c24-toast]").count() == 0

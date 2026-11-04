@@ -54,7 +54,7 @@
     <script type="application/json" id="c24-data">{{ json_script({"word_list": language.word_list, "word_list_supplement": language.word_list_supplement, "characters": language.characters, "input_characters": (language.input_characters if language.input_characters is defined else language.characters), "config": language.config}) }}</script>
     <!-- page settings: todays_word is "" in the leaderboard game (the server colors guesses);
          demo = Developer view; lb = leaderboard game (/lb/<lang>); activity = inside Discord -->
-    <script type="application/json" id="c24-page">{{ json_script({"todays_idx": language.todays_idx | string, "todays_word": language.daily_word, "kolo_base": url_for('static', filename='images/kolo/'), "asset_v": asset_version('images/kolo/'), "demo": (demo is defined and demo) and true or false, "lb": (lb is defined and lb) and true or false, "lb_enabled": (lb_enabled is defined and lb_enabled) and true or false, "activity": in_activity and true or false}) }}</script>
+    <script type="application/json" id="c24-page">{{ json_script({"todays_idx": language.todays_idx | string, "todays_word": language.daily_word, "kolo_base": url_for('static', filename='images/kolo/'), "asset_v": asset_version('images/kolo/'), "demo": (demo is defined and demo) and true or false, "lb": (lb is defined and lb) and true or false, "lb_enabled": (lb_enabled is defined and lb_enabled) and true or false, "activity": in_activity and true or false, "demo_key": (demo_key and not (demo is defined and demo)) and true or false}) }}</script>
     <!-- leaderboard game: today's guesses so far, from the server ({"guesses", "done", "won", "answer", "points", "rank"}) -->
     <script type="application/json" id="c24-lb-state">{{ json_script(lb_state if (lb and lb_state is defined) else none) }}</script>
     {% if in_activity %}
@@ -79,12 +79,20 @@
                         {{ brand.lockup(language.config.language_code) }}</button></h1>{% elif demo %}
                 <h1 class="c24-title c24-header-title uppercase"><a href="{{ aq('/') }}" class="inline-flex items-center gap-2">
                         {{ brand.lockup(language.config.language_code, arrow=false) }}</a></h1>{% else %}
+                <div class="c24-header-start">
+                <!-- website: Discord at the top left (owner, 2026-11-04): "Sign in with Discord" on the
+                     guest game, your avatar menu on the leaderboard game -->
+                {% if lb_enabled and not demo and not in_activity %}
+                {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
+                    t('lb_account', 'Your Discord account'), t('lb_signin', 'Sign in with Discord'),
+                    t('lb_view', 'View leaderboard'), t('lb_logout', 'Log out')) }}
+                {% endif %}
                 <!-- website: the brand opens the same language window as in Discord ("EN ▾");
                      its choices are links to the other language's game (rebrand 2026-11-04) -->
                 <h1 class="c24-title c24-header-title uppercase"><button type="button" class="c24-lang-btn inline-flex items-center gap-2"
                         data-lang-open aria-haspopup="dialog" v-on:click="openLang"
                         aria-label="{{ t('activity_lang_button', 'Change language') }} ({{ language.config.name_native }})">
-                        {{ brand.lockup(language.config.language_code) }}</button></h1>{% endif %}
+                        {{ brand.lockup(language.config.language_code) }}</button></h1></div>{% endif %}
                 <div class="c24-header-side c24-header-end">
                     {% if lb %}
                     <!-- who else is playing today: opens the live sheet (hidden where the sidebar shows).
@@ -145,11 +153,7 @@
                     </button>
                     <!-- Casa 24's door: casa24records.com (replaced Settings, rebrand 2026-11-04) -->
                     {{ brand.door('c24-icon-btn') }}
-                    {% if lb and not in_activity %}
-                    {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
-                        t('lb_account', 'Your Discord account'), t('lb_signin', 'Sign in with Discord'),
-                        t('lb_view', 'View leaderboard'), t('lb_logout', 'Log out')) }}
-                    {% endif %}
+
                 </div>
             </header>
             {% if demo %}
@@ -507,7 +511,15 @@
     </div>
     {% endif %}
 
-    <!-- JS (the theme menu's saved value and its change handler live in theme.js) -->
+    {% if lb_enabled and not in_activity %}
+    <!-- one-time notices from Discord sign-in / delete my data ("/" forwards them here;
+         discord.js closes them and cleans the address) -->
+    {% set dismiss = t('lb_dismiss', 'Close') %}
+    {% if request.args.get('login') == 'failed' %}{{ dc.toast('login-failed', t('lb_login_failed', "Couldn't sign in with Discord. Please try again."), dismiss, warn=true) }}{% endif %}
+    {% if request.args.get('login') == 'cancelled' %}{{ dc.toast('login-cancelled', t('lb_login_cancelled', 'You cancelled the Discord sign-in.'), dismiss) }}{% endif %}
+    {% if request.args.get('deleted') == '1' %}{{ dc.toast('deleted', t('lb_deleted', 'Done: your leaderboard data was deleted.'), dismiss) }}{% endif %}
+    {% endif %}
+    <!-- JS (theme.js: dark only, and the language select helper) -->
     <script defer src="{{ asset('game.js') }}"></script>
     {% if in_activity %}
     <!-- Discord Activity only (the game in the Activity shell's iframe): borrows the shell's

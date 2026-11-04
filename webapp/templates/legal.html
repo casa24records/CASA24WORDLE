@@ -27,7 +27,7 @@
 <body class="c24-lb-page c24-legal-page">
     <header class="c24-header c24-header-menu c24-lb-header">
         <div class="c24-header-side">
-            <a href="{{ aq('/') }}" class="c24-icon-btn" aria-label="{{ 'Menú' if ui == 'es' else 'Menu' }}" title="{{ 'Menú' if ui == 'es' else 'Menu' }}">
+            <a href="{{ aq('/') }}" class="c24-icon-btn" aria-label="{{ 'Jugar' if ui == 'es' else 'Play' }}" title="{{ 'Jugar' if ui == 'es' else 'Play' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg>
             </a>
         </div>
@@ -53,7 +53,7 @@
             <span aria-hidden="true">·</span>
             <a href="{{ aq('/privacy?lang=' ~ ui) }}"{% if page == 'privacy' %} aria-current="page"{% endif %}>{{ 'Privacidad' if ui == 'es' else 'Privacy' }}</a>
         </p>
-        <p class="c24-lb-back"><a href="{{ aq('/') }}">← {{ 'Menú' if ui == 'es' else 'Menu' }}</a></p>
+        <p class="c24-lb-back"><a href="{{ aq('/') }}">← {{ 'Jugar' if ui == 'es' else 'Play' }}</a></p>
     </main>
 </body>
 

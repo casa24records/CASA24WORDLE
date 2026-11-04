@@ -470,7 +470,9 @@ def test_rate_limit(lb_env, client, discord):
 
 
 def test_guest_routes_never_write(lb_env, client, discord, mem):
-    for path in ["/", "/es", "/en", "/sitemap.xml", "/leaderboard"]:
+    # "/" redirects into the guest game (no start page since 2026-11-04)
+    assert client.get("/").status_code == 302
+    for path in ["/es", "/en", "/sitemap.xml", "/leaderboard"]:
         assert client.get(path).status_code == 200, path
     assert client.get("/fr").status_code == 302  # removed language: redirect, still no writes
     assert mem.is_empty()

@@ -1,4 +1,5 @@
-"""Leaderboard front end: menu choice, leaderboard page, leaderboard game page.
+"""Leaderboard front end: "/" (straight into a game, no start page since 2026-11-04),
+the game header's Discord slot, leaderboard page, leaderboard game page.
 
 Templates are rendered with the variables the backend contract promises
 (lb_enabled, lb_user, lb, lb_state, rows, me_row, is_admin...), so these tests
@@ -10,6 +11,7 @@ Tests that need a real backend route skip when it isn't there.
 import json
 import re
 import threading
+from urllib.parse import urlparse
 
 import flask
 import pytest
@@ -48,13 +50,6 @@ def render(template, path="/", **ctx):
         return flask.render_template(template, **ctx)
 
 
-def render_menu(path="/", **ctx):
-    base = dict(languages=app.languages, language_codes=app.language_codes,
-                todays_idx=app.get_todays_idx(), demo_enabled=False)
-    base.update(ctx)
-    return render("index.html", path, **base)
-
-
 def render_game(lang="es", **ctx):
     language = app.Language(lang, app.language_codes_5words[lang])
     if ctx.get("lb"):
@@ -69,69 +64,219 @@ def row(rank, pid, name, points, is_me=False):
             "played": points // 2, "current_streak": 2, "best_streak": 4, "is_me": is_me}
 
 
-# ---------- menu ----------
-
-def test_menu_without_leaderboard_has_no_choice(lb_off):
-    html = app.app.test_client().get("/").get_data(as_text=True)
-    assert "data-lb-menu" not in html
-    assert "/leaderboard" not in html
-    assert "data-mode=" not in html
-
+# ---------- the game header's Discord slot (top left, website, 2026-11-04) ----------
 
 DISCORD_PATH = "M20.317 4.3698"  # start of the official Discord logo path (simple-icons)
 AVATAR_HASH = "a_" + "0123456789abcdef" * 2
 DEFAULT_AVATAR = f"https://cdn.discordapp.com/embed/avatars/{(int(ME['id']) >> 22) % 6}.png"
+ACT = "frame_id=f1&instance_id=i1&platform=desktop"
 
 
-def main_view(html):
-    """The page without the privacy <dialog> and the <head> script."""
-    body = html[html.index("<body"):]
-    return body[:body.index('<dialog id="c24-privacy"')] if '<dialog id="c24-privacy"' in body else body
+def header_start(html):
+    """The markup of <div class="c24-header-start"> up to the brand's closing </h1>
+    (None when the page has no such header area)."""
+    if '<div class="c24-header-start">' not in html:
+        return None
+    start = html.index('<div class="c24-header-start">')
+    return html[start:html.index("</h1>", start)]
 
 
-def test_menu_logged_out_shows_discord_button():
-    html = render_menu(lb_enabled=True, lb_user=None)
-    assert "data-dc-area" in html and "data-lb-menu" in html
-    assert re.search(r'<a href="/auth/discord/login\?next=/lb/(es|en)" class="c24-dc-btn ', html)
-    assert DISCORD_PATH in html
-    assert "Entrar con Discord" in html and "Sign in with Discord" in html
-    # trophy icon button to the leaderboard (no text link, no emoji)
-    assert re.search(r'<a href="/leaderboard" class="c24-icon-btn" data-lb-trophy', html)
-    assert "🏆" not in html and "Ver leaderboard</span></a>" not in html
-    # no guest/leaderboard switch: cards play as guest, the button signs in
-    assert "data-mode=" not in html and "data-guest-toggle" not in html
-    # privacy only inside the (i) dialog, not in the main view
-    assert "data-dc-privacy" in html and '<dialog id="c24-privacy"' in html
-    assert "no vemos tu contraseña" in html and "no se suman al ranking" in html and "nunca tus palabras" in html
-    assert "no vemos tu contraseña" not in main_view(html)
-    assert "Discord handles your login" not in main_view(html)
-    assert "/auth/logout" not in main_view(html) and "data-dc-toggle" not in main_view(html)  # logged out
-    # Español and English are big cards (Vue); the old "Más idiomas" chips are gone
-    assert "c24-chip" not in html and "Más idiomas" not in html and "more-languages" not in html
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_guest_game_header_has_sign_in_at_top_left(lb_env, lb_client, lang):
+    html = lb_client.get("/" + lang).get_data(as_text=True)
+    head = header_start(html)
+    assert head is not None
+    # the sign-in icon link comes before the brand, inside the header's start area
+    m = re.search(r'<a href="([^"]+)" class="c24-icon-btn c24-dc-icon"[^>]*data-dc-login', head)
+    assert m, head[:400]
+    assert m.group(1) == f"/auth/discord/login?next=/lb/{lang}"
+    assert head.index("data-dc-login") < head.index("c24-header-title")
+    assert DISCORD_PATH in head
+    assert "Sign in with Discord" in head or "Entrar con Discord" in head  # aria-label / title
+    assert "data-dc-menu" not in html and "/auth/logout" not in html  # signed out
+    assert html.count("c24-dc-icon") == 1  # one sign-in icon (the end window's hint has its own button)
 
 
-def test_menu_logged_in_shows_avatar_menu_and_play_button():
-    # signed in, the landing shows only through /?menu=1: one Play button back into the game
-    html = render_menu("/?menu=1", lb_enabled=True, lb_user=ME, ui="en")
-    assert "@kolo_fan" in html
-    assert "data-dc-toggle" in html and DEFAULT_AVATAR in html
-    assert 'data-dc-id="100000000000000001"' in html
-    assert re.search(r'<form method="post" action="/auth/logout" data-dc-clear>', html)
-    assert 'href="/lb/en" class="c24-land-go" data-lb-play' in html
-    assert "data-guest-toggle" not in html  # the old guest switch is gone
-    assert "c24-dc-btn" not in main_view(html)  # no big sign-in button
-    assert '"username":"kolo_fan"' in html  # handed to index.js
-    assert '<script type="application/json" id="c24-dc-me">"100000000000000001"</script>' in html  # handed to the avatar script
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_leaderboard_game_header_has_avatar_menu_at_top_left(lb_env, lb_client, discord, lang):
+    login(lb_client, discord)
+    html = lb_client.get("/lb/" + lang).get_data(as_text=True)
+    head = header_start(html)
+    assert head is not None and "data-dc-menu" in head
+    assert head.index("data-dc-menu") < head.index("c24-header-title")
+    assert "data-dc-toggle" in head and "@kolo_fan" in head and DEFAULT_AVATAR in head
+    assert '<form method="post" action="/auth/logout" data-dc-clear>' in head
+    assert 'href="/leaderboard" class="c24-dc-pop-item"' in head
+    assert "data-dc-login" not in html
+    assert '<script type="application/json" id="c24-dc-me">"100000000000000001"</script>' in html
+
+
+def test_guest_game_header_signed_in_shows_avatar(lb_env, lb_client, discord):
+    # signed in but on the guest game (a direct /es link): the avatar menu, not "Sign in"
+    login(lb_client, discord)
+    head = header_start(lb_client.get("/es").get_data(as_text=True))
+    assert "data-dc-menu" in head and "data-dc-login" not in head
+
+
+def test_no_discord_slot_without_leaderboard(lb_off):
+    for lang in ("es", "en"):
+        html = app.app.test_client().get("/" + lang).get_data(as_text=True)
+        assert "data-dc-login" not in html and "data-dc-menu" not in html
+        assert "/auth/discord/login" not in html
+
+
+def test_no_discord_slot_on_demo_game(lb_env, lb_client, monkeypatch):
+    monkeypatch.setenv("DEMO_PASSWORD", "fake-pw-for-tests")
+    assert lb_client.post("/demo", data={"password": "fake-pw-for-tests"}).status_code == 302
+    html = lb_client.get("/demo/es").get_data(as_text=True)
+    assert '"demo":true' in html and '"demo_key":false' in html  # the combo never fires there
+    assert "data-dc-login" not in html and "data-dc-menu" not in html
+    assert '<div class="c24-header-start">' not in html
+
+
+def test_no_discord_slot_in_activity():
+    html = render_game("es", lb=True, lb_state=None, lb_enabled=True, lb_user=ME, C24_ACTIVITY=True,
+                       activity_client_id="123", activity_params=[], activity_langs=[])
+    assert "data-dc-login" not in html and "data-dc-menu" not in html
+    assert '<div class="c24-header-start">' not in html
+    assert '"demo_key":false' in html
 
 
 @pytest.mark.parametrize("query,marker", [("login=failed", "login-failed"), ("login=cancelled", "login-cancelled"),
                                           ("deleted=1", "deleted")])
-def test_menu_notices(query, marker):
-    html = render_menu("/?" + query, lb_enabled=True, lb_user=None)
+def test_game_notices(lb_env, lb_client, query, marker):
+    html = lb_client.get("/es?" + query).get_data(as_text=True)
     assert f'data-notice="{marker}"' in html and "data-c24-toast" in html
-    assert f'data-notice="{marker}"' not in render_menu("/", lb_enabled=True, lb_user=None)
+    assert html.count("data-c24-toast>") == 1
     if marker == "login-cancelled":
         assert "Cancelaste el inicio de sesión con Discord." in html
+    if marker == "login-failed":
+        assert 'role="alert"' in html  # a warning, read out at once
+    assert "data-c24-toast>" not in lb_client.get("/es").get_data(as_text=True)
+    assert "data-c24-toast>" not in lb_client.get("/es?login=evil&deleted=0").get_data(as_text=True)
+
+
+def test_game_notices_on_leaderboard_game(lb_env, lb_client, discord):
+    login(lb_client, discord)
+    html = lb_client.get("/lb/en?login=failed").get_data(as_text=True)
+    assert 'data-notice="login-failed"' in html and "sign in with Discord. Please try again." in html
+
+
+def test_no_game_notices_without_leaderboard_or_in_activity(lb_off):
+    assert "data-c24-toast>" not in app.app.test_client().get("/es?login=failed").get_data(as_text=True)
+    act = render_game("es", lb=True, lb_state=None, lb_enabled=True, lb_user=ME, C24_ACTIVITY=True,
+                      activity_client_id="123", activity_params=[], activity_langs=[])
+    assert "data-c24-toast>" not in act
+
+
+# ---------- "/" on the website: straight into a game, no start page (2026-11-04) ----------
+
+def location(r):
+    assert r.status_code == 302, r.status_code
+    assert r.headers["Cache-Control"] == "no-store"
+    loc = urlparse(r.headers["Location"])
+    return loc.path + ("?" + loc.query if loc.query else "")
+
+
+LANG_CASES = [
+    (None, "en-US,en;q=0.9", "en"),
+    (None, "es-PA,es;q=0.9", "es"),
+    (None, "fr-FR", "es"),          # neither: Spanish
+    (None, None, "es"),             # no Accept-Language at all
+    ("en", "es-PA", "en"),          # the game's language (c24_lang cookie) wins
+    ("es", "en-US", "es"),
+    ("ko", "en-US", "en"),          # not a game language: ignored
+    ("<script>", "fr", "es"),
+]
+
+
+@pytest.mark.parametrize("cookie,accept,expected", LANG_CASES)
+def test_signed_out_root_opens_the_guest_game(lb_env, lb_client, cookie, accept, expected):
+    if cookie:
+        lb_client.set_cookie("c24_lang", cookie)
+    r = lb_client.get("/", headers={"Accept-Language": accept} if accept else {})
+    assert location(r) == "/" + expected
+
+
+@pytest.mark.parametrize("cookie,accept,expected", LANG_CASES)
+def test_signed_in_root_goes_to_the_leaderboard_game(lb_env, lb_client, discord, cookie, accept, expected):
+    login(lb_client, discord)
+    if cookie:
+        lb_client.set_cookie("c24_lang", cookie)
+    r = lb_client.get("/", headers={"Accept-Language": accept} if accept else {})
+    assert location(r) == "/lb/" + expected
+
+
+def test_root_follows_into_a_working_game(lb_env, lb_client, discord):
+    r = lb_client.get("/", headers={"Accept-Language": "en"}, follow_redirects=True)
+    assert r.status_code == 200 and r.request.path == "/en"
+    assert "data-dc-login" in r.get_data(as_text=True)
+    login(lb_client, discord)
+    r = lb_client.get("/", headers={"Accept-Language": "en"}, follow_redirects=True)
+    assert r.status_code == 200 and r.request.path == "/lb/en"
+    assert '"lb":true' in r.get_data(as_text=True)
+
+
+def test_root_menu_param_is_gone(lb_env, lb_client, discord):
+    # /?menu=1 used to show the landing to a signed-in player: now it is just "/"
+    assert location(lb_client.get("/?menu=1", headers={"Accept-Language": "es"})) == "/es"
+    login(lb_client, discord)
+    assert location(lb_client.get("/?menu=1", headers={"Accept-Language": "es"})) == "/lb/es"
+
+
+def test_root_after_logout_is_the_guest_game(lb_env, lb_client, discord):
+    login(lb_client, discord)
+    assert location(lb_client.get("/", headers={"Accept-Language": "es"})) == "/lb/es"
+    r = lb_client.post("/auth/logout", headers={"Origin": "http://localhost"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")
+    assert location(lb_client.get("/", headers={"Accept-Language": "es"})) == "/es"
+
+
+def test_root_with_a_stale_cookie_is_the_guest_game(lb_env, lb_client):
+    lb_client.set_cookie("c24_lb", "not-a-valid-signed-cookie")
+    assert location(lb_client.get("/", headers={"Accept-Language": "en"})) == "/en"
+
+
+def test_root_developer_view_session_is_the_guest_game(lb_env, lb_client, discord, monkeypatch):
+    monkeypatch.setenv("DEMO_PASSWORD", "fake-pw-for-tests")
+    login(lb_client, discord)
+    assert lb_client.post("/demo", data={"password": "fake-pw-for-tests"}).status_code == 302
+    assert location(lb_client.get("/", headers={"Accept-Language": "es"})) == "/es"
+
+
+def test_root_without_leaderboard_is_the_guest_game(lb_off):
+    c = app.app.test_client()
+    c.set_cookie("c24_lb", "anything")
+    assert location(c.get("/", headers={"Accept-Language": "en"})) == "/en"
+    assert location(c.get("/?login=failed", headers={"Accept-Language": "es"})) == "/es?login=failed"
+
+
+@pytest.mark.parametrize("query,forwarded", [
+    ("login=failed", "login=failed"),
+    ("login=cancelled", "login=cancelled"),
+    ("deleted=1", "deleted=1"),
+    ("login=failed&deleted=1", "login=failed&deleted=1"),
+    ("login=evil", ""),
+    ("deleted=0", ""),
+    ("deleted=true", ""),
+    ("login=failed&next=//evil.example", "login=failed"),
+    ("x=1&menu=1&lang=en", ""),
+    ("login=%3Cscript%3E", ""),
+])
+def test_root_forwards_only_the_known_notices(lb_env, lb_client, discord, query, forwarded):
+    suffix = ("?" + forwarded) if forwarded else ""
+    r = lb_client.get("/?" + query, headers={"Accept-Language": "es"})
+    assert location(r) == "/es" + suffix
+    login(lb_client, discord)
+    r = lb_client.get("/?" + query, headers={"Accept-Language": "es"})
+    assert location(r) == "/lb/es" + suffix
+
+
+def test_root_in_activity_is_still_the_shell(lb_env, lb_client):
+    r = lb_client.get("/?" + ACT)
+    assert r.status_code == 200 and "activity-shell.js" in r.get_data(as_text=True)
+    r = lb_client.get("/?embed=1")  # inside the shell's iframe: the game
+    assert r.status_code == 302 and urlparse(r.headers["Location"]).path == "/lb/es"
 
 
 # ---------- game pages ----------
@@ -282,68 +427,6 @@ def test_leaderboard_route_renders_empty(lb_on):
         assert "?v=" in url, url
 
 
-def test_menu_route_shows_choice_when_enabled(lb_on):
-    if not has_route("/lb/<lang_code>"):
-        pytest.skip("backend leaderboard routes not there yet")
-    html = app.app.test_client().get("/").get_data(as_text=True)
-    assert "data-lb-menu" in html and 'href="/leaderboard"' in html
-
-
-# ---------- "/" on the website: signed in → the game, signed out → the landing (2026-11-04) ----------
-
-def test_signed_out_root_is_the_landing(lb_env, lb_client, monkeypatch):
-    monkeypatch.delenv("DEMO_PASSWORD", raising=False)
-    r = lb_client.get("/")
-    assert r.status_code == 200
-    html = r.get_data(as_text=True)
-    assert "data-dc-login" in html and "Sign in with Discord" in html and "Entrar con Discord" in html
-    assert "kolo-hoodie-full.webp" in html and "el-wordle.webp" in html
-    assert 'v-for="lang in menuLanguages"' in html and ":href=\"'/' + lang.language_code\"" in html  # guest es/en
-    assert "Developer view" not in html and "data-demo" not in html and 'href="/demo' not in html
-    assert "light" not in main_view(html).lower()  # dark only: no light/dark switch or mention
-
-
-@pytest.mark.parametrize("cookie,accept,expected", [
-    (None, "en-US,en;q=0.9", "en"),
-    (None, "es-PA,es;q=0.9", "es"),
-    (None, "fr-FR", "es"),          # neither: Spanish
-    ("en", "es-PA", "en"),          # the header language window's choice wins
-    ("es", "en-US", "es"),
-    ("ko", "en-US", "en"),          # not a leaderboard language: ignored
-])
-def test_signed_in_root_goes_to_the_game(lb_env, lb_client, discord, cookie, accept, expected):
-    login(lb_client, discord)
-    if cookie:
-        lb_client.set_cookie("c24_lang", cookie)
-    r = lb_client.get("/", headers={"Accept-Language": accept})
-    assert r.status_code == 302 and r.headers["Location"].endswith("/lb/" + expected)
-    assert r.headers["Cache-Control"] == "no-store"
-
-
-def test_signed_in_menu_escape_hatch_and_logout(lb_env, lb_client, discord):
-    login(lb_client, discord)
-    r = lb_client.get("/?menu=1")
-    assert r.status_code == 200 and "data-lb-play" in r.get_data(as_text=True)
-    # log out lands on "/", which is the landing again (signed out)
-    r = lb_client.post("/auth/logout", headers={"Origin": "http://localhost"})
-    assert r.status_code == 302 and r.headers["Location"].endswith("/")
-    r = lb_client.get("/")
-    assert r.status_code == 200 and "data-dc-login" in r.get_data(as_text=True)
-
-
-def test_signed_in_root_no_redirect_for_developer_view(lb_env, lb_client, discord, monkeypatch):
-    monkeypatch.setenv("DEMO_PASSWORD", "fake-pw-for-tests")
-    login(lb_client, discord)
-    assert lb_client.post("/demo", data={"password": "fake-pw-for-tests"}).status_code == 302
-    assert lb_client.get("/").status_code == 200
-
-
-def test_root_without_leaderboard_never_redirects(lb_off):
-    c = app.app.test_client()
-    c.set_cookie("c24_lb", "anything")
-    assert c.get("/").status_code == 200
-
-
 # ---------- browser ----------
 
 pw = pytest.importorskip("playwright")
@@ -376,128 +459,109 @@ def test_guest_game_has_no_js_errors(lb_off, server, page):
     assert errors == []
 
 
-def open_menu(server, page, html, path="/menu-lb", frag=""):
+def open_game_page(server, page, html, path="/lb/es", frag=""):
     page.route(server + path, lambda r: r.fulfill(body=html, content_type="text/html"))
+    page.route(server + "/api/live?**", lambda r: r.fulfill(
+        status=200, content_type="application/json", body='{"players": [], "count": 0}'))
     page.goto(server + path + frag)
-    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('[data-lang=es]')")
+    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('.key')")
 
 
-def test_menu_logged_out_cards_and_button(server, page):
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None))
-    page.evaluate("localStorage.setItem('casa24_lang', 'en')")
-    page.reload()
-    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('[data-lang=es]')")
-    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"  # cards: guest
-    assert page.get_attribute("[data-dc-area] .c24-dc-btn", "href") == "/auth/discord/login?next=%2Flb%2Fen"
-    assert page.is_visible("[data-dc-area] .c24-dc-btn")
-    assert page.inner_text("[data-dc-area] .c24-dc-btn").strip() == "Sign in with Discord"  # one language
-    assert page.evaluate("getComputedStyle(document.querySelector('.c24-dc-btn')).backgroundColor") == "rgb(88, 101, 242)"
-    # privacy dialog: opens from (i), closes with Esc
-    page.click("[data-dc-area] [data-dc-privacy]")
-    assert page.is_visible("#c24-privacy")
-    assert "Discord handles your login" in page.inner_text("#c24-privacy")
-    page.keyboard.press("Escape")
-    assert not page.is_visible("#c24-privacy")
+def guest_html(lang="es", **ctx):
+    return render_game(lang, lb_enabled=True, lb_user=None, **ctx)
 
 
-def test_menu_logged_in_play_button_and_guest_cards(server, page):
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
-    page.evaluate("document.cookie = 'c24_lang=en; path=/'")
-    page.reload()
-    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('[data-lang=es]')")
-    assert page.get_attribute("[data-lb-play]", "href") == "/lb/en"  # the language window's choice
-    assert page.inner_text("[data-lb-play]").strip().lower() == "play"  # one language
-    # the two cards are always the guest games
-    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"
-    assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/en"
-    assert page.locator("[data-guest-toggle]").count() == 0
+def lb_html(lang="es", **ctx):
+    return render_game(lang, lb=True, lb_state=None, lb_enabled=True, lb_user=ME, **ctx)
 
 
-def card_info(page):
-    return page.eval_on_selector_all(".c24-primary > .c24-play", """els => els.map(e => ({
-        lang: e.dataset.lang || null, href: e.getAttribute('href'), cls: e.className, dir: e.getAttribute('dir'),
-        status: (e.querySelector('.c24-play-status') || {}).textContent || '', h: e.getBoundingClientRect().height,
-        trophy: !!e.querySelector('[data-lb-status] .c24-trophy')}))""")
+def test_guest_game_sign_in_icon(server, page):
+    open_game_page(server, page, guest_html("en"), path="/en")
+    link = page.locator(".c24-header-start [data-dc-login]")
+    assert link.is_visible()
+    assert link.get_attribute("href") == "/auth/discord/login?next=/lb/en"
+    assert link.get_attribute("aria-label") == "Sign in with Discord"
+    # it sits left of the brand
+    brand = page.locator(".c24-header-title").bounding_box()
+    box = link.bounding_box()
+    assert box["x"] + box["width"] <= brand["x"] + 0.5
+    assert box["x"] < 60
 
 
-def test_menu_two_guest_cards_no_developer_card(server, page):
-    page.set_viewport_size({"width": 390, "height": 844})
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None, demo_enabled=True))
-    cards = card_info(page)
-    assert [c["lang"] for c in cards] in (["es", "en"], ["en", "es"])
-    assert len(cards) == 2 and page.locator(".c24-chips, .c24-chip, .c24-play-demo, [data-demo]").count() == 0
-    assert page.locator("text=Developer view").count() == 0
-    # the whole landing fits a phone screen: no scrolling
-    assert page.evaluate("document.documentElement.scrollHeight") <= 844
-    # both language cards are links to the guest game when logged out, no dir=rtl anywhere
-    assert all(c["href"] == "/" + c["lang"] for c in cards[:2])
-    assert all(c["dir"] is None for c in cards)
-    # each card speaks its own language
-    assert "Jugar" in next(c for c in cards if c["lang"] == "es")["status"]
-    assert "Play" in next(c for c in cards if c["lang"] == "en")["status"]
-    assert page.evaluate("document.documentElement.scrollWidth") <= 390
-
-
+# the hidden Developer view shortcut (moved from the landing into the game, 2026-11-04)
 DEMO_COMBOS = {"mac": "Control+Meta+KeyD", "other": "Control+Alt+Shift+KeyD"}
 
 
 @pytest.mark.parametrize("combo", DEMO_COMBOS)
 @pytest.mark.parametrize("enabled", [True, False])
-def test_menu_secret_key_opens_developer_view(server, page, combo, enabled):
+def test_game_secret_key_opens_developer_view(lb_off, server, page, monkeypatch, combo, enabled):
+    if enabled:
+        monkeypatch.setenv("DEMO_PASSWORD", "fake-pw-for-tests")
+    else:
+        monkeypatch.delenv("DEMO_PASSWORD", raising=False)
     page.route(server + "/demo", lambda r: r.fulfill(body="<p id=demo-page>demo</p>", content_type="text/html"))
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None, demo_enabled=enabled))
+    page.goto(server + "/es")  # the real guest game (demo_key comes from the server)
+    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('.key')")
+    assert page.evaluate("c24_page.demo_key") is enabled
     page.keyboard.press("Control+KeyD")  # not enough on its own
     page.keyboard.press("Meta+KeyD")
+    page.keyboard.press("Control+Shift+KeyD")
     page.wait_for_timeout(150)
-    assert page.evaluate("location.pathname") == "/menu-lb"
+    assert page.evaluate("location.pathname") == "/es"
+    assert page.locator("main .grid-cols-5").first.inner_text().strip() == ""  # nothing typed either
     page.keyboard.press(DEMO_COMBOS[combo])
     if enabled:
         page.wait_for_url(server + "/demo")
+        assert page.locator("#demo-page").count() == 1
     else:
         page.wait_for_timeout(300)
-        assert page.evaluate("location.pathname") == "/menu-lb"
+        assert page.evaluate("location.pathname") == "/es"
 
 
-def test_menu_sign_in_goes_to_last_language_played(server, page):
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None))
-    page.evaluate("localStorage.setItem('casa24_lang', 'en')")
-    page.reload()
-    page.wait_for_function("window.Vue && document.querySelector('[data-lang=en]')")
-    assert page.get_attribute("[data-dc-area] .c24-dc-btn", "href") == "/auth/discord/login?next=%2Flb%2Fen"
-    assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/en"  # logged out: guest
-    # a removed language saved on the device is ignored
-    page.evaluate("localStorage.setItem('casa24_lang', 'ko')")
-    page.reload()
-    page.wait_for_function("window.Vue && document.querySelector('[data-lang=en]')")
-    assert "%2Flb%2Fko" not in page.get_attribute("[data-dc-area] .c24-dc-btn", "href")
+@pytest.mark.parametrize("variant", ["demo", "activity"])
+def test_game_secret_key_never_on_demo_game_or_activity(server, page, variant):
+    ctx = {"demo": True} if variant == "demo" else dict(
+        lb=True, lb_state=None, lb_user=ME, C24_ACTIVITY=True, activity_client_id="123",
+        activity_params=[], activity_langs=[])
+    html = render_game("es", lb_enabled=True, **ctx)
+    assert '"demo_key":false' in html
+    open_game_page(server, page, html, path="/game-" + variant)
+    page.evaluate("window.__still_here = 1")
+    for combo in DEMO_COMBOS.values():
+        page.keyboard.press(combo)
+    page.wait_for_timeout(300)
+    assert page.evaluate("window.__still_here") == 1
+    assert page.evaluate("location.pathname") == "/game-" + variant
 
 
-def test_menu_avatar_from_fragment_menu_and_logout(server, page):
+def test_game_avatar_from_fragment_menu_and_logout(server, page):
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
     page.route("https://cdn.discordapp.com/**", lambda r: r.fulfill(status=200, content_type="image/png", body=b""))
     page.route(server + "/auth/logout", lambda r: r.fulfill(status=200, content_type="text/html", body="bye"))
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME), frag="#dc=" + AVATAR_HASH)
+    open_game_page(server, page, lb_html(), frag="#dc=" + AVATAR_HASH)
     assert page.evaluate("location.hash") == ""
-    assert page.evaluate("location.pathname") == "/menu-lb"
+    assert page.evaluate("location.pathname") == "/lb/es"
     saved = json.loads(page.evaluate("localStorage.getItem('c24_dc_avatar')"))
     assert saved == {"id": ME["id"], "hash": AVATAR_HASH}
-    src = page.get_attribute(".c24-dc-me img", "src")
+    src = page.get_attribute(".c24-header-start .c24-dc-me img", "src")
     assert src == f"https://cdn.discordapp.com/avatars/{ME['id']}/{AVATAR_HASH}.png?size=64"
-    # header menu: opens, Esc and an outside tap close it
+    # header menu (top left): opens to the right, Esc and an outside tap close it
     page.click("[data-dc-toggle]")
     assert page.is_visible("[data-dc-pop]") and page.get_attribute("[data-dc-toggle]", "aria-expanded") == "true"
     assert "@kolo_fan" in page.inner_text("[data-dc-pop]")
+    btn = page.locator("[data-dc-toggle]").bounding_box()
+    pop = page.locator("[data-dc-pop]").bounding_box()
+    assert pop["x"] >= btn["x"] - 0.5 and pop["y"] >= btn["y"] + btn["height"]
     page.keyboard.press("Escape")
     assert not page.is_visible("[data-dc-pop]")
     page.click("[data-dc-toggle]")
-    page.mouse.click(5, 400)
+    page.mouse.click(200, 400)
     assert not page.is_visible("[data-dc-pop]")
     # an invalid fragment changes nothing (and is removed)
     page.goto("about:blank")
-    page.goto(server + "/menu-lb#dc=../../evil")
-    page.wait_for_function("window.Vue && document.querySelector('[data-lang=es]')")
+    page.goto(server + "/lb/es#dc=../../evil")
+    page.wait_for_function("window.Vue && document.querySelector('.key')")
     assert page.evaluate("location.hash") == ""
     assert json.loads(page.evaluate("localStorage.getItem('c24_dc_avatar')"))["hash"] == AVATAR_HASH
     # log out forgets the picture
@@ -510,11 +574,11 @@ def test_menu_avatar_from_fragment_menu_and_logout(server, page):
 
 def test_avatar_of_someone_else_is_not_used(server, page):
     page.route("https://cdn.discordapp.com/**", lambda r: r.fulfill(status=200, content_type="image/png", body=b""))
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
+    open_game_page(server, page, lb_html())
     page.evaluate("localStorage.setItem('c24_dc_avatar', JSON.stringify({id: '999', hash: '%s'}))" % AVATAR_HASH)
     page.reload()
-    page.wait_for_function("window.Vue && document.querySelector('[data-lang=es]')")
-    assert page.get_attribute(".c24-dc-me img", "src") == DEFAULT_AVATAR
+    page.wait_for_function("window.Vue && document.querySelector('.key')")
+    assert page.get_attribute(".c24-header-start .c24-dc-me img", "src") == DEFAULT_AVATAR
 
 
 def boxes_overlap(a, b):
@@ -522,29 +586,35 @@ def boxes_overlap(a, b):
                 or a["y"] + a["height"] <= b["y"] + 0.5 or b["y"] + b["height"] <= a["y"] + 0.5)
 
 
-HEADER_BOXES = """() => [...document.querySelectorAll('header.c24-header > .c24-header-side > *, header.c24-header .c24-header-title a')]
+HEADER_BOXES = """() => [...document.querySelectorAll('header.c24-header .c24-header-start > *, header.c24-header > .c24-header-side > *')]
     .filter(e => e.getClientRects().length && getComputedStyle(e).display !== 'none')
     .map(e => { const r = e.getBoundingClientRect(); return {x: r.x, y: r.y, width: r.width, height: r.height, n: e.className}; })"""
 
 
 @pytest.mark.parametrize("width,height", [(320, 568), (390, 844), (430, 932), (768, 1024)])
 @pytest.mark.parametrize("user", [None, ME])
-def test_menu_layout_no_overlap(server, page, width, height, user):
+def test_game_header_with_discord_slot_no_overlap(server, page, width, height, user):
     page.set_viewport_size({"width": width, "height": height})
-    open_menu(server, page, render_menu("/?login=cancelled", lb_enabled=True, lb_user=user))
+    html = lb_html() if user else guest_html()
+    open_game_page(server, page, html, path="/lb/es" if user else "/es")
     assert page.evaluate("document.documentElement.scrollWidth") <= width
     boxes = page.evaluate(HEADER_BOXES)
-    assert len(boxes) >= 5
+    assert len(boxes) >= 3, boxes
     for i, a in enumerate(boxes):
         assert a["x"] >= 0 and a["x"] + a["width"] <= width + 0.5, a
         for b in boxes[i + 1:]:
             assert not boxes_overlap(a, b), (a, b)
-    # the title's text fits inside its own box (an overflow would run under the icons)
-    assert page.evaluate("(() => { const a = document.querySelector('.c24-header-title a');"
+    # the Discord slot is the first thing on the left, the brand right after it
+    slot = page.locator(".c24-header-start > [data-dc-menu], .c24-header-start > [data-dc-login]").bounding_box()
+    brand = page.locator(".c24-header-start .c24-header-title").bounding_box()
+    assert slot["x"] < brand["x"] and slot["x"] + slot["width"] <= brand["x"] + 0.5
+    # the title's content fits inside its own box (an overflow would run under the icons)
+    assert page.evaluate("(() => { const a = document.querySelector('.c24-header-title button');"
                          " return a.scrollWidth <= a.clientWidth + 1; })()")
-    area = page.locator("[data-dc-area]").bounding_box()
-    card = page.locator("a.c24-play").first.bounding_box()
-    assert area["y"] + area["height"] <= card["y"]
+    # the header stays above the board
+    head = page.locator("header.c24-header").bounding_box()
+    tile = page.locator("main .grid-cols-5 > div").first.bounding_box()
+    assert head["y"] + head["height"] <= tile["y"] + 0.5
     if user:
         page.click("[data-dc-toggle]")
         pop = page.locator("[data-dc-pop]").bounding_box()

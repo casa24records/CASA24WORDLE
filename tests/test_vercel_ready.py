@@ -13,9 +13,12 @@ CHECK = """
 import importlib
 app = importlib.import_module("webapp.app").app
 c = app.test_client()
-for path in ["/", "/es", "/en", "/sitemap.xml"]:
+for path in ["/es", "/en", "/sitemap.xml"]:
     r = c.get(path, base_url="http://x.vercel.app", headers={"X-Forwarded-Proto": "https"})
     assert r.status_code == 200, (path, r.status_code)
+# "/" opens the game (no start page since 2026-11-04)
+r = c.get("/", base_url="http://x.vercel.app", headers={"X-Forwarded-Proto": "https"})
+assert r.status_code == 302 and r.headers["Location"].endswith("/es"), (r.status_code, r.headers)
 # the sitemap uses the visitor's own address, never an upstream domain
 sitemap = c.get("/sitemap.xml", base_url="http://x.vercel.app", headers={"X-Forwarded-Proto": "https"}).text
 assert "wordle.global" not in sitemap, sitemap
@@ -132,8 +135,8 @@ def test_every_static_url_is_versioned():
     sys.path.insert(0, ROOT)
     app = importlib.import_module("webapp.app").app
     c = app.test_client()
-    for path in ["/", "/es", "/en"]:
-        html = c.get(path).get_data(as_text=True)
+    for path in ["/", "/es", "/en", "/terms", "/privacy"]:
+        html = c.get(path, follow_redirects=True).get_data(as_text=True)
         urls = re.findall(r"""/static/[^"'\s)]*""", html)
         assert urls, path
         # KOLO_BASE is a folder prefix; game.js adds ?v=ASSET_V to each Kolo URL

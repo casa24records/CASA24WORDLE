@@ -20,6 +20,16 @@
         else if (ME && h === "") { save(null); }  // no picture on Discord: default avatar
         if (window.history.replaceState) { window.history.replaceState(null, "", window.location.pathname + window.location.search); }
     }
+    // ?login=failed|cancelled / ?deleted=1 notices show once; a reload shouldn't bring them
+    // back (only those two params go: anything else in the query must stay). Moved here
+    // from the removed start page's index.js (2026-11-04).
+    if (/[?&](login|deleted)=/.test(window.location.search) && window.history.replaceState) {
+        var params = new URLSearchParams(window.location.search);
+        params.delete("login");
+        params.delete("deleted");
+        var query = params.toString();
+        window.history.replaceState(null, "", window.location.pathname + (query ? "?" + query : "") + window.location.hash);
+    }
     function avatarUrl(id) {
         var s = load();
         if (s && s.id === id && HASH.test(s.hash || "")) {

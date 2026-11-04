@@ -49,17 +49,23 @@ def login(client, password=FAKE_PASSWORD):
 # ---------- server side (Flask test client) ----------
 
 def test_disabled_hides_everything(disabled, client):
-    assert "data-demo" not in client.get("/").get_data(as_text=True)
+    for path in ("/es", "/en"):
+        html = client.get(path).get_data(as_text=True)
+        assert "data-demo" not in html and '"demo_key":false' in html, path
     assert client.get("/demo").status_code == 404
     assert client.post("/demo", data={"password": ""}).status_code == 404
     assert client.get("/demo/es").status_code == 404
 
 
 def test_enabled_hidden_key_not_card(enabled, client):
-    # no Developer view card any more (2026-11-04): only the flag for the secret key combo
-    html = client.get("/").get_data(as_text=True)
-    assert 'data-demo-key="1"' in html
-    assert "Developer view" not in html and "data-demo>" not in html and 'href="/demo' not in html
+    # no start page any more (2026-11-04): the game pages carry the flag for the secret
+    # key combo (game.js), never a visible Developer view link
+    for path in ("/es", "/en"):
+        html = client.get(path).get_data(as_text=True)
+        assert '"demo_key":true' in html, path
+        # (the texts JSON for game.js carries every string; look at the markup only)
+        visible = re.sub(r"<!--.*?-->|<script\b.*?</script>", "", html, flags=re.S)
+        assert "Developer view" not in visible and "data-demo>" not in html and 'href="/demo' not in html, path
     r = client.get("/demo")
     assert r.status_code == 200
     assert 'name="password"' in r.get_data(as_text=True)
@@ -168,7 +174,7 @@ def test_real_game_is_not_demo(enabled, client):
 def test_password_not_in_pages(enabled, client):
     login(client)
     for path in ("/", "/demo/es", "/demo/en", "/es"):
-        assert FAKE_PASSWORD not in client.get(path).get_data(as_text=True)
+        assert FAKE_PASSWORD not in client.get(path, follow_redirects=True).get_data(as_text=True)
 
 
 # ---------- browser (Playwright) ----------
@@ -210,8 +216,9 @@ def test_demo_in_browser_saves_nothing(enabled, server, page):
     page.on("console", lambda m: m.type == "error" and errors.append(m.text))
     page.set_viewport_size({"width": 390, "height": 844})
 
-    # a real player's saved game and results
+    # a real player's saved game and results ("/" opens the guest game: no start page)
     page.goto(server + "/")
+    page.wait_for_function("window.Vue && document.querySelector('#app .key')")
     page.evaluate(
         "([save, results]) => { localStorage.setItem('es', save);"
         " localStorage.setItem('game_results', results); localStorage.setItem('casa24_lang', 'en'); }",
@@ -219,8 +226,7 @@ def test_demo_in_browser_saves_nothing(enabled, server, page):
     )
     before = storage(page)
 
-    # the secret key combo on the start screen leads to the login form (not logged in yet)
-    page.wait_for_function("window.Vue && document.querySelector('.c24-play')")
+    # the secret key combo in the game leads to the login form (not logged in yet)
     page.keyboard.press("Control+Meta+KeyD")
     page.wait_for_url("**/demo")
     page.fill("#demo-password", FAKE_PASSWORD)
@@ -252,8 +258,8 @@ def test_demo_in_browser_saves_nothing(enabled, server, page):
     assert storage(page) == before
 
     # English: the combo again (other systems' version), then /demo/en
-    page.goto(server + "/")
-    page.wait_for_function("window.Vue && document.querySelector('.c24-play')")
+    page.goto(server + "/en")
+    page.wait_for_function("window.Vue && document.querySelector('#app .key')")
     page.keyboard.press("Control+Alt+Shift+KeyD")
     page.wait_for_url("**/demo/es")  # already signed in: /demo goes straight to the game
     page.goto(server + "/demo/en")

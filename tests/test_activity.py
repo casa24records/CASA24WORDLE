@@ -203,7 +203,7 @@ def test_shell_never_inside_its_own_iframe(lb_env, client):
         assert r.status_code == 302, path
         loc = urlparse(r.headers["Location"])
         assert loc.path == target and parse_qs(loc.query) == {"embed": ["1"]}, path
-    # /activity on the web: back to the menu
+    # /activity on the web: back to "/" (which opens the game)
     r = client.get("/activity")
     assert r.status_code == 302 and r.headers["Location"].endswith("/")
 
@@ -211,8 +211,9 @@ def test_shell_never_inside_its_own_iframe(lb_env, client):
 def test_shell_off_when_leaderboard_off(monkeypatch, client):
     for name in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SECRET_KEY", "DATABASE_URL"):
         monkeypatch.delenv(name, raising=False)
-    html = client.get("/?" + ACT).get_data(as_text=True)
-    assert "activity-shell.js" not in html  # the normal menu, as before
+    r = client.get("/?" + ACT)
+    assert "activity-shell.js" not in r.get_data(as_text=True)
+    assert r.status_code == 302 and urlparse(r.headers["Location"]).path in ("/es", "/en")  # the website's "/"
 
 
 def test_no_guest_game_inside_activity(lb_env, client):
@@ -511,12 +512,14 @@ def test_no_inline_js_in_rendered_pages(lb_env, client, discord, monkeypatch):
     for path in ["/", "/es", "/en", "/leaderboard", "/demo", "/sitemap.xml",
                  "/?" + ACT, "/activity?" + ACT, "/lb/es?" + ACT, "/lb/es?embed=1", "/lb/en?embed=1",
                  "/leaderboard?tab=es&" + ACT, "/leaderboard?tab=es&embed=1"]:
-        pages[path] = client.get(path).get_data(as_text=True)
+        # (on the website "/" redirects into the game since 2026-11-04: check where it lands)
+        pages[path] = client.get(path, follow_redirects=True).get_data(as_text=True)
     login(client, discord)
     app._record_result(app.lb_store(), P1, "es", app.lb_today()[0], True, 3)
     client.post("/demo", data={"password": "demo-pass-test"})
-    for path in ["/", "/lb/es", "/lb/en", "/leaderboard?tab=es", "/demo/es", "/?login=failed", "/?deleted=1"]:
-        r = client.get(path)
+    for path in ["/", "/lb/es", "/lb/en", "/leaderboard?tab=es", "/demo/es", "/?login=failed", "/?deleted=1",
+                 "/es?login=failed", "/en?deleted=1", "/lb/es?login=cancelled"]:
+        r = client.get(path, follow_redirects=True)
         assert r.status_code == 200, path
         pages["in:" + path] = r.get_data(as_text=True)
     bad = {p: inline_problems(h) for p, h in pages.items() if inline_problems(h)}
@@ -535,7 +538,7 @@ def test_no_inline_js_in_template_sources():
 
 
 def test_static_js_has_no_confirm_alert_or_open():
-    for name in ("game.js", "index.js", "discord.js", "theme.js", "leaderboard.js", "discord-activity.js",
+    for name in ("game.js", "discord.js", "theme.js", "leaderboard.js", "discord-activity.js",
                  "activity-shell.js"):
         with open(os.path.join(STATIC, name), encoding="utf-8") as f:
             src = f.read()
@@ -1220,7 +1223,9 @@ def test_browser_delete_confirm_is_an_in_page_dialog(lb_env, server, page, disco
     page.click("[data-dc-toggle]")
     page.click("[data-lb-delete]")
     page.click("[data-confirm-yes]")
-    page.wait_for_url("**/?deleted=1")
+    # "/?deleted=1" opens the guest game (no start page since 2026-11-04) with the notice
+    page.wait_for_url(re.compile(r".*/(es|en)(\?.*)?$"))
+    page.wait_for_selector('[data-notice="deleted"]', state="attached")
     assert mem.get_player(P1) is None
     assert dialogs == []  # never a browser confirm()/alert()
 

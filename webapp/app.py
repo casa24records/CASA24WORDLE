@@ -304,7 +304,9 @@ def inject_activity():
            "activity_langs": [],
            # the header's language window on the website ("EN ▾", rebrand 2026-11-04)
            "game_langs": [{"code": c, "name_native": language_configs[c]["name_native"]}
-                          for c in LB_LANGS if c in language_configs]}
+                          for c in LB_LANGS if c in language_configs],
+           # the hidden Developer view shortcut (Ctrl+⌘+D) on the website's game pages
+           "demo_key": demo_enabled() and not activity}
     if activity:
         # the public app ID for the SDK (never the secret) and the language window's list
         ctx["activity_client_id"] = discord_auth.client_id()
@@ -602,27 +604,27 @@ def index():
         if is_activity_embed():
             return _no_store(redirect(activity_url(f"/lb/{lang if lang in LB_LANGS else 'es'}")))
         return activity_shell(lang)
-    # website, signed in with Discord: straight into the leaderboard game (owner,
-    # 2026-11-04). /?menu=1 still shows the landing; never for Developer view sessions.
-    if (lb_enabled() and not is_activity() and request.args.get("menu") != "1"
-            and not _demo_logged_in() and request.cookies.get(LB_COOKIE) and lb_current_user()):
-        return _no_store(redirect(f"/lb/{landing_lang()}"))
-    return render_template(
-        "index.html",
-        languages=languages,
-        language_codes=language_codes,
-        todays_idx=get_todays_idx(),
-        demo_enabled=demo_enabled(),
-        ui=landing_lang(),
-        texts={lang: language_configs[lang]["text"] for lang in DEMO_LANGS},
-    )
+    # website (owner, 2026-11-04): no start page. "/" goes straight into the game, like
+    # the app: signed in with Discord -> the leaderboard game; otherwise the guest game,
+    # with "Sign in with Discord" at the top left of its header. Language: the c24_lang
+    # cookie (the game remembers it), else the computer's (Accept-Language), else Spanish.
+    # The one-time notices (/?login=failed|cancelled, /?deleted=1) travel along and
+    # show as a toast in the game.
+    lang = landing_lang()
+    notice = {k: v for k, v in (("login", request.args.get("login")), ("deleted", request.args.get("deleted")))
+              if (k, v) in (("login", "failed"), ("login", "cancelled"), ("deleted", "1"))}
+    query = ("?" + urlencode(notice)) if notice else ""
+    if (lb_enabled() and not _demo_logged_in() and request.cookies.get(LB_COOKIE)
+            and lb_current_user()):
+        return _no_store(redirect(f"/lb/{lang}{query}"))
+    return _no_store(redirect(f"/{lang}{query}"))
 
 
 LANG_COOKIE = "c24_lang"  # the game header's language window sets it (es/en)
 
 
 def landing_lang():
-    """es/en for the signed-in redirect from "/": the c24_lang cookie if valid,
+    """es/en for "/" (the game to open): the c24_lang cookie if valid,
     else the computer's language (Accept-Language), else Spanish."""
     saved = request.cookies.get(LANG_COOKIE)
     if saved in LB_LANGS:

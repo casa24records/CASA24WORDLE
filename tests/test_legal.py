@@ -2,8 +2,8 @@
 
 Full texts in Spanish and English (?lang=es|en, else Accept-Language; any other
 language reads English), one contact constant (app.LEGAL_CONTACT_EMAIL), CSP-safe
-(no inline JS), versioned assets, in the sitemap, linked (small) from the start
-screen, /leaderboard and the game's Settings. Inside the Discord Activity those
+(no inline JS), versioned assets, in the sitemap, linked (small) from the game's
+How to play and /leaderboard (no start page since 2026-11-04). Inside the Discord Activity those
 links open through the shell's SDK openExternalLink (browser test in
 test_activity.py: test_browser_settings_legal_links_and_delete_my_data)."""
 
@@ -111,17 +111,20 @@ def test_sitemap_lists_legal_pages(client):
     assert "<loc>http://localhost/terms</loc>" in xml and "<loc>http://localhost/privacy</loc>" in xml
 
 
-def test_links_on_start_screen_and_leaderboard(lb_env, client):
-    menu = page(client, "/")
-    assert 'href="/terms?lang=es"' in menu and 'href="/privacy?lang=es"' in menu
-    assert 'href="/terms?lang=en"' in menu and 'href="/privacy?lang=en"' in menu
+def test_links_on_game_and_leaderboard(lb_env, client):
+    # "/" opens the game (no start page since 2026-11-04): the links are in its How to play
+    for lang, accept in (("es", "es-PA"), ("en", "en-US")):
+        r = client.get("/", headers={"Accept-Language": accept}, follow_redirects=True)
+        game = r.get_data(as_text=True)
+        assert f'href="/terms?lang={lang}"' in game and f'href="/privacy?lang={lang}"' in game
     board = page(client, "/leaderboard?tab=all", **{"Accept-Language": "es"})
     assert 'href="/terms?lang=es"' in board and 'href="/privacy?lang=es"' in board
     assert "Términos" in board
     board_en = page(client, "/leaderboard?tab=en")
     assert 'href="/privacy?lang=en"' in board_en and 'href="/terms?lang=en"' in board_en
     # also without the leaderboard (guest-only site)
-    assert 'href="/privacy?lang=es"' in page(app.app.test_client(), "/")
+    guest = app.app.test_client().get("/", headers={"Accept-Language": "es"}, follow_redirects=True)
+    assert 'href="/privacy?lang=es"' in guest.get_data(as_text=True)
 
 
 def test_game_settings_links(lb_env, client):

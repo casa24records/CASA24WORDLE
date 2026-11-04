@@ -300,19 +300,29 @@ def test_accessibility_basics():
     assert data["input_characters"]
 
 
-def test_focus_order_brand_actions_board_keyboard(server, page):
+@pytest.mark.parametrize("variant", ["guest", "lb", "act"])
+def test_focus_order_brand_actions_board_keyboard(server, page, variant):
+    """Website (2026-11-04): the Discord slot at the top left comes first (sign-in icon on
+    the guest game, avatar menu on the leaderboard game), then the brand, the header
+    actions and the keyboard. Inside Discord there is no Discord slot: the brand first."""
     page.set_viewport_size({"width": 1366, "height": 768})
-    open_game(page, server, "lb")
+    open_game(page, server, variant)
     order = page.evaluate("""() => {
         const all = [...document.querySelectorAll('a[href], button, [tabindex]')]
-            .filter(e => e.getClientRects().length && !e.closest('[v-cloak], .c24-modal-wrap, #c24-live'));
-        const where = e => e.closest('.c24-header-title') ? 'brand' : e.closest('header') ? 'actions'
+            .filter(e => e.getClientRects().length && !e.closest('[v-cloak], .c24-modal-wrap, #c24-live, .c24-dc-pop'));
+        const where = e => e.closest('[data-dc-login], [data-dc-menu]') ? 'discord'
+            : e.closest('.c24-header-title') ? 'brand' : e.closest('header') ? 'actions'
             : e.closest('.c24-keyboard') ? 'keyboard' : 'other';
         return all.map(where);
     }""")
     seen = [x for i, x in enumerate(order) if i == 0 or order[i - 1] != x]
-    assert seen[:3] == ["brand", "actions", "keyboard"], seen
+    expected = ["brand", "actions", "keyboard"] if variant == "act" else ["discord", "brand", "actions", "keyboard"]
+    assert seen[:len(expected)] == expected, seen
     assert page.evaluate("getComputedStyle(document.querySelector('.key')).touchAction") == "manipulation"
+    if variant != "act":
+        page.keyboard.press("Tab")
+        sel = "[data-dc-login]" if variant == "guest" else "[data-dc-menu]"
+        assert page.evaluate(f"!!document.activeElement.closest('{sel}')")
     page.keyboard.press("Tab")
     assert page.evaluate("!!document.activeElement.closest('.c24-header-title')")
     page.keyboard.press("Tab")

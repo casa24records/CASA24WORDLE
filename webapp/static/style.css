@@ -129,10 +129,7 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     :root:not([data-theme="light"]) .c24-result-row > .is-incorrect { box-shadow: inset 0 0 0 1px var(--c24-line-strong); }
 }
 
-/* ---------- start screen ---------- */
-.c24-hero-kolo { height: 150px; width: auto; }
-@media (max-height: 700px) { .c24-hero-kolo { height: 96px; } }
-.c24-today { font-size: 0.8rem; color: var(--c24-subtle); }
+/* ---------- play cards (Developer view login) ---------- */
 .c24-play {
     display: flex;
     align-items: center;
@@ -293,8 +290,12 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 .c24-header-bar .c24-badge { font-size: 0.8em; }
 .c24-header-bar .c24-header-end { flex: none; }
 .c24-header-bar .c24-dc-menu { flex: none; }
-/* the avatar sits at the right end: its menu opens to the left */
-.c24-header-bar .c24-dc-pop { inset-inline-start: auto; inset-inline-end: 0; }
+/* website (2026-11-04): Discord sits at the top left, before the brand ("Sign in with
+   Discord" on the guest game, the avatar menu on the leaderboard game): its menu opens
+   to the right */
+.c24-header-start { display: flex; align-items: center; flex: 0 1 auto; min-width: 0; gap: 2px; }
+.c24-header-start .c24-dc-menu { flex: none; }
+.c24-header-bar .c24-dc-pop { inset-inline-start: 0; inset-inline-end: auto; }
 @media (max-width: 480px) {
     .c24-header-bar { height: calc(48px + var(--c24-safe-top)); }
     .c24-header-bar .c24-header-title { font-size: 1.5rem; }
@@ -661,28 +662,6 @@ main .grid-cols-5 > div {
 }
 .c24-toast-box { position: relative; max-width: 20rem; text-align: center; }
 
-/* ---------- start screen ---------- */
-.c24-menu-app {
-    padding: 0 var(--c24-safe-right) calc(3rem + var(--c24-safe-bottom)) var(--c24-safe-left);
-}
-.c24-start {
-    max-width: 24rem;
-    margin: 0 auto;
-    padding: 1.5rem 1rem 2rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-}
-.c24-primary { display: grid; gap: 0.75rem; }
-@media (max-height: 700px) {
-    .c24-start { padding-top: 1rem; gap: 1rem; }
-    .c24-menu-app { padding-bottom: calc(1rem + var(--c24-safe-bottom)); }
-}
-@media (min-width: 640px) {
-    .c24-start { max-width: 40rem; }
-    .c24-primary { grid-template-columns: 1fr 1fr; }
-}
-
 /* ---------- hover only with a real mouse (no "stuck" hover after a tap) ---------- */
 @media (hover: hover) and (pointer: fine) {
     .c24-play:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15); }
@@ -695,18 +674,7 @@ main .grid-cols-5 > div {
 .c24-close + div > :first-child { padding-inline-end: 40px; }
 .c24-close + div > .mx-auto:first-child { padding-inline: 40px; }
 
-/* ---------- demo mode (team only, /demo) ---------- */
-.c24-play-demo {
-    grid-column: 1 / -1;
-    background: transparent;
-    border-style: dashed;
-    border-color: var(--c24-line-strong);
-    color: var(--c24-subtle);
-    padding-top: 0.6rem;
-    padding-bottom: 0.6rem;
-}
-.c24-play-demo .c24-play-name { font-size: 1.4rem; }
-.c24-demo-bar {
+/* ---------- demo mode (team only, /demo) ---------- */.c24-demo-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -764,17 +732,6 @@ main .grid-cols-5 > div {
 }
 .c24-demo-login-form .c24-play { justify-content: center; font-weight: 700; cursor: pointer; }
 .c24-demo-login-error { color: #d9534f; font-weight: 700; font-size: 0.9rem; }
-.c24-demo-langs { display: flex; gap: 0.5rem; }
-.c24-demo-langs a {
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 0.7rem;
-    border-radius: 8px;
-    border: 2px solid var(--c24-line-strong);
-    color: var(--c24-text);
-}
-@media (hover: hover) and (pointer: fine) { .c24-demo-langs a:hover { background: var(--c24-hover); } }
 
 /* ---------- leaderboard (every language; Discord login) ---------- */
 /* menu: Discord area, notices, links */
@@ -1072,19 +1029,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     font-weight: 700;
     cursor: pointer;
 }
-/* signed in: "play as guest" switch */
-.c24-guest-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    min-height: 44px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--c24-subtle);
-    cursor: pointer;
-}
-.c24-switch {
+/* signed in: "play as guest" switch */.c24-switch {
     appearance: none;
     -webkit-appearance: none;
     position: relative;
@@ -1488,13 +1433,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 }
 /* narrow phones: the menu header holds avatar + trophy + info on the left;
    the info button steps aside so the title keeps its room */
-@media (max-width: 419px) {
-    .c24-header .c24-hide-narrow { display: none; }
-}
 /* phones with the leaderboard on: the Discord slot + trophy (+ info from 420px) leave room for "Casa 24" only */
-@media (max-width: 479px) {
-    .c24-header-menu-lb .c24-title-extra { display: none; }
-}
 @media (hover: hover) and (pointer: fine) {
     .c24-dc-btn:hover { background: #4752C4; }
     .c24-dc-btn:active { background: #3C45A5; }
@@ -1861,109 +1800,3 @@ button.c24-lb-link { background: transparent; border: 0; font: inherit; font-wei
     clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
-/* ---------- landing (rebrand 2026-11-04) ---------- */
-/* index.html when signed out: big "El Wordle" title, full-body Kolo in the hoodie over a
-   few faded board tiles, one short line, Sign in with Discord, the two guest games.
-   Phones: one column that fits the screen. ≥ 900px wide: Kolo left, the rest right. */
-.c24-menu-app:has(.c24-land) { padding-bottom: var(--c24-safe-bottom); }
-.c24-start.c24-land {
-    max-width: 26rem;
-    min-height: calc(100dvh - 56px - var(--c24-safe-bottom));
-    padding: 0.75rem 16px 1rem;
-    gap: 0.5rem;
-    justify-content: center;
-}
-.c24-land-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.25rem; }
-
-/* Kolo stands on a few board tiles (green / amber / dark), faded at the edges */
-.c24-land-stage { position: relative; display: grid; place-items: end center; width: 100%; order: 2; }
-.c24-land-tiles {
-    position: absolute; inset: 12% 0 6%;
-    display: grid; grid-template-columns: repeat(5, 1fr); align-content: center; gap: 6px;
-    width: min(100%, 300px); margin: 0 auto;
-    -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent 100%);
-    mask-image: radial-gradient(closest-side, #000 35%, transparent 100%);
-    opacity: 0.55;
-}
-.c24-land-tiles i { aspect-ratio: 1; border-radius: 4px; background: var(--c24-surface); box-shadow: inset 0 0 0 1px var(--c24-line); }
-.c24-land-tiles i.g { background: var(--c24-green); box-shadow: none; }
-.c24-land-tiles i.a { background: var(--c24-amber); box-shadow: none; opacity: 0.85; }
-.c24-land-kolo {
-    position: relative;
-    height: clamp(150px, calc(100dvh - 560px), 330px); width: auto;
-    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
-}
-.c24-land-copy { display: contents; }
-.c24-land-title { order: 1; margin: 0; display: flex; flex-direction: column; align-items: center; line-height: 1; }
-.c24-land-title img { width: min(80vw, 300px); height: auto; display: block; }
-.c24-land-by {
-    margin-top: -0.35rem; align-self: flex-end; margin-right: 8%;
-    font-family: var(--c24-font-display); font-size: 1.35rem; letter-spacing: 0.04em; color: var(--c24-lime);
-}
-.c24-land-tag { order: 3; margin: 0.25rem 0 0; font-size: 1.05rem; font-weight: 700; color: var(--c24-text); }
-.c24-land .c24-today > span + span { margin-left: 0.35rem; }
-.c24-land .c24-today { order: 4; margin: 0; font-size: 0.8rem; color: var(--c24-subtle); }
-.c24-today-num { font-family: var(--c24-font-display); font-size: 1.25rem; color: var(--c24-lime); vertical-align: -0.05em; }
-.c24-today-time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--c24-text); }
-
-.c24-land-actions { order: 5; display: flex; flex-direction: column; gap: 0.5rem; width: 100%; margin-top: 0.5rem; }
-.c24-land .c24-dc-area { gap: 0; }
-.c24-land .c24-dc-btn { min-height: 56px; justify-content: center; font-size: 1.05rem; border-radius: 14px; }
-.c24-land .c24-dc-privacy-link { min-height: 36px; font-size: 0.75rem; }
-.c24-land-go {
-    display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-    min-height: 56px; border-radius: 14px;
-    background: var(--c24-lime); color: #0f1a12;
-    font-family: var(--c24-font-display); font-size: 1.9rem; text-transform: uppercase; letter-spacing: 0.04em;
-}
-.c24-land-go:active { transform: scale(0.98); }
-.c24-land-go:focus-visible { outline: 3px solid var(--c24-accent); outline-offset: 3px; }
-
-/* "or play as guest" between two thin lines */
-.c24-land-or {
-    display: flex; align-items: center; gap: 0.75rem; margin: 0.1rem 0 0;
-    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--c24-subtle);
-}
-.c24-land-or::before, .c24-land-or::after { content: ""; flex: 1; height: 1px; background: var(--c24-line); }
-
-/* the two guest games side by side: quiet outlined tiles */
-.c24-land .c24-primary.c24-land-guest { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-.c24-land .c24-land-guest .c24-play {
-    flex-direction: column; justify-content: center; gap: 0.15rem;
-    min-height: 64px; padding: 0.5rem 0.5rem;
-    border: 2px solid var(--c24-line-strong); background: transparent; color: var(--c24-text);
-}
-.c24-land .c24-land-guest .c24-play-name { font-size: 1.6rem; }
-.c24-land .c24-land-guest .c24-play-status { font-size: 0.72rem; color: var(--c24-subtle); opacity: 1; }
-.c24-play-streak { margin-left: 0.4rem; }
-@media (hover: hover) and (pointer: fine) {
-    .c24-land .c24-land-guest .c24-play:hover { border-color: var(--c24-green); box-shadow: none; }
-    .c24-land-go:hover { filter: brightness(1.05); }
-}
-.c24-land .c24-land-guest .c24-play:focus-visible { outline: 3px solid var(--c24-accent); outline-offset: 3px; }
-
-.c24-land-foot { text-align: center; }
-.c24-land-foot .c24-legal-foot { margin: 0; }
-
-/* short phones (iPhone SE …): smaller Kolo first, then a smaller title */
-@media (max-height: 640px) {
-    .c24-start.c24-land { padding-top: 0.25rem; gap: 0.25rem; }
-    .c24-land-kolo { height: clamp(96px, calc(100dvh - 454px), 200px); }
-    .c24-land-title img { width: min(56vw, 210px); }
-    .c24-land-by { font-size: 1.1rem; }
-    .c24-land-tag { font-size: 0.95rem; margin-top: 0; }
-    .c24-land-actions { margin-top: 0.25rem; gap: 0.35rem; }
-    .c24-land .c24-dc-btn { min-height: 48px; }
-    .c24-land .c24-land-guest .c24-play { min-height: 54px; }
-}
-
-/* laptops and desktops: Kolo on the left, title and buttons on the right */
-@media (min-width: 900px) and (min-height: 560px) {
-    .c24-start.c24-land { max-width: 58rem; padding-top: 1.5rem; gap: 1rem; }
-    .c24-land-hero { flex-direction: row; align-items: center; justify-content: center; gap: 3rem; text-align: left; }
-    .c24-land-stage { order: 0; width: auto; flex: 0 0 auto; }
-    .c24-land-tiles { inset: 0 -22%; width: auto; }
-    .c24-land-kolo { height: clamp(300px, calc(100dvh - 210px), 470px); }
-    .c24-land-copy { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; text-align: center; width: 24rem; flex: 0 0 auto; }
-    .c24-land-title img { width: 356px; }
-}

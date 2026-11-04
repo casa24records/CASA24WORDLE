@@ -671,6 +671,14 @@ const app = Vue.createApp({
                 this.switchLayout();
                 return;
             }
+            if (event.code === "KeyD" && event.ctrlKey && (event.metaKey || (event.altKey && event.shiftKey))
+                && c24_page.demo_key === true) {
+                // hidden: Ctrl+⌘+D (Ctrl+Alt+Shift+D elsewhere) opens the team's Developer view
+                // (password page); only on the website and when it is enabled
+                event.preventDefault();
+                window.location.assign("/demo");
+                return;
+            }
             // shortcuts (Ctrl+R, Cmd+C...) and IME composition are not typing;
             // AltGr (Ctrl+Alt on Windows) still types letters on some layouts
             var alt_graph = event.getModifierState && event.getModifierState("AltGraph");

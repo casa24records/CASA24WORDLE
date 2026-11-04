@@ -491,7 +491,8 @@ def test_presence_hidden_player_never_appears(lb_env, client, discord, mem):
 def test_presence_guest_and_demo_pages_create_no_rows(lb_env, client, discord, mem, monkeypatch):
     monkeypatch.setenv("DEMO_PASSWORD", "fake-demo-pass-for-tests")
     login(client, discord, user_id=ME, username="kolo_fan")
-    for path in ("/?menu=1", "/es", "/en", "/leaderboard"):  # (signed in, "/" goes to /lb/<lang>)
+    assert client.get("/").status_code == 302  # (signed in, "/" only redirects to /lb/<lang>)
+    for path in ("/es", "/en", "/leaderboard"):
         assert client.get(path).status_code == 200, path
     assert client.post("/demo", data={"password": "fake-demo-pass-for-tests"}).status_code == 302
     assert client.get("/demo/es").status_code == 200

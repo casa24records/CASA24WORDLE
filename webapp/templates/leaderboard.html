@@ -45,7 +45,7 @@
 <body class="c24-lb-page">
     <header class="c24-header c24-header-menu c24-lb-header">
         <div class="c24-header-side">
-            <a href="{{ aq('/') }}" class="c24-icon-btn" aria-label="{{ L('lb_back', 'Menú', 'Menu') }}" title="{{ L('lb_back', 'Menú', 'Menu') }}">
+            <a href="{{ aq('/') }}" class="c24-icon-btn" aria-label="{{ L('lb_back', 'Jugar', 'Play') }}" title="{{ L('lb_back', 'Jugar', 'Play') }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6"/></svg>
             </a>
             {% if lb_enabled and not in_activity %}
@@ -135,7 +135,7 @@
             {{ dc.privacy_link(L('lb_privacy_title', 'Privacidad', 'Privacy')) }}
         </section>
 
-        <p class="c24-lb-back"><a href="{{ aq('/') }}">← {{ L('lb_back', 'Menú', 'Menu') }}</a></p>
+        <p class="c24-lb-back"><a href="{{ aq('/') }}">← {{ L('lb_back', 'Jugar', 'Play') }}</a></p>
         {#- Terms / Privacy: full texts in es and en.
             Inside Discord, discord-activity.js opens data-c24-external with the SDK's openExternalLink. -#}
         {% set legal_lang = ui %}

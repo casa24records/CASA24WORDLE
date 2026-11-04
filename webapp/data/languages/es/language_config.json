@@ -28,7 +28,6 @@
         "demo_title": "Vista de desarrollador",
         "demo_intro": "Para el equipo de Casa 24: el mismo juego, con botones para reiniciar con otra palabra y para poner la palabra. No cuenta en tus estadísticas.",
         "lb_view": "Ver leaderboard",
-        "lb_login": "Entrar con Discord",
         "lb_logout": "Cerrar sesión",
         "lb_privacy": "Discord maneja tu inicio de sesión; nosotros no vemos tu contraseña ni tu correo. Guardamos tu ID, tu nombre de usuario y tu foto de perfil de Discord y tus resultados para mostrar el ranking y quién está jugando hoy. Los demás jugadores ven solo tus colores, nunca tus palabras.",
         "lb_guest_note": "Las partidas como invitado no se suman al ranking.",
@@ -53,13 +52,12 @@
         "lb_delete": "Borrar mis datos",
         "lb_delete_confirm": "¿Borrar todos tus datos del leaderboard? No se puede deshacer.",
         "lb_hide": "Ocultar",
-        "lb_back": "Menú",
+        "lb_back": "Jugar",
         "lb_signin": "Entrar con Discord",
         "lb_login_cancelled": "Cancelaste el inicio de sesión con Discord.",
         "lb_avatar_note": "Tu foto de Discord la ven los demás jugadores en la lista de quién está jugando hoy.",
         "lb_account": "Tu cuenta de Discord",
         "lb_privacy_title": "Privacidad",
-        "lb_play_guest": "Jugar como invitado (no cuenta)",
         "lb_rank_label": "Puesto",
         "lb_points_label": "puntos",
         "lb_point_label": "punto",
@@ -82,9 +80,7 @@
         "stats_label": "Estadísticas",
         "board_label": "Tablero",
         "board_row": "Fila",
-        "keyboard_label": "Teclado",
-        "landing_tagline": "Una palabra al día. Seis intentos.",
-        "landing_or_guest": "o juega como invitado"
+        "keyboard_label": "Teclado"
     },
     "help": {
         "title": "Cómo jugar",
