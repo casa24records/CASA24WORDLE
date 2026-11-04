@@ -7,6 +7,8 @@
     - dc.privacy_link / dc.privacy_dialog: the "(i) Privacy" link and its dialog
     - dc.toast(...): short notice (login failed/cancelled, data deleted) that closes itself
     - dc.trophy(): line trophy icon (same style as the header icons)
+    - dc.medal(rank): gold/silver/bronze rosette for ranks 1-3 (leaderboard tables; the
+      rank stays readable for screen readers; colors from .c24-medal.is-1/2/3 in style.css)
     - dc.script(lb_user): static/discord.js (reads #dc=<avatar hash> after login, keeps it in
       localStorage c24_dc_avatar, this browser only, fills every img[data-dc-avatar], menus,
       privacy dialog, in-page delete confirmation). No inline JS (Discord Activity CSP).
@@ -18,6 +20,13 @@
 
 {% macro trophy(cls='c24-trophy') -%}
 <svg class="{{ cls }}" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10"/><path d="M17 4v8a5 5 0 0 1 -10 0v-8"/><circle cx="5" cy="9" r="2"/><circle cx="19" cy="9" r="2"/></svg>
+{%- endmacro %}
+
+{#- Rosette medal for rank 1, 2 or 3 (~26px): ring, face, the number in the middle and two
+    ribbon tails. The SVG is decoration; the sr-only number keeps the rank for screen readers.
+    Used by leaderboard.html and by the Vue rows of the game's leaderboard window (v-if per rank). -#}
+{% macro medal(rank) -%}
+<span class="c24-medal is-{{ rank }}"><svg class="c24-medal-svg" viewBox="0 0 26 32" width="26" height="32" aria-hidden="true" focusable="false"><path class="c24-medal-tail" d="M7.5 17L4 30.5l4.2-1.9 2.6 3.4L13 20z"/><path class="c24-medal-tail" d="M18.5 17L22 30.5l-4.2-1.9-2.6 3.4L13 20z"/><circle class="c24-medal-ring" cx="13" cy="12" r="11.5"/><circle class="c24-medal-face" cx="13" cy="12" r="8.5"/><circle class="c24-medal-pleat" cx="13" cy="12" r="10" fill="none" stroke-width="1" stroke-dasharray="1.6 1.6"/><text class="c24-medal-num" x="13" y="12.5" text-anchor="middle" dominant-baseline="central">{{ rank }}</text></svg><span class="sr-only">{{ rank }}</span></span>
 {%- endmacro %}
 
 {#- Official-style button: Blurple, white logo, 48px. `label` may be markup. -#}

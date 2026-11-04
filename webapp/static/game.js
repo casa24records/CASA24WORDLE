@@ -1,4 +1,4 @@
-// Casa 24 Wordle game page (Vue 3). Word lists, characters, config and page
+// El Wordle by Casa 24 game page (Vue 3). Word lists, characters, config and page
 // settings come from the JSON blocks #c24-data and #c24-page in game.html (data,
 // not code: no inline scripts, so the Discord Activity's CSP can run the page).
 
@@ -192,12 +192,10 @@ const app = Vue.createApp({
             todays_word: todays_word,
             todays_idx: todays_idx,
             config: config,
-            allow_any_word: false,
 
 
             showHelpModal: false,
             show_stats_modal: false,
-            show_options_modal: false,
 
             notification: {
                 show: false,
@@ -272,12 +270,13 @@ const app = Vue.createApp({
             live_open: false,   // narrow screens: the bottom sheet is open
             lb_ready: !ACTIVITY, // Discord Activity: the first state from the server has been painted
             board_open: false,  // Discord Activity: leaderboard window
-            lang_open: false,   // Discord Activity: language window (header "ES ▾")
+            lang_open: false,   // language window (header "EN ▾"; Discord and the website)
             board_tab: "",
             board_rows: [],
             board_me: null,
             board_loading: false,
             board_error: false,
+            stats_end: false,   // the stats window opened by itself at the end of the game: + Kolo, grid, rank
             share_open: false,  // share text to copy by hand
             share_text: "",
         }
@@ -335,9 +334,14 @@ const app = Vue.createApp({
         },
     },
     created() {
-        // remember the last language played, for the start screen
+        // remember the last language played, for the start screen; on the website the
+        // c24_lang cookie also lets "/" send a signed-in player straight to this language
         if (!DEMO) {
             try { localStorage.setItem("casa24_lang", this.config.language_code); } catch (e) { }
+            if (!ACTIVITY) {
+                document.cookie = "c24_lang=" + encodeURIComponent(this.config.language_code)
+                    + "; Path=/; Max-Age=31536000; SameSite=Lax" + (location.protocol === "https:" ? "; Secure" : "");
+            }
         }
         // listen for any keypresses
         window.addEventListener('keydown', this.keyDown);
@@ -389,7 +393,7 @@ const app = Vue.createApp({
         this.showTiles();
 
         if (this.game_over) {
-            this.show_stats_modal = true;
+            this.openStats(true);
         }
         if (LB) {
             // live view: first ask after the board has rendered, then every 3 s while visible
@@ -410,11 +414,11 @@ const app = Vue.createApp({
     },
     methods: {
         async shareResults() {
-            // share text, e.g. "Casa 24 Wordle ES #123 3/6" + link + emoji grid.
+            // share text, e.g. "El Wordle by Casa 24 ES #123 3/6" + link + emoji grid.
             // Web: the system share sheet, else copy. Inside Discord: copy only (no new
             // windows from the iframe). Can't copy: a window with the text to copy by hand.
             this.emoji_board = this.getEmojiBoard();
-            var text_to_share = "Casa 24 Wordle " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + PUBLIC_ORIGIN + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
+            var text_to_share = "El Wordle by Casa 24 " + this.config.language_code.toUpperCase() + " #" + this.todays_idx + " " + this.attempts + "/6" + "\n" + PUBLIC_ORIGIN + "/" + this.config.language_code + "\n" + "\n" + this.emoji_board;
             if (navigator.share && !ACTIVITY) {
                 try {
                     await navigator.share({
@@ -451,7 +455,6 @@ const app = Vue.createApp({
         },
         openLang() {
             // Discord Activity: the language window (header "ES ▾")
-            this.show_options_modal = false;
             this.show_stats_modal = false;
             this.lang_open = true;
             this.$nextTick(() => {
@@ -570,7 +573,7 @@ const app = Vue.createApp({
             if (folded === foldAccents(this.todays_word)) {
                 return this.todays_word;
             }
-            if (this.checkWord(word) && !this.allow_any_word) {
+            if (this.checkWord(word)) {
                 return word;
             }
             if (!this.fold_map) {
@@ -588,9 +591,6 @@ const app = Vue.createApp({
             return this.fold_map[folded] || word;
         },
         checkWord(word) {
-            if (this.allow_any_word) {
-                return true;
-            }
             return word_list.indexOf(word) != -1 || word_list_supplement.indexOf(word) != -1;
         },
 
@@ -658,10 +658,17 @@ const app = Vue.createApp({
                 this.closeLive();
                 this.showHelpModal = false;
                 this.show_stats_modal = false;
-                this.show_options_modal = false;
                 this.board_open = false;
                 this.lang_open = false;
                 this.share_open = false;
+                return;
+            }
+            if (event.code === "KeyA" && event.ctrlKey && (event.metaKey || (event.altKey && event.shiftKey))) {
+                // hidden: Ctrl+⌘+A on a Mac (Ctrl+Alt+Shift+A elsewhere) switches the keyboard
+                // between QWERTY and alphabetical (no Settings any more; the server keeps the
+                // choice in a cookie, inside Discord the ?layout= parameter travels with the page)
+                event.preventDefault();
+                this.switchLayout();
                 return;
             }
             // shortcuts (Ctrl+R, Cmd+C...) and IME composition are not typing;
@@ -859,7 +866,7 @@ const app = Vue.createApp({
                 this.show_stats_modal = false;
             }
             if (this.game_over && (!was_over || !same_day)) {
-                this.show_stats_modal = true;  // finished elsewhere (another tab, Discord)
+                this.openStats(true);  // finished elsewhere (another tab, Discord)
             }
         },
         loadState(force) {
@@ -1072,6 +1079,35 @@ const app = Vue.createApp({
                 this.liveFetch();
             }
         },
+        switchLayout() {
+            var board = document.querySelector(".c24-keyboard");
+            var current = board && board.getAttribute("data-layout");
+            var url = new URL(window.location.href);
+            url.searchParams.set("layout", current === "alphabetical" ? "qwerty" : "alphabetical");
+            window.location.replace(url.toString());
+        },
+        openStats(end) {
+            // end=true: opened by itself when the game ends (Kolo, result grid, rank/points);
+            // the header icon opens the compact window of the guide (date, n/6, next word, share)
+            this.stats_end = !!end;
+            this.show_stats_modal = true;
+        },
+        toggleStats() {
+            if (this.show_stats_modal) { this.show_stats_modal = false; return; }
+            this.openStats(false);
+        },
+        stats_date() {
+            // the game's day (Panama) for the stats title: "November 1st, 2026" / "1 de noviembre de 2026"
+            var day = (this.lb_day || panamaDate());
+            var parts = day.split("-").map(Number);
+            var date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12));
+            var es = this.config.language_code === "es";
+            var month = date.toLocaleString(es ? "es" : "en", { month: "long", timeZone: "UTC" });
+            if (es) { return { text: parts[2] + " de " + month + " de " + parts[0], ord: "" }; }
+            var d = parts[2], ord = "th";
+            if (d % 10 === 1 && d !== 11) { ord = "st"; } else if (d % 10 === 2 && d !== 12) { ord = "nd"; } else if (d % 10 === 3 && d !== 13) { ord = "rd"; }
+            return { text: month + " " + d, ord: ord, year: String(parts[0]) };
+        },
         toggleLive() {
             if (this.live_open) {
                 this.closeLive();
@@ -1174,7 +1210,7 @@ const app = Vue.createApp({
             }, delay);
             setTimeout(() => {
                 this.hideNotification();  // the answer toast would cover the window title
-                this.show_stats_modal = true;
+                this.openStats(true);
             }, delay + (delay > 0 ? 1600 : 400));
 
             if (DEMO || LB) { return; }  // demo results don't count; leaderboard results live on the server
@@ -1198,7 +1234,7 @@ const app = Vue.createApp({
             this.attempts = "X";
             setTimeout(() => {
                 this.hideNotification();  // the answer toast would cover the window title
-                this.show_stats_modal = true;
+                this.openStats(true);
             }, delay + 400);
             if (DEMO || LB) { return; }  // demo results don't count; leaderboard results live on the server
             // save a loss to local storage game results

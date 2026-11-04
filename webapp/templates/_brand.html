@@ -1,0 +1,23 @@
+{#- El Wordle by Casa 24: the brand pieces every page shares (rebrand 2026-11-04,
+    designer's guide Explained.pdf). Images come from scripts/brand_assets.py --rebrand.
+    - lockup(code, arrow): Kolo in the hoodie + the "El Wordle" title + the lime language
+      button ("EN ▾"). The title image carries the name for screen readers. Its class
+      c24-title-text lets it step aside on the narrowest headers (style.css), like the
+      old "Casa 24" text did.
+    - door(extra_class): the Casa 24 door logo, a link to casa24records.com. On the web
+      it opens a new tab; inside the Discord Activity, discord-activity.js sends
+      data-c24-external links through the SDK's openExternalLink (window.open and
+      target=_blank don't work in Discord's iframe). -#}
+{% macro lockup(code, arrow=true) -%}
+<img src="{{ asset('images/brand/kolo-hoodie.webp') }}" width="160" height="192" alt="" class="c24-logo c24-logo-kolo">
+<img src="{{ asset('images/brand/el-wordle.webp') }}" width="356" height="160" alt="El Wordle by Casa 24" class="c24-title-text c24-titler">
+{%- if code %}
+<span class="c24-badge">{{ code }}{% if arrow %}<span class="c24-badge-arrow" aria-hidden="true">▾</span>{% endif %}</span>
+{%- endif %}
+{%- endmacro %}
+
+{% macro door(extra_class='', label='Casa 24 Records') -%}
+<a href="https://www.casa24records.com" target="_blank" rel="noopener" data-c24-external="https://www.casa24records.com"
+    class="c24-door-link {{ extra_class }}" data-c24-door aria-label="{{ label }} (casa24records.com)" title="casa24records.com"><span
+    class="c24-door" aria-hidden="true"></span></a>
+{%- endmacro %}

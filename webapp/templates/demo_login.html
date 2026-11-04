@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 {% set es = texts['es'] %}{% set en = texts['en'] %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme" content="dark">
     <meta name="robots" content="noindex">
-    <title>Casa 24 Wordle · Developer view</title>
+    <title>El Wordle by Casa 24 · Developer view</title>
     <link rel="shortcut icon" href="{{ asset('favicon/favicon.ico') }}">
     <style>
         @font-face { font-family: "VT323"; src: url("{{ asset('fonts/VT323-Regular.ttf') }}") format("truetype"); font-display: swap; }
@@ -18,8 +18,8 @@
 <body class="c24-demo-login-page">
     <main class="c24-demo-login">
         <a href="/" class="c24-demo-login-logo">
-            <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
-            <span class="c24-title">Casa 24 Wordle</span>
+            <img src="{{ asset('images/brand/kolo-hoodie.webp') }}" width="160" height="192" alt="" class="c24-logo c24-logo-kolo">
+            <img src="{{ asset('images/brand/el-wordle.webp') }}" width="356" height="160" alt="El Wordle by Casa 24" class="c24-titler">
         </a>
         <h1 class="c24-title c24-demo-login-title">🔒 {{ es.demo_title }} / {{ en.demo_title }}</h1>
         <p class="c24-demo-login-intro"><span lang="es">{{ es.demo_intro }}</span><br><span lang="en">{{ en.demo_intro }}</span></p>

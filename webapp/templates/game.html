@@ -1,33 +1,33 @@
 {# t(key, fallback): text from language_config.json "text", English if missing #}
 {% macro t(key, default) %}{{ language.config.text.get(key, default) | trim }}{% endmacro %}
 {% import '_discord.html' as dc %}
+{% import '_brand.html' as brand %}
 {% set me = lb_user if (lb_enabled is defined and lb_enabled and lb_user is defined and lb_user) else none %}
 {#- inside the Discord Activity (app.py is_activity()): automatic login, no login/logout menu,
     leaderboard and language in windows of this page (no extra page loads) -#}
 {% set in_activity = C24_ACTIVITY is defined and C24_ACTIVITY and lb is defined and lb %}
 <!DOCTYPE html>
-<html lang="{{ language.language_code }}"{% if in_activity %} class="c24-embed"{% endif %}>
+<html lang="{{ language.language_code }}" data-theme="dark"{% if in_activity %} class="c24-embed"{% endif %}>
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="color-scheme" content="light dark">
-    <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0f1a12" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0f1a12">
     <link rel="shortcut icon" href="{{ asset('favicon/favicon.ico') }}">
 
-    <title>Casa 24 Wordle · {{ language.config.name_native }}</title>
+    <title>El Wordle by Casa 24 · {{ language.config.name_native }}</title>
     <meta name="description" content="{{ language.config.meta.description }}">
     <meta property="description" content="{{ language.config.meta.description }}">
     <meta name="keywords" content="wordle, {{ language.config.name}}, {{ language.config.name_native }}">
-    <meta property="og:title" content="Casa 24 Wordle · {{ language.config.name_native }}">
+    <meta property="og:title" content="El Wordle by Casa 24 · {{ language.config.name_native }}">
     <meta property="og:url" content="{{ request.url_root }}{{ language.config.language_code }}">
-    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/kolo/kolo-hero.png') }}">
+    <meta property="og:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/brand/og-image.png') }}">
     <meta property="og:type" content="website">
     <meta property="og:description" content="{{ language.config.meta.description }}">
-    <meta property="twitter:title" content="Casa 24 Wordle · {{ language.config.name_native }}">
+    <meta property="twitter:title" content="El Wordle by Casa 24 · {{ language.config.name_native }}">
     <meta property="twitter:description" content="{{ language.config.meta.description }}">
-    <meta property="twitter:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/kolo/kolo-hero.png') }}">
+    <meta property="twitter:image" content="{{ request.url_root.rstrip('/') }}{{ asset('images/brand/og-image.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('favicon/apple-touch-icon.png') }}">
     <link rel="manifest" href="{{ asset('favicon/site.webmanifest') }}">
     {% if hreflang_links is defined and hreflang_links %}{% for l in hreflang_links %}<link rel="alternate" hreflang="{{ l.lang }}" href="{{ l.href }}">
@@ -76,14 +76,15 @@
                 <h1 class="c24-title c24-header-title uppercase"><button type="button" class="c24-lang-btn inline-flex items-center gap-2"
                         data-activity-lang-open aria-haspopup="dialog" v-on:click="openLang"
                         aria-label="{{ t('activity_lang_button', 'Change language') }} ({{ language.config.name_native }})">
-                        <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="" class="c24-logo">
-                        <span class="c24-title-text">Casa 24</span>
-                        <span class="c24-badge">{{ language.config.language_code }} ▾</span></button></h1>{% else %}
+                        {{ brand.lockup(language.config.language_code) }}</button></h1>{% elif demo %}
                 <h1 class="c24-title c24-header-title uppercase"><a href="{{ aq('/') }}" class="inline-flex items-center gap-2">
-                        <!-- LOGO SLOT: Kolo's face. Replace the src to use another logo. -->
-                        <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-logo">
-                        <span class="c24-title-text">Casa 24</span>
-                        <span class="c24-badge">{{ language.config.language_code }}</span></a></h1>{% endif %}
+                        {{ brand.lockup(language.config.language_code, arrow=false) }}</a></h1>{% else %}
+                <!-- website: the brand opens the same language window as in Discord ("EN ▾");
+                     its choices are links to the other language's game (rebrand 2026-11-04) -->
+                <h1 class="c24-title c24-header-title uppercase"><button type="button" class="c24-lang-btn inline-flex items-center gap-2"
+                        data-lang-open aria-haspopup="dialog" v-on:click="openLang"
+                        aria-label="{{ t('activity_lang_button', 'Change language') }} ({{ language.config.name_native }})">
+                        {{ brand.lockup(language.config.language_code) }}</button></h1>{% endif %}
                 <div class="c24-header-side c24-header-end">
                     {% if lb %}
                     <!-- who else is playing today: opens the live sheet (hidden where the sidebar shows).
@@ -131,7 +132,7 @@
                         aria-label="{{ t('lb_view', 'View leaderboard') }}" title="{{ t('lb_view', 'View leaderboard') }}">{{ dc.trophy() }}</a>
                     {% endif %}
                     <button type="button" class="c24-icon-btn" data-stats-open aria-label="{{ t('stats_label', 'Statistics') }}" title="{{ t('stats_label', 'Statistics') }}"
-                        v-on:click="show_stats_modal = !show_stats_modal">
+                        v-on:click="toggleStats">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24"
                             height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -142,18 +143,8 @@
                             <line x1="4" y1="20" x2="18" y2="20"></line>
                         </svg>
                     </button>
-                    <button type="button" class="c24-icon-btn" aria-label="{{ t('settings', 'Settings') }}"
-                        v-on:click="show_options_modal = !show_options_modal">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                            <path
-                                d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z">
-                            </path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
+                    <!-- Casa 24's door: casa24records.com (replaced Settings, rebrand 2026-11-04) -->
+                    {{ brand.door('c24-icon-btn') }}
                     {% if lb and not in_activity %}
                     {{ dc.header_slot(me, '/auth/discord/login?next=' ~ ('/lb/' ~ language.config.language_code) | urlencode,
                         t('lb_account', 'Your Discord account'), t('lb_signin', 'Sign in with Discord'),
@@ -183,7 +174,8 @@
                 </div>
             </main>
             <!-- The keyboard, right under the board: --rows lets style.css make keys shorter on short screens -->
-            <div class="c24-keyboard" role="group" aria-label="{{ t('keyboard_label', 'Keyboard') }}" style="--rows: {{ language.keyboard | length }}">
+            <div class="c24-keyboard" role="group" aria-label="{{ t('keyboard_label', 'Keyboard') }}" style="--rows: {{ language.keyboard | length }}"
+                data-layout="{{ language.keyboard_layout_name }}">
                 {% for row in language.keyboard %}
                 <div class="c24-key-row">
                     {% for c in row %}
@@ -243,183 +235,82 @@
         {% endif %}
 
         <!-- NOTIFICATIONS & MODALS-->
-        <div v-show="showHelpModal || show_stats_modal || show_options_modal || board_open{% if in_activity %} || lang_open{% endif %} || share_open" class="c24-backdrop" v-cloak></div>
+        <div v-show="showHelpModal || show_stats_modal || board_open || lang_open || share_open" class="c24-backdrop" v-cloak></div>
 
-        <!-- help modal -->
+        <!-- help modal (rebrand 2026-11-04, Explained.pdf): the El Wordle title, three examples,
+             the Casa 24 door, and small Terms / Privacy (+ Delete my data in Discord) that used
+             to live in Settings. Example words: help.example_1..3 in language_config.json,
+             else the first three answers. Colored letters: 1st green, 3rd amber, 5th gray. -->
+        {% set help = language.config.help %}
+        {% set ex = [help.example_1 or language.word_list[0], help.example_2 or language.word_list[1], help.example_3 or language.word_list[2]] %}
         <div id="HelpModal" v-show="showHelpModal" class="c24-modal-wrap" v-cloak>
-            <div class="c24-modal bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
+            <div class="c24-modal c24-help bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
                 aria-modal="true" aria-labelledby="help-title">
-                <button type="button" class="c24-close" aria-label="{{ language.config.help.close }}"
-                    v-on:click="showHelpModal = false">×</button>
-                <div class="flex flex-col gap-2">
-                    <h2 id="help-title" class="flex mx-auto uppercase font-bold text-2xl tracking-wider">Wordle <span
-                            class="ml-1 text-transparent bg-clip-text c24-gradient">{{
-                            language.config.name_native }}</span>
-                    </h2>
-
-                    <h3 class="font-bold text-lg">{{ language.config.help.title }}</h3>
-                    <!-- how to play -->
-                    <p class="text-sm">{{ language.config.help.text_1_1_1 }} <a
-                            class="font-bold uppercase">Wordle</a> {{ language.config.help.text_1_1_2 }}</p>
-                    <p class="text-sm">{{ language.config.help.text_1_2 }}</p>
-                    <p class="text-sm">{{ language.config.help.text_1_3 }}</p>
-
-                    <div class="border-t-2 border-gray-300"></div>
-                    <div class="justify-center items-center flex flex-col gap-2">
-                        <h2 class="text-md font-semibold text-gray-900">{{ language.config.help.title_2 }}</h2>
-
-                        <div class="c24-example grid grid-cols-5 gap-1 w-full">
-                            {% for c in language.word_list[0] %}
-                            {% if loop.index == 1 %}
-                            <div class="inline-flex justify-center items-center correct uppercase font-bold select-none text-white">
-                                {{c}}</div>
-                            {% else %}
-                            <div class="inline-flex justify-center items-center uppercase font-bold select-none border-2 border-neutral-500">
-                                {{c}}</div>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
-                        <p class="text-sm mb-2"><span
-                                class="font-bold uppercase">{{language.word_list[0][0]}}</span> {{
-                            language.config.help.text_2_1 }}</p>
-
-                        <div class="c24-example grid grid-cols-5 gap-1 w-full">
-                            {% for c in language.word_list[1] %}
-                            {% if loop.index == 3 %}
-                            <div class="inline-flex justify-center items-center semicorrect uppercase font-bold select-none text-white">
-                                {{c}}</div>
-                            {% else %}
-                            <div class="inline-flex justify-center items-center uppercase font-bold select-none border-2 border-neutral-500">
-                                {{c}}</div>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
-                        <p class="text-sm mb-2"><span
-                                class="font-bold uppercase">{{language.word_list[1][2]}}</span> {{
-                            language.config.help.text_2_2 }}</p>
-
-                        <div class="c24-example grid grid-cols-5 gap-1 w-full">
-                            {% for c in language.word_list[2] %}
-                            {% if loop.index == 5 %}
-                            <div class="inline-flex justify-center items-center incorrect uppercase font-bold select-none text-white">
-                                {{c}}</div>
-                            {% else %}
-                            <div class="inline-flex justify-center items-center uppercase font-bold select-none border-2 border-neutral-500">
-                                {{c}}</div>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
-                        <p class="text-sm mb-2"><span
-                                class="font-bold uppercase">{{language.word_list[2][4]}}</span> {{
-                            language.config.help.text_2_3 }}</p>
+                <button type="button" class="c24-close" aria-label="{{ help.close }}"
+                    v-on:click="showHelpModal = false">✕</button>
+                <div class="flex flex-col items-center gap-2">
+                    <h2 id="help-title" class="c24-help-title"><img src="{{ asset('images/brand/el-wordle.webp') }}"
+                            width="356" height="160" alt="El Wordle by Casa 24"><span class="sr-only"> · {{ help.title }}</span></h2>
+                    <h3 class="c24-help-examples">{{ help.title_2 }}</h3>
+                    {% for word in ex %}
+                    {% set pos = [0, 2, 4][loop.index0] %}
+                    {% set kind = ['correct', 'semicorrect', 'incorrect'][loop.index0] %}
+                    <div class="c24-example grid grid-cols-5 gap-1 w-full">
+                        {% for c in word %}
+                        {% if loop.index0 == pos %}
+                        <div class="inline-flex justify-center items-center {{ kind }} uppercase font-bold select-none">{{ c }}</div>
+                        {% else %}
+                        <div class="inline-flex justify-center items-center uppercase font-bold select-none border-2 border-neutral-500">{{ c }}</div>
+                        {% endif %}
+                        {% endfor %}
                     </div>
+                    <p class="c24-help-line"><span class="c24-help-letter is-{{ kind }}">{{ word[pos] | upper }}</span> {{
+                        help['text_2_' ~ loop.index] }}</p>
+                    {% endfor %}
 
-                    <div class="border-t-2 border-gray-300"></div>
-                    {% if lb_enabled and not lb and not demo and not lb_user %}
-                    <!-- guest game: one short line on signing in (the end window has the button) -->
-                    <p class="text-sm" data-lb-guest-sync>{{ t('lb_guest_sync', 'Sign in with Discord to continue this game on Discord and count it toward the ranking.') }}</p>
+                    <!-- Casa 24's door: casa24records.com (new tab; in Discord: SDK openExternalLink) -->
+                    {{ brand.door('c24-help-door') }}
+                    {#- Terms / Privacy. Inside Discord the game can't navigate away: discord-activity.js
+                        opens data-c24-external through the shell (SDK openExternalLink). -#}
+                    {% set legal_lang = language.language_code if language.language_code in ('es', 'en') else 'en' %}
+                    <p class="c24-legal-foot c24-help-legal" data-legal-links>
+                        <a href="{{ aq('/terms?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/terms?lang={{ legal_lang }}">{{ t('legal_terms', 'Terms') }}</a>
+                        · <a href="{{ aq('/privacy?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/privacy?lang={{ legal_lang }}">{{ t('legal_privacy', 'Privacy') }}</a>
+                    </p>
+                    {% if in_activity %}
+                    {#- Discord Activity: delete my data without leaving Discord (in-page confirm from
+                        discord.js, then discord-activity.js posts /api/me/delete with the Bearer session) -#}
+                    <form method="dialog" class="c24-activity-delete" data-activity-delete data-confirm-event
+                        data-confirm="{{ t('lb_delete_confirm', "Delete all your leaderboard data? This can't be undone.") }}"
+                        data-confirm-ok="{{ t('lb_delete', 'Delete my data') }}" data-confirm-cancel="{{ t('lb_cancel', 'Cancel') }}"
+                        data-error="{{ t('lb_error', 'Something went wrong') }}">
+                        <button type="submit" class="c24-activity-delete-btn">{{ t('lb_delete', 'Delete my data') }}</button>
+                        <span class="c24-activity-delete-status" data-activity-delete-status role="status"></span>
+                    </form>
                     {% endif %}
-
-                    <button type="button" class="c24-text-btn uppercase font-bold text-sm tracking-wider"
-                        v-on:click="showHelpModal = false">{{ language.config.help.close }}
-                        <span class="text-lg text-neutral-400" aria-hidden="true">×</span></button>
                 </div>
             </div>
         </div>
 
-        <!-- options modal -->
-        <div v-show="show_options_modal" class="c24-modal-wrap" v-cloak>
-            <div class="c24-modal c24-modal-sm bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
-                aria-modal="true" aria-labelledby="settings-title">
-                <button type="button" class="c24-close" aria-label="close"
-                    v-on:click="show_options_modal = false">×</button>
-                <div class="flex flex-col gap-2">
-                    <h3 id="settings-title" class="uppercase font-bold text-xl tracking-wider mb-5">{{ t('settings', 'Settings') }}</h3>
-                    <div class="space-y-4">
-                        {% if language.keyboard_layouts|length > 1 %}
-                        <!-- keyboard layout (es: QWERTY (Ñ) / Alfabético; en: QWERTY / Dvorak / Alphabetical) -->
-                        <form method="get" class="flex flex-row items-center"
-                            aria-label="Keyboard layout selector">
-                            {% for k, v in activity_params %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-                            <p id="keyboard-layout-label" class="flex-grow">{{ t('keyboard_layout', 'Keyboard layout') }}</p>
-                            <select id="keyboard-layout-select" name="layout" aria-labelledby="keyboard-layout-label"
-                                class="border border-neutral-300 rounded px-2 py-1 bg-white"
-                                data-autosubmit>
-                                {% for layout_name, layout_meta in language.keyboard_layouts.items() %}
-                                <option value="{{ layout_name }}"
-                                    {% if layout_name == language.keyboard_layout_name %}selected{% endif %}>
-                                    {{ layout_meta.label }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </form>
-                        {% endif %}
-
-                        {# inside Discord the language is changed from the header button ("ES ▾") #}
-
-                        {% if not lb %}
-                        {% if language.keyboard_layouts|length > 1 %}<div class="border-t-2 border-gray-300"></div>{% endif %}
-                        <div class="flex flex-row items-center">
-                            <p class="flex-grow">{{ t('easy_mode', 'Allow any word (easy mode)') }}</p>
-                            <!-- toggle at the end -->
-                            <input type="checkbox" v-model="allow_any_word" />
-                        </div>
-                        {% endif %}
-
-                        {% if language.keyboard_layouts|length > 1 or not lb %}<div class="border-t-2 border-gray-300"></div>{% endif %}
-                        <div class="flex flex-row items-center">
-                            <p id="theme-label" class="flex-grow">{{ t('theme', 'Theme') }}</p>
-                            <select id="theme-select" aria-labelledby="theme-label" class="rounded border px-2 py-1"
-                                data-theme-select>
-                                <option value="auto">{{ t('theme_auto', 'Automatic') }}</option>
-                                <option value="light">{{ t('theme_light', 'Light') }}</option>
-                                <option value="dark">{{ t('theme_dark', 'Dark') }}</option>
-                            </select>
-                        </div>
-
-                        {#- Terms / Privacy. Inside Discord the game can't navigate away: discord-activity.js
-                            opens data-c24-external through the shell (SDK openExternalLink). -#}
-                        {% set legal_lang = language.language_code if language.language_code in ('es', 'en') else 'en' %}
-                        <p class="c24-legal-foot c24-legal-foot-settings" data-legal-links>
-                            <a href="{{ aq('/terms?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/terms?lang={{ legal_lang }}">{{ t('legal_terms', 'Terms') }}</a>
-                            · <a href="{{ aq('/privacy?lang=' ~ legal_lang) }}" data-c24-external="{{ public_url }}/privacy?lang={{ legal_lang }}">{{ t('legal_privacy', 'Privacy') }}</a>
-                        </p>
-                        {% if in_activity %}
-                        {#- Discord Activity: delete my data without leaving Discord (in-page confirm from
-                            discord.js, then discord-activity.js posts /api/me/delete with the Bearer session) -#}
-                        <form method="dialog" class="c24-activity-delete" data-activity-delete data-confirm-event
-                            data-confirm="{{ t('lb_delete_confirm', "Delete all your leaderboard data? This can't be undone.") }}"
-                            data-confirm-ok="{{ t('lb_delete', 'Delete my data') }}" data-confirm-cancel="{{ t('lb_cancel', 'Cancel') }}"
-                            data-error="{{ t('lb_error', 'Something went wrong') }}">
-                            <button type="submit" class="c24-activity-delete-btn">{{ t('lb_delete', 'Delete my data') }}</button>
-                            <span class="c24-activity-delete-status" data-activity-delete-status role="status"></span>
-                        </form>
-                        {% endif %}
-
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- stats modal -->
+        <!-- stats modal (rebrand 2026-11-04, Explained.pdf): the date, the score n/6 (green when
+             won), next word, timer and Share. Opened by itself at the end of the game (stats_end):
+             also the random Kolo, the clean result grid and the rank / local stats below. The
+             header icon always opens the compact window. -->
         <div v-show="show_stats_modal" class="c24-modal-wrap" v-cloak>
-            <div class="c24-modal bg-white border-2 border-slate-200 rounded-xl shadow-xl flex flex-col" role="dialog"
-                aria-modal="true" aria-labelledby="stats-title">
+            <div class="c24-modal c24-stats bg-white border-2 border-slate-200 rounded-xl shadow-xl flex flex-col" role="dialog"
+                aria-modal="true" aria-labelledby="stats-title" v-bind:class="{ 'is-end': stats_end && game_over }">
                 <button type="button" class="c24-close" aria-label="close"
-                    v-on:click="show_stats_modal = false">×</button>
+                    v-on:click="show_stats_modal = false">✕</button>
 
-                <div class="c24-modal-head mt-5">
-                    <h3 id="stats-title" class="text-center text-xl font-bold">Casa 24 Wordle {{
-                        language.config.language_code | upper }}
-                        #[[ todays_idx ]] [[attempts]]/6
-                    </h3>
+                <div class="c24-stats-head">
+                    <h3 id="stats-title" class="c24-stats-date"><template v-if="stats_date().ord">[[ stats_date().text ]]<sup>[[ stats_date().ord ]]</sup>, [[ stats_date().year ]]</template><template
+                        v-else>[[ stats_date().text ]]</template><span class="sr-only"> · El Wordle by Casa 24 {{ language.config.language_code | upper }} #[[ todays_idx ]]</span></h3>
+                    <p class="c24-stats-score" data-stats-score v-bind:class="{ 'is-won': game_won }">[[ attempts ]]/6</p>
                 </div>
 
-                <div class="relative flex-auto mx-6 my-3 mb-6">
-                    <p v-if="game_won" class="c24-result">{{ t('result_won', 'You won!') }}</p>
-                    <p v-if="game_over && !game_won" class="c24-result">{{ t('result_lost', 'You lost') }}</p>
+                <div v-if="stats_end && game_over" class="c24-stats-end">
                     <!-- a random Kolo celebrates a win or mourns a loss -->
-                    <img v-if="game_over && kolo_image" :src="kolo_url()" alt="Kolo" class="c24-kolo mb-2"
+                    <img v-if="kolo_image" :src="kolo_url()" alt="Kolo" class="c24-kolo"
                         loading="lazy" decoding="async">
                     <!-- the result in the game's colors (Share still copies the emoji version) -->
                     <div v-if="result_rows.length" id="emoji_board" class="c24-result-grid" role="img"
@@ -428,32 +319,17 @@
                             <span v-for="(c, k) in row" v-bind:key="k" v-bind:class="c"></span>
                         </div>
                     </div>
-                    <p v-if="attempts=='0'" class="text-center text-sm text-gray-600">
-                        {{ language.config.text.no_attempts }}
-                    </p>
                 </div>
 
-                <div class="flex flex-col sm:flex-row gap-4 py-3 px-6 sm:gap-10 border-t border-solid ">
-                    <div class="flex flex-col w-full sm:w-1/2 items-center sm:border-r">
-                        <p class="mt-2 uppercase font-semibold text-md whitespace-pre-line">{{
-                            language.config.text.next_word }}</p>
-                        <p class="m-2 text-3xl" v-html="this.time_until_next_day"></p>
-                    </div>
-                    <!-- green share button -->
-                    <div class="flex flex-col w-full sm:w-1/2 items-center">
-                        <div class="flex flex-col items-center h-full w-full mx-auto p-1">
-                            <button
-                                class="flex-auto w-full m-2 p-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-lg"
-                                v-on:click="shareResults" id="copy_button">{{
-                                language.config.text.share }}
-                            </button>
-                        </div>
-                    </div>
+                <div class="c24-stats-next">
+                    <p class="c24-stats-next-label">{{ language.config.text.next_word }}</p>
+                    <p class="c24-stats-timer" v-html="this.time_until_next_day"></p>
+                    <button class="c24-share-btn" v-on:click="shareResults" id="copy_button">{{ language.config.text.share }}</button>
                 </div>
 
                 {% if lb %}
                 <!-- leaderboard game: rank and points from the server (local stats don't apply) -->
-                <div class="c24-lb-end border-t border-solid px-3 py-4" data-lb-end>
+                <div v-if="stats_end && game_over && (lb_rank || lb_points !== null)" class="c24-lb-end border-t border-solid px-3 py-4" data-lb-end>
                     <div v-if="game_over && (lb_rank || lb_points !== null)" class="c24-lb-stats">
                         <div v-if="lb_rank" class="c24-lb-stat">
                             <p class="c24-lb-big c24-lb-rank">#[[ lb_rank ]]</p>
@@ -464,14 +340,9 @@
                             <p class="c24-lb-small">[[ lb_points === 1 ? {{ t('lb_point_label', 'point')|tojson }} : {{ t('lb_points_label', 'points')|tojson }} ]]</p>
                         </div>
                     </div>
-                    {% if in_activity %}
-                    <button type="button" class="c24-lb-link" data-activity-board-link v-on:click="openBoard">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_view', 'View leaderboard') }} →</button>
-                    {% else %}
-                    <a href="/leaderboard?tab={{ language.config.language_code }}" class="c24-lb-link">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_view', 'View leaderboard') }} →</a>
-                    {% endif %}
                 </div>
                 {% else %}
-                <div class="flex flex-row justify-center items-start gap-2 border-t border-solid px-3 py-5">
+                <div v-if="stats_end && game_over" class="flex flex-row justify-center items-start gap-2 border-t border-solid px-3 py-5">
                     <div class="flex flex-col text-center flex-grow">
                         <p class="text-3xl text-center">[[stats.n_games]]</p>
                         <p class="text-xs leading-tight mt-1">{{ t('stats_games', 'Games') }}</p>
@@ -511,24 +382,26 @@
         <div v-show="board_open" class="c24-modal-wrap" data-activity-board v-cloak>
             <div class="c24-modal bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
                 aria-modal="true" aria-labelledby="board-title">
-                <button type="button" class="c24-close" aria-label="{{ t('lb_dismiss', 'Close') }}"
-                    v-on:click="board_open = false">×</button>
-                <h3 id="board-title" class="c24-board-title uppercase font-bold text-xl tracking-wider">{{ dc.trophy('c24-trophy c24-trophy-inline') }} {{ t('lb_title', 'Leaderboard') }}</h3>
-                <nav class="c24-board-tabs" aria-label="{{ t('lb_title', 'Leaderboard') }}">
-                    <button type="button" class="c24-lb-tab" data-board-tab="{{ language.language_code }}"
-                        v-bind:class="{ 'is-active': board_tab === '{{ language.language_code }}' }"
-                        v-on:click="loadBoard('{{ language.language_code }}')">{{ language.config.name_native }}</button>
-                    <button type="button" class="c24-lb-tab" data-board-tab="all"
-                        v-bind:class="{ 'is-active': board_tab === 'all' }"
-                        v-on:click="loadBoard('all')">{{ t('lb_tab_all', 'Combined') }}</button>
-                </nav>
+                <button type="button" class="c24-close c24-board-close" aria-label="{{ t('lb_dismiss', 'Close') }}"
+                    v-on:click="board_open = false">✕</button>
+                <!-- header row: trophy, then the tabs EN · ESP · MIX as plain text (active = amber) -->
+                <div class="c24-board-head">
+                    <h3 id="board-title" class="c24-board-title">{{ dc.trophy('c24-trophy c24-trophy-inline') }}<span class="sr-only">{{ t('lb_title', 'Leaderboard') }}</span></h3>
+                    <nav class="c24-board-tabs" aria-label="{{ t('lb_title', 'Leaderboard') }}">
+                        {% for code, label, name in [('en', t('lb_tab_en', 'EN'), 'English'), ('es', t('lb_tab_es', 'ESP'), 'Español'), ('all', t('lb_tab_all', 'MIX'), 'Español + English')] %}
+                        <button type="button" class="c24-lb-tab" data-board-tab="{{ code }}" title="{{ name }}"{% if code != 'all' %} lang="{{ code }}"{% endif %}
+                            v-bind:class="{ 'is-active': board_tab === '{{ code }}' }" v-bind:aria-pressed="board_tab === '{{ code }}' ? 'true' : 'false'"
+                            v-on:click="loadBoard('{{ code }}')">{{ label }}</button>
+                        {% endfor %}
+                    </nav>
+                </div>
                 <p v-if="board_error" class="c24-lb-empty">{{ t('lb_error', 'Something went wrong. Please try again.') }}</p>
                 <p v-else-if="board_loading" class="c24-lb-empty">…</p>
                 <p v-else-if="board_rows.length === 0" class="c24-lb-empty" data-board-empty>{{ t('lb_empty', 'No games yet.') }}</p>
                 <table v-else class="c24-lb-table" data-board-table>
                     <thead>
                         <tr>
-                            <th scope="col" class="c24-lb-n">#</th>
+                            <th scope="col" class="c24-lb-n"><span class="sr-only">#</span></th>
                             <th scope="col" class="c24-lb-name">{{ t('lb_col_player', 'Player') }}</th>
                             <th scope="col" class="c24-lb-num">{{ t('lb_col_points', 'Points') }}</th>
                             <th scope="col" class="c24-lb-num c24-lb-opt1">{{ t('lb_col_wins', 'Wins') }}</th>
@@ -538,7 +411,7 @@
                     <tbody>
                         <tr v-for="row in board_rows" v-bind:key="row.rank + ':' + row.username"
                             v-bind:class="{ 'is-me': row.is_me }">
-                            <td class="c24-lb-n">[[ row.rank ]]</td>
+                            <td class="c24-lb-n"><template v-if="row.rank === 1">{{ dc.medal(1) }}</template><template v-else-if="row.rank === 2">{{ dc.medal(2) }}</template><template v-else-if="row.rank === 3">{{ dc.medal(3) }}</template><template v-else>[[ row.rank ]]</template></td>
                             <td class="c24-lb-name"><span class="c24-lb-user" dir="ltr">@[[ row.username ]]</span>
                                 <span v-if="row.is_me" class="c24-lb-you">{{ t('lb_you', 'You') }}</span></td>
                             <td class="c24-lb-num c24-lb-pts">[[ row.points ]]</td>
@@ -567,6 +440,25 @@
                         data-lang-choice="{{ l.code }}" lang="{{ l.code }}"
                         {% if l.code == language.language_code %}aria-current="true"{% endif %}
                         v-on:click="chooseLang('{{ l.code }}')">{{ l.name_native }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% elif not demo %}
+        <!-- website: the same language window; a choice is a link to that language's game
+             (leaderboard /lb/<code> or guest /<code>); game.js remembers it in the c24_lang
+             cookie, which "/" uses to send signed-in players straight to their game -->
+        <div v-show="lang_open" class="c24-modal-wrap" data-web-langs v-cloak>
+            <div class="c24-modal c24-modal-sm bg-white rounded-lg shadow-lg p-5 border-2 border-slate-200" role="dialog"
+                aria-modal="true" aria-labelledby="lang-title">
+                <button type="button" class="c24-close" aria-label="{{ t('lb_dismiss', 'Close') }}"
+                    v-on:click="lang_open = false">✕</button>
+                <h3 id="lang-title" class="c24-board-title uppercase font-bold text-xl tracking-wider">{{ t('activity_lang_button', 'Change language') }}</h3>
+                <div class="c24-lang-list">
+                    {% for l in game_langs %}
+                    <a href="{{ ('/lb/' if lb else '/') ~ l.code }}" class="c24-lang-choice{% if l.code == language.language_code %} is-active{% endif %}"
+                        data-lang-choice="{{ l.code }}" lang="{{ l.code }}" hreflang="{{ l.code }}"
+                        {% if l.code == language.language_code %}aria-current="true"{% endif %}>{{ l.name_native }}</a>
                     {% endfor %}
                 </div>
             </div>
@@ -606,7 +498,7 @@
          Only "Try again" after a refusal or an error; there is no login button and no guest mode. -->
     <div id="c24-activity-overlay" class="c24-activity-overlay" data-state="loading" role="status" aria-live="polite">
         <div class="c24-activity-box">
-            <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="" class="c24-activity-kolo">
+            <img src="{{ asset('images/brand/kolo-hoodie.webp') }}" width="160" height="192" alt="" class="c24-activity-kolo">
             <p class="c24-activity-msg" data-when="loading"><span lang="es">Conectando con Discord…</span> <span lang="en">Connecting to Discord…</span></p>
             <p class="c24-activity-msg" data-when="denied"><span lang="es">Para jugar en Discord necesitamos tu permiso (solo tu nombre de usuario).</span> <span lang="en">To play in Discord we need your permission (only your username).</span></p>
             <p class="c24-activity-msg" data-when="error"><span lang="es">No pudimos conectar con Discord. Intenta de nuevo, o cierra y vuelve a abrir la actividad.</span> <span lang="en">We couldn't connect to Discord. Try again, or close and reopen the activity.</span></p>

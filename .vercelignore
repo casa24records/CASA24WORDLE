@@ -27,3 +27,5 @@ skills-lock.json
 tailwind.config.js
 scripts/build_css.py
 webapp/static/src/
+# the designer's source PNGs (the game serves the WebP copies in webapp/static/images/brand/)
+design/

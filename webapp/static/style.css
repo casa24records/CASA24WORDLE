@@ -1,81 +1,50 @@
 /* ==========================================================================
-   CASA 24 THEME: change colors, fonts and images here, in one place.
-   Colors sampled from the Kolo artwork.
+   EL WORDLE BY CASA 24 THEME: change colors, fonts and images here, in one place.
+   Rebrand 2026-11-04: colors measured from the designer's guide (Explained.pdf)
+   and the brand assets (design/rebrand-v1.1/). Dark only: there is no light
+   mode any more (theme.js always sets data-theme="dark" on <html>, so the
+   older [data-theme="dark"] rules below keep applying).
    ========================================================================== */
 :root {
+    color-scheme: dark;
     /* brand */
-    --c24-orange: #ff7944;        /* Kolo's fur */
-    --c24-green: #1f5a33;         /* hoodie green */
+    --c24-orange: #ff7944;        /* Kolo's fur: "You" badge and counters only */
+    --c24-green: #2f7a48;         /* tile green (guide's color bar) */
+    --c24-amber: #ffb800;         /* tile amber (guide's color bar) */
+    --c24-lime: #efff5e;          /* language button "EN ▾" */
+    --c24-win: #32dd65;           /* stats score when the game is won */
+    --c24-accent: var(--c24-amber); /* close ✕, active tab */
     --c24-forest: #163119;        /* dark forest green */
-    --c24-cream: #f4efe6;         /* page background */
-    --c24-sand: #cfc5b6;          /* hoodie cream: borders, keys */
-    --c24-ink: #0a0b09;           /* text */
-    --c24-muted: #5f5a55;         /* secondary text */
+    --c24-cream: #f4efe6;         /* light text */
+    --c24-sand: #cfc5b6;
+    --c24-ink: #0a0b09;           /* dark text on light/amber/lime */
+    --c24-muted: #b9b0a3;         /* secondary text */
 
     /* game tiles (text color chosen for contrast on each) */
     --c24-correct-bg: var(--c24-green);
     --c24-correct-fg: #ffffff;
-    --c24-present-bg: var(--c24-orange);
+    --c24-present-bg: var(--c24-amber);
     --c24-present-fg: var(--c24-ink);
-    --c24-absent-bg: #77716b;
+    --c24-absent-bg: #2c302d;
     --c24-absent-fg: #ffffff;
-    --c24-key-bg: #e4dccf;
+
+    /* surfaces */
+    --c24-bg: #0f1a12;            /* page */
+    --c24-surface: #17241a;       /* windows, cards */
+    --c24-text: var(--c24-cream);
+    --c24-subtle: var(--c24-muted);
+    --c24-line: #34453a;
+    --c24-line-strong: #6f8174;
+    --c24-hover: #223326;
+    --c24-key-bg: #5d6d61;
+    --c24-key-fg: var(--c24-cream);
+    --c24-input-bg: #17241a;
+    --c24-live: #4cc477;          /* "live" dot in the live view */
 
     /* fonts: Gilroy if the files are present (license needed for the web),
        otherwise the system font. VT323 (free, OFL) is the pixel font. */
     --c24-font-body: "Gilroy", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --c24-font-display: "VT323", ui-monospace, monospace;
-}
-
-/* ---------- light / dark surfaces ----------
-   Light is the default. Dark follows the device setting unless the player
-   picks a theme (theme.js sets data-theme="light" or "dark" on <html>). */
-:root {
-    color-scheme: light;
-    --c24-bg: var(--c24-cream);
-    --c24-surface: var(--c24-cream);
-    --c24-text: var(--c24-ink);
-    --c24-subtle: var(--c24-muted);
-    --c24-line: var(--c24-sand);
-    --c24-line-strong: #8f877c;
-    --c24-hover: #e9e1d4;
-    --c24-key-fg: var(--c24-ink);
-    --c24-input-bg: #ffffff;
-    --c24-live: #1f8a46;          /* "live" dot in the live view */
-}
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-        color-scheme: dark;
-        --c24-bg: #0f1a12;
-        --c24-surface: #17241a;
-        --c24-text: #f4efe6;
-        --c24-subtle: #b9b0a3;
-        --c24-line: #34453a;
-        --c24-line-strong: #6f8174;
-        --c24-hover: #223326;
-        --c24-key-bg: #5d6d61;
-        --c24-key-fg: #f4efe6;
-        --c24-input-bg: #17241a;
-        --c24-absent-bg: #2b312d;
-        --c24-correct-bg: #2f7a47;
-        --c24-live: #4cc477;
-    }
-}
-:root[data-theme="dark"] {
-    color-scheme: dark;
-    --c24-bg: #0f1a12;
-    --c24-surface: #17241a;
-    --c24-text: #f4efe6;
-    --c24-subtle: #b9b0a3;
-    --c24-line: #34453a;
-    --c24-line-strong: #6f8174;
-    --c24-hover: #223326;
-    --c24-key-bg: #5d6d61;
-    --c24-key-fg: #f4efe6;
-    --c24-input-bg: #17241a;
-    --c24-absent-bg: #2b312d;
-    --c24-correct-bg: #2f7a47;
-    --c24-live: #4cc477;
 }
 
 /* VT323's @font-face is in the <head> of index.html and game.html, so its URL
@@ -118,14 +87,6 @@ input[type="text"] { background-color: var(--c24-input-bg); color: var(--c24-tex
 select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 
 /* menu theme button */
-.c24-theme-button { color: var(--c24-subtle); }
-.c24-icon-sun { display: none; }
-:root[data-theme="dark"] .c24-icon-sun { display: inline; }
-:root[data-theme="dark"] .c24-icon-moon { display: none; }
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .c24-icon-sun { display: inline; }
-    :root:not([data-theme="light"]) .c24-icon-moon { display: none; }
-}
 
 /* ---------- Casa 24 pieces ---------- */
 .c24-title {
@@ -141,11 +102,12 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     background: var(--c24-orange);
     object-fit: cover;
 }
-.c24-badge {
-    background: var(--c24-orange);
+.c24-badge {              /* the language button: lime "EN ▾" (rebrand 2026-11-04) */
+    background: var(--c24-lime);
     color: var(--c24-ink);
-    border-radius: 4px;
-    padding: 0 0.3em;
+    border-radius: 5px;
+    padding: 0.04em 0.4em;
+    letter-spacing: 0.08em;
 }
 .c24-kolo { margin: 0 auto; max-height: 160px; max-height: min(160px, calc(var(--vh) * 22)); width: auto; }
 .c24-result {
@@ -327,7 +289,7 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     -webkit-tap-highlight-color: transparent;
 }
 .c24-header-bar .c24-header-title > a:focus-visible,
-.c24-header-bar .c24-lang-btn:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: -2px; }
+.c24-header-bar .c24-lang-btn:focus-visible { outline: 2px solid var(--c24-accent); outline-offset: -2px; }
 .c24-header-bar .c24-badge { font-size: 0.8em; }
 .c24-header-bar .c24-header-end { flex: none; }
 .c24-header-bar .c24-dc-menu { flex: none; }
@@ -338,6 +300,17 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     .c24-header-bar .c24-header-title { font-size: 1.5rem; }
     .c24-header-bar .c24-logo { width: 32px; height: 32px; }
     .c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.4rem; }
+.c24-badge-arrow { margin-inline-start: 0.35em; font-size: 0.8em; }
+/* narrow phones: the 6 actions need the room (people, help, trophy, stats, door, avatar) */
+@media (max-width: 400px) {
+    .c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.25rem; padding: 0 2px; }
+    .c24-header-bar .c24-badge { font-size: 0.7em; letter-spacing: 0.02em; padding: 0.04em 0.25em; }
+    .c24-badge-arrow { margin-inline-start: 0.15em; }
+}
+@media (max-width: 359px) {
+    .c24-header-bar .c24-badge { padding: 0.04em 0.15em; letter-spacing: 0; }
+    .c24-badge-arrow { margin-inline-start: 0.1em; }
+}
 }
 @media (min-width: 768px) {
     .c24-game .c24-header-bar {
@@ -357,10 +330,11 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
     .c24-header-bar .c24-logo { width: 28px; height: 28px; }
     .c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.3rem; padding: 0 2px; }
 }
-/* when "Casa 24" steps aside (by the number of actions on the right):
+/* when the title steps aside (by the number of actions on the right):
    leaderboard game on the web 6, inside Discord 5, guest game 4 (3 without the leaderboard) */
-@media (max-width: 480px) { .c24-header-lb:not(.c24-header-act) .c24-title-text { display: none; } }
-@media (max-width: 419px) { .c24-header-act .c24-title-text { display: none; } }
+/* (the "El Wordle" title image is narrower than the old "Casa 24" text: it stays longer) */
+@media (max-width: 419px) { .c24-header-lb:not(.c24-header-act) .c24-title-text { display: none; } }
+@media (max-width: 379px) { .c24-header-act .c24-title-text { display: none; } }
 @media (max-width: 359px) { .c24-header-bar:not(.c24-header-lb):not(.c24-header-guest) .c24-title-text { display: none; } }
 @media (max-width: 339px) { .c24-header-guest .c24-title-text { display: none; } }
 /* phones under 400px: the facepile shows 2 faces, so the actions keep their 44px */
@@ -371,6 +345,49 @@ select { background-color: var(--c24-input-bg); color: var(--c24-text); }
 @media (min-width: 860px) {
     :root.c24-embed:not(.c24-plat-mobile) .c24-header-act .c24-title-text { display: inline; }
 }
+
+/* ---------- El Wordle brand pieces (templates/_brand.html, rebrand 2026-11-04) ----------
+   Kolo in the hoodie (not a round avatar any more) + the "El Wordle" title image, sized
+   from the header height; the Casa 24 door is a mask so it takes the icon color. */
+.c24-logo.c24-logo-kolo { width: auto; height: 40px; border-radius: 0; background: none; object-fit: contain; }
+.c24-titler { display: block; width: auto; height: 28px; }
+.c24-header-bar .c24-logo.c24-logo-kolo { height: 40px; }
+.c24-header-bar .c24-titler { height: 26px; }
+@media (max-width: 480px) {
+    .c24-header-bar .c24-logo.c24-logo-kolo { height: 36px; }
+    .c24-header-bar .c24-titler { height: 22px; }
+}
+@media (min-width: 768px) {
+    .c24-header-bar .c24-logo.c24-logo-kolo { height: 50px; }
+    .c24-header-bar .c24-titler { height: 32px; }
+}
+@media (max-width: 359px) {
+    .c24-header-bar .c24-logo.c24-logo-kolo { height: 29px; }
+    .c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.15rem; padding: 0 1px; }
+}
+.c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.4rem; }
+.c24-badge-arrow { margin-inline-start: 0.35em; font-size: 0.8em; }
+/* narrow phones: the 6 actions need the room (people, help, trophy, stats, door, avatar) */
+@media (max-width: 400px) {
+    .c24-header-bar .c24-header-title > a, .c24-header-bar .c24-lang-btn { gap: 0.25rem; padding: 0 2px; }
+    .c24-header-bar .c24-badge { font-size: 0.7em; letter-spacing: 0.02em; padding: 0.04em 0.25em; }
+    .c24-badge-arrow { margin-inline-start: 0.15em; }
+}
+@media (max-width: 359px) {
+    .c24-header-bar .c24-badge { padding: 0.04em 0.15em; letter-spacing: 0; }
+    .c24-badge-arrow { margin-inline-start: 0.1em; }
+}
+.c24-door-link { display: inline-flex; align-items: center; justify-content: center; color: var(--c24-subtle); }
+.c24-door {
+    display: block;
+    width: 18px;
+    height: 24px;
+    background: currentColor;
+    -webkit-mask: url("images/brand/casa24-door.webp") center / contain no-repeat;
+    mask: url("images/brand/casa24-door.webp") center / contain no-repeat;
+}
+.c24-door-link:hover, .c24-door-link:focus-visible { color: var(--c24-text); }
+.c24-door-link:focus-visible { outline: 2px solid var(--c24-accent); outline-offset: 2px; border-radius: 6px; }
 
 /* ---------- game page: header, board, keyboard in one column ---------- */
 .c24-game {
@@ -507,7 +524,7 @@ main .grid-cols-5 > div {
 .key:focus-visible,
 .c24-icon-btn:focus-visible,
 .c24-close:focus-visible {
-    outline: 3px solid var(--c24-orange);
+    outline: 3px solid var(--c24-accent);
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--c24-text);
 }
@@ -534,6 +551,8 @@ main .grid-cols-5 > div {
     }
     .c24-game .c24-header-title { font-size: 1.5rem; }
     .c24-game .c24-logo { width: 26px; height: 26px; }
+    .c24-game .c24-header-bar .c24-logo.c24-logo-kolo { width: auto; height: 34px; }
+    .c24-game .c24-header-bar .c24-titler { height: 20px; }
     .c24-game .c24-icon-btn { height: 40px; }
     .c24-game .c24-board-area { grid-column: 1; grid-row: 2; height: auto; margin: 0; }
     .c24-game .c24-keyboard { margin: 0; }
@@ -589,6 +608,46 @@ main .grid-cols-5 > div {
     color: var(--c24-subtle);
 }
 .c24-text-btn { min-height: 44px; padding-top: 0.5rem; }
+/* the guide's amber ✕ on every window (rebrand 2026-11-04) */
+.c24-close { color: var(--c24-accent); font-size: 1.35rem; font-weight: 900; }
+
+/* How to play (Explained.pdf): the El Wordle title, three examples, the door, small legal */
+.c24-help-title { margin: 0.25rem 0 0; }
+.c24-help-title img { display: block; width: auto; height: 84px; margin: 0 auto; }
+.c24-close + div > .c24-help-title:first-child { padding-inline: 40px; }
+.c24-help-examples { margin: 0.5rem 0 0.25rem; font-weight: 700; font-size: 1.05rem; }
+.c24-help-line { margin: 0 0 0.6rem; font-size: 0.875rem; text-align: center; }
+.c24-help-letter { font-family: var(--c24-font-display); font-size: 1.15em; }
+.c24-help-letter.is-correct { color: var(--c24-win); }
+.c24-help-letter.is-semicorrect { color: var(--c24-amber); }
+.c24-help-letter.is-incorrect { color: var(--c24-subtle); }
+.c24-help-door { width: 44px; height: 44px; margin-top: 0.25rem; color: var(--c24-text); }
+.c24-help-door .c24-door { width: 22px; height: 29px; }
+.c24-help-legal { margin: 0; font-size: 0.75rem; color: var(--c24-subtle); text-align: center; }
+.c24-help .c24-activity-delete { justify-content: center; }
+
+/* Stats (Explained.pdf): date, n/6 (green when won), next word, timer, Share */
+.c24-stats { width: min(420px, 100% - 32px); text-align: center; }
+.c24-stats-head { padding: 1.25rem 48px 0; }
+.c24-stats-date { margin: 0; font-size: 1rem; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; }
+.c24-stats-date sup { font-size: 0.6em; }
+.c24-stats-score { margin: 0.35rem 0 0; font-size: 1.9rem; font-weight: 800; line-height: 1.1; }
+.c24-stats-score.is-won { color: var(--c24-win); }
+.c24-stats-end { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem 0; }
+.c24-stats-next { display: flex; flex-direction: column; align-items: center; padding: 0.75rem 1.5rem 1.25rem; }
+.c24-stats-next-label { margin: 0.5rem 0 0; font-weight: 700; text-transform: uppercase; }
+.c24-stats-timer { margin: 0.25rem 0 0.75rem; font-size: 1.9rem; }
+.c24-share-btn {
+    width: min(240px, 100%);
+    min-height: 52px;
+    border-radius: 8px;
+    background: #1f5a33;
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+@media (hover: hover) and (pointer: fine) { .c24-share-btn:hover { filter: brightness(1.1); } }
+.c24-share-btn:focus-visible { outline: 3px solid var(--c24-accent); outline-offset: 2px; }
 
 /* notification: slides down from the top (game.js changes "top") */
 .c24-toast {
@@ -720,7 +779,7 @@ main .grid-cols-5 > div {
 /* ---------- leaderboard (every language; Discord login) ---------- */
 /* menu: Discord area, notices, links */
 .c24-lb-tab:focus-visible, .c24-lb-btn:focus-visible, .c24-notice-close:focus-visible {
-    outline: 2px solid var(--c24-orange);
+    outline: 2px solid var(--c24-accent);
     outline-offset: 2px;
 }
 .c24-notice-close {
@@ -806,7 +865,7 @@ main .grid-cols-5 > div {
     color: var(--c24-subtle);
     text-decoration: none;
 }
-.c24-lb-tab:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: -2px; }
+.c24-lb-tab:focus-visible { outline: 2px solid var(--c24-accent); outline-offset: -2px; }
 .c24-lb-tab.is-active { background: var(--c24-correct-bg); color: #fff; }
 .c24-lb-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .c24-lb-table th {
@@ -855,7 +914,7 @@ main .grid-cols-5 > div {
     text-align: center;
     padding: 0.6rem;
     border-radius: 12px;
-    border: 2px solid var(--c24-orange);
+    border: 2px solid var(--c24-accent);
     background: var(--c24-surface);
 }
 .c24-lb .c24-lb-account { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; text-align: center; }
@@ -959,7 +1018,7 @@ main .grid-cols-5 > div {
 .c24-dc-btn-text { display: flex; flex-direction: column; min-width: 0; }
 .c24-dc-btn-sub { font-size: 0.75rem; font-weight: 600; opacity: 0.92; }
 .c24-dc-btn:active { background: #3C45A5; transform: scale(0.98); }
-.c24-dc-btn:focus-visible { outline: 3px solid var(--c24-orange); outline-offset: 3px; }
+.c24-dc-btn:focus-visible { outline: 3px solid var(--c24-accent); outline-offset: 3px; }
 .c24-dc-area { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; }
 .c24-dc-area > .c24-dc-btn { width: 100%; }
 .c24-dc-area .c24-dc-privacy-link, .c24-dc-area > span { align-self: center; }
@@ -982,7 +1041,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     cursor: pointer;
 }
 .c24-dc-privacy-link svg { width: 16px; height: 16px; flex: none; }
-.c24-dc-privacy-link:focus-visible, .c24-privacy-close:focus-visible, .c24-switch:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+.c24-dc-privacy-link:focus-visible, .c24-privacy-close:focus-visible, .c24-switch:focus-visible { outline: 2px solid var(--c24-accent); outline-offset: 2px; }
 .c24-privacy {
     width: min(26rem, calc(100% - 32px));
     max-height: calc(100dvh - 32px);
@@ -1106,7 +1165,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 .c24-dc-me .c24-dc-avatar-head { width: 30px; height: 30px; box-shadow: 0 0 0 2px var(--c24-surface), 0 0 0 3px #5865F2; }
 .c24-dc-icon .c24-dc-mark { width: 24px; height: 24px; }
 .c24-dc-me:focus-visible, .c24-dc-icon:focus-visible, .c24-dc-pop-item:focus-visible, .c24-header .c24-icon-btn:focus-visible {
-    outline: 3px solid var(--c24-orange);
+    outline: 3px solid var(--c24-accent);
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--c24-text);
 }
@@ -1332,7 +1391,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) .c24-live-grid > .is-incorrect { border-color: var(--c24-line-strong); }
 }
-.c24-live-close:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+.c24-live-close:focus-visible { outline: 2px solid var(--c24-accent); outline-offset: 2px; }
 /* "Live" motion: a friend who joins pops in, one who leaves fades out, the others slide
    to their new place (Vue <transition-group name="c24-pop">). A cell is keyed by its
    color, so it flips only when that color changes (a friend's new guess landing).
@@ -1393,7 +1452,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     text-transform: uppercase;
     overflow-wrap: anywhere;
 }
-.c24-live-invite:focus-visible, .c24-live-card:focus-visible { outline: 3px solid var(--c24-orange); outline-offset: 2px; }
+.c24-live-invite:focus-visible, .c24-live-card:focus-visible { outline: 3px solid var(--c24-accent); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) {
     .c24-live-invite:hover { background: var(--c24-hover); }
 }
@@ -1467,7 +1526,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
     max-width: 22rem;
     text-align: center;
 }
-.c24-activity-kolo { width: 72px; height: 72px; }
+.c24-activity-kolo { width: auto; height: 88px; }
 .c24-activity-overlay[data-state="loading"] .c24-activity-kolo { animation: c24-activity-pulse 1.2s ease-in-out infinite; }
 @keyframes c24-activity-pulse { 50% { transform: scale(0.9); opacity: 0.7; } }
 @media (prefers-reduced-motion: reduce) {
@@ -1493,7 +1552,7 @@ html[lang="en"] [data-l="es"], html:not([lang="en"]) [data-l="en"] { display: no
 }
 .c24-activity-overlay[data-state="denied"] .c24-activity-retry,
 .c24-activity-overlay[data-state="error"] .c24-activity-retry { display: inline-flex; align-items: center; }
-.c24-activity-retry:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+.c24-activity-retry:focus-visible { outline: 2px solid var(--c24-accent); outline-offset: 2px; }
 /* "Delete my data" done: only "Play again" (signs in again, a new empty account) */
 .c24-activity-overlay:not([data-state="deleted"]) .c24-activity-again { display: none; }
 .c24-activity-overlay[data-state="deleted"] .c24-activity-again { display: inline-flex; align-items: center; }
@@ -1542,7 +1601,7 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
     padding: max(16px, var(--c24-safe-top)) max(16px, var(--c24-safe-right)) max(16px, var(--c24-safe-bottom)) max(16px, var(--c24-safe-left));
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-.c24-picker-logo { width: 64px; height: 64px; flex: none; margin-top: auto; border-radius: 9999px; background: var(--c24-orange); }
+.c24-picker-logo { width: auto; height: 72px; flex: none; margin-top: auto; }
 .c24-picker-title { margin: 0; text-align: center; font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
 .c24-picker-title span[lang="en"] { display: block; font-weight: 400; font-size: 0.9em; color: var(--c24-subtle); }
 .c24-picker-list {
@@ -1566,7 +1625,7 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
     text-align: center;
 }
 .c24-picker-btn:hover, .c24-lang-choice:hover { background: var(--c24-hover); }
-.c24-picker-btn:focus-visible, .c24-lang-choice:focus-visible, .c24-lang-btn:focus-visible { outline: 2px solid var(--c24-orange); outline-offset: 2px; }
+.c24-picker-btn:focus-visible, .c24-lang-choice:focus-visible, .c24-lang-btn:focus-visible { outline: 2px solid var(--c24-accent); outline-offset: 2px; }
 .c24-picker-btn.is-suggested { border-color: var(--c24-orange); }
 .c24-lang-choice.is-active { background: var(--c24-correct-bg); color: var(--c24-correct-fg); border-color: transparent; }
 @media (max-height: 420px) {
@@ -1728,3 +1787,177 @@ button.c24-lb-link { background: transparent; border: 0; font: inherit; font-wei
 .c24-confirm-danger { color: #b3261e; }
 :root[data-theme="dark"] .c24-confirm-danger { color: #ff8a80; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .c24-confirm-danger { color: #ff8a80; } }
+
+/* ---------- leaderboard: EN · ESP · MIX tabs and medals (rebrand 2026-11-04) ---------- */
+/* Both the /leaderboard page (.c24-lb) and the Discord in-game window ([data-activity-board]).
+   Header row: trophy, then EN · ESP · MIX as plain large text tabs; the active one is amber.
+   Light mode uses a darker amber for text (#FFB800 on cream is unreadable), dark mode the real one. */
+.c24-lb, [data-activity-board] { --c24-lb-on: #8a5a00; }
+:root[data-theme="dark"] .c24-lb, :root[data-theme="dark"] [data-activity-board] { --c24-lb-on: var(--c24-accent, #FFB800); }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .c24-lb,
+    :root:not([data-theme="light"]) [data-activity-board] { --c24-lb-on: var(--c24-accent, #FFB800); }
+}
+
+/* header row */
+.c24-lb-head, .c24-board-head { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.c24-lb-head .c24-lb-title, .c24-board-head .c24-board-title {
+    flex: 0 0 auto; display: flex; align-items: center; margin: 0; padding: 0; font-size: 1rem; color: var(--c24-text);
+}
+.c24-lb-head .c24-trophy, .c24-board-head .c24-trophy { width: 1.75rem; height: 1.75rem; vertical-align: middle; color: var(--c24-text); }
+[data-activity-board] .c24-board-head { margin: 0 0 0.75rem; padding-inline-end: 44px; }  /* room for the ✕ */
+[data-activity-board] .c24-board-head > :first-child { padding-inline-end: 0; }
+
+/* the tabs: plain text, no pills */
+.c24-lb-head .c24-lb-tabs, .c24-board-head .c24-board-tabs {
+    display: flex; align-items: center; justify-content: flex-start; gap: 0.25rem 1rem;
+    margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; min-width: 0; overflow-x: auto;
+}
+.c24-lb-head .c24-lb-tab, .c24-board-head .c24-lb-tab {
+    flex: 0 0 auto; min-width: 0; min-height: 44px; padding: 0 0.25rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; border-radius: 6px; background: transparent;
+    font-family: inherit; font-size: 1.4rem; font-weight: 800; letter-spacing: 0.04em; line-height: 1;
+    color: var(--c24-text); text-decoration: none; cursor: pointer;
+}
+.c24-lb-head .c24-lb-tab.is-active, .c24-board-head .c24-lb-tab.is-active { background: transparent; color: var(--c24-lb-on); }
+.c24-lb-head .c24-lb-tab:focus-visible, .c24-board-head .c24-lb-tab:focus-visible { outline: 2px solid var(--c24-lb-on); outline-offset: 2px; }
+@media (hover: hover) {
+    .c24-lb-head .c24-lb-tab:not(.is-active):hover, .c24-board-head .c24-lb-tab:not(.is-active):hover { background: transparent; color: var(--c24-lb-on); }
+}
+
+/* close ✕ of the leaderboard window: amber and bold */
+[data-activity-board] .c24-board-close { color: var(--c24-lb-on); font-weight: 800; font-size: 1.35rem; }
+
+/* table: PLAYER · POINTS · WINS · STREAK, thin lines, own row highlighted */
+.c24-lb .c24-lb-table th, [data-activity-board] .c24-lb-table th {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--c24-subtle); border-bottom: 1px solid var(--c24-line);
+}
+.c24-lb .c24-lb-table td, [data-activity-board] .c24-lb-table td { border-bottom: 1px solid var(--c24-line); vertical-align: middle; }
+.c24-lb .c24-lb-table tr.is-me td, [data-activity-board] .c24-lb-table tr.is-me td { background: var(--c24-hover); }
+.c24-lb-table .c24-lb-n { text-align: center; }
+.c24-lb-table td.c24-lb-n:has(.c24-medal) { padding-block: 0.2rem; }
+
+/* medals for rank 1, 2, 3 (dc.medal in _discord.html): rosette, number in the middle, ribbon tails */
+.c24-medal { position: relative; display: inline-flex; vertical-align: middle; width: 26px; height: 32px; }
+.c24-medal-svg { display: block; width: 26px; height: 32px; overflow: visible; }
+.c24-medal-ring { fill: var(--c24-medal-ring); }
+.c24-medal-face { fill: var(--c24-medal-face); }
+.c24-medal-tail { fill: var(--c24-medal-ring); }
+.c24-medal-pleat { stroke: rgba(255, 255, 255, 0.45); }
+.c24-medal-num { fill: #1a1208; font: 800 11px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.c24-medal.is-1 { --c24-medal-face: #F5B323; --c24-medal-ring: #B57F0E; }
+.c24-medal.is-2 { --c24-medal-face: #B9BEC2; --c24-medal-ring: #7D858B; }
+.c24-medal.is-3 { --c24-medal-face: #D9622B; --c24-medal-ring: #9A3E14; }
+.c24-medal .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- landing (rebrand 2026-11-04) ---------- */
+/* index.html when signed out: big "El Wordle" title, full-body Kolo in the hoodie over a
+   few faded board tiles, one short line, Sign in with Discord, the two guest games.
+   Phones: one column that fits the screen. ≥ 900px wide: Kolo left, the rest right. */
+.c24-menu-app:has(.c24-land) { padding-bottom: var(--c24-safe-bottom); }
+.c24-start.c24-land {
+    max-width: 26rem;
+    min-height: calc(100dvh - 56px - var(--c24-safe-bottom));
+    padding: 0.75rem 16px 1rem;
+    gap: 0.5rem;
+    justify-content: center;
+}
+.c24-land-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.25rem; }
+
+/* Kolo stands on a few board tiles (green / amber / dark), faded at the edges */
+.c24-land-stage { position: relative; display: grid; place-items: end center; width: 100%; order: 2; }
+.c24-land-tiles {
+    position: absolute; inset: 12% 0 6%;
+    display: grid; grid-template-columns: repeat(5, 1fr); align-content: center; gap: 6px;
+    width: min(100%, 300px); margin: 0 auto;
+    -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent 100%);
+    mask-image: radial-gradient(closest-side, #000 35%, transparent 100%);
+    opacity: 0.55;
+}
+.c24-land-tiles i { aspect-ratio: 1; border-radius: 4px; background: var(--c24-surface); box-shadow: inset 0 0 0 1px var(--c24-line); }
+.c24-land-tiles i.g { background: var(--c24-green); box-shadow: none; }
+.c24-land-tiles i.a { background: var(--c24-amber); box-shadow: none; opacity: 0.85; }
+.c24-land-kolo {
+    position: relative;
+    height: clamp(150px, calc(100dvh - 560px), 330px); width: auto;
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+}
+.c24-land-copy { display: contents; }
+.c24-land-title { order: 1; margin: 0; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.c24-land-title img { width: min(80vw, 300px); height: auto; display: block; }
+.c24-land-by {
+    margin-top: -0.35rem; align-self: flex-end; margin-right: 8%;
+    font-family: var(--c24-font-display); font-size: 1.35rem; letter-spacing: 0.04em; color: var(--c24-lime);
+}
+.c24-land-tag { order: 3; margin: 0.25rem 0 0; font-size: 1.05rem; font-weight: 700; color: var(--c24-text); }
+.c24-land .c24-today > span + span { margin-left: 0.35rem; }
+.c24-land .c24-today { order: 4; margin: 0; font-size: 0.8rem; color: var(--c24-subtle); }
+.c24-today-num { font-family: var(--c24-font-display); font-size: 1.25rem; color: var(--c24-lime); vertical-align: -0.05em; }
+.c24-today-time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--c24-text); }
+
+.c24-land-actions { order: 5; display: flex; flex-direction: column; gap: 0.5rem; width: 100%; margin-top: 0.5rem; }
+.c24-land .c24-dc-area { gap: 0; }
+.c24-land .c24-dc-btn { min-height: 56px; justify-content: center; font-size: 1.05rem; border-radius: 14px; }
+.c24-land .c24-dc-privacy-link { min-height: 36px; font-size: 0.75rem; }
+.c24-land-go {
+    display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    min-height: 56px; border-radius: 14px;
+    background: var(--c24-lime); color: #0f1a12;
+    font-family: var(--c24-font-display); font-size: 1.9rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.c24-land-go:active { transform: scale(0.98); }
+.c24-land-go:focus-visible { outline: 3px solid var(--c24-accent); outline-offset: 3px; }
+
+/* "or play as guest" between two thin lines */
+.c24-land-or {
+    display: flex; align-items: center; gap: 0.75rem; margin: 0.1rem 0 0;
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--c24-subtle);
+}
+.c24-land-or::before, .c24-land-or::after { content: ""; flex: 1; height: 1px; background: var(--c24-line); }
+
+/* the two guest games side by side: quiet outlined tiles */
+.c24-land .c24-primary.c24-land-guest { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.c24-land .c24-land-guest .c24-play {
+    flex-direction: column; justify-content: center; gap: 0.15rem;
+    min-height: 64px; padding: 0.5rem 0.5rem;
+    border: 2px solid var(--c24-line-strong); background: transparent; color: var(--c24-text);
+}
+.c24-land .c24-land-guest .c24-play-name { font-size: 1.6rem; }
+.c24-land .c24-land-guest .c24-play-status { font-size: 0.72rem; color: var(--c24-subtle); opacity: 1; }
+.c24-play-streak { margin-left: 0.4rem; }
+@media (hover: hover) and (pointer: fine) {
+    .c24-land .c24-land-guest .c24-play:hover { border-color: var(--c24-green); box-shadow: none; }
+    .c24-land-go:hover { filter: brightness(1.05); }
+}
+.c24-land .c24-land-guest .c24-play:focus-visible { outline: 3px solid var(--c24-accent); outline-offset: 3px; }
+
+.c24-land-foot { text-align: center; }
+.c24-land-foot .c24-legal-foot { margin: 0; }
+
+/* short phones (iPhone SE …): smaller Kolo first, then a smaller title */
+@media (max-height: 640px) {
+    .c24-start.c24-land { padding-top: 0.25rem; gap: 0.25rem; }
+    .c24-land-kolo { height: clamp(96px, calc(100dvh - 454px), 200px); }
+    .c24-land-title img { width: min(56vw, 210px); }
+    .c24-land-by { font-size: 1.1rem; }
+    .c24-land-tag { font-size: 0.95rem; margin-top: 0; }
+    .c24-land-actions { margin-top: 0.25rem; gap: 0.35rem; }
+    .c24-land .c24-dc-btn { min-height: 48px; }
+    .c24-land .c24-land-guest .c24-play { min-height: 54px; }
+}
+
+/* laptops and desktops: Kolo on the left, title and buttons on the right */
+@media (min-width: 900px) and (min-height: 560px) {
+    .c24-start.c24-land { max-width: 58rem; padding-top: 1.5rem; gap: 1rem; }
+    .c24-land-hero { flex-direction: row; align-items: center; justify-content: center; gap: 3rem; text-align: left; }
+    .c24-land-stage { order: 0; width: auto; flex: 0 0 auto; }
+    .c24-land-tiles { inset: 0 -22%; width: auto; }
+    .c24-land-kolo { height: clamp(300px, calc(100dvh - 210px), 470px); }
+    .c24-land-copy { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; text-align: center; width: 24rem; flex: 0 0 auto; }
+    .c24-land-title img { width: 356px; }
+}

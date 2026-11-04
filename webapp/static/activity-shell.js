@@ -1,4 +1,4 @@
-// Casa 24 Wordle inside Discord: the Activity "shell" (templates/activity.html).
+// El Wordle by Casa 24 inside Discord: the Activity "shell" (templates/activity.html).
 // Discord loads this page ONCE per launch (URL Mapping "/" with frame_id,
 // instance_id and platform). It is the only page that talks to the Discord SDK:
 //
@@ -256,15 +256,6 @@ window.addEventListener("message", (e) => {
     } else if (data.type === "c24-log" && typeof data.message === "string") {
         // the game's errors, into Discord's debug logs (the SDK forwards this console)
         console.warn("Casa 24 game: " + data.message.slice(0, 300));
-    }
-});
-
-// the theme chosen in the game's settings (same localStorage): follow it here too
-window.addEventListener("storage", (e) => {
-    if (e.key === "casa24_theme" && window.casa24SetTheme) {
-        const v = e.newValue;
-        if (v === "light" || v === "dark") { document.documentElement.setAttribute("data-theme", v); }
-        else { document.documentElement.removeAttribute("data-theme"); }
     }
 });
 

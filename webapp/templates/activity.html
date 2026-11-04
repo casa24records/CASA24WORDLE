@@ -4,13 +4,13 @@
     token, authenticate), keeps the session in memory and shows the game in the
     same-origin <iframe> below. Changing language swaps the iframe, never this page,
     so the SDK handshake runs exactly once. No inline code (Discord's CSP): JSON only. -#}
-<html lang="es" class="c24-shell-html">
+<html lang="es" class="c24-shell-html" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="color-scheme" content="light dark">
-    <title>Casa 24 Wordle</title>
+    <meta name="color-scheme" content="dark">
+    <title>El Wordle by Casa 24</title>
     <!-- the Discord SDK first: its whole module graph in parallel (no import waterfall).
          Plain paths: the folder name carries the SDK version, the files import each other without ?v= -->
     {% for path in sdk_preloads %}
@@ -29,12 +29,12 @@
 
 <body class="c24-shell">
     <!-- the game: /lb/<lang>?embed=1 plus Discord's query (activity-shell.js sets the src) -->
-    <iframe id="c24-game" name="c24-game" class="c24-shell-frame" title="Casa 24 Wordle"
+    <iframe id="c24-game" name="c24-game" class="c24-shell-frame" title="El Wordle by Casa 24"
         allow="clipboard-write" hidden></iframe>
 
     <!-- first launch: pick a language (remembered on this device) -->
     <section id="c24-picker" class="c24-picker" aria-labelledby="c24-picker-title" hidden>
-        <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="Casa 24" class="c24-picker-logo">
+        <img src="{{ asset('images/brand/el-wordle.webp') }}" width="356" height="160" alt="El Wordle by Casa 24" class="c24-picker-logo">
         <h1 id="c24-picker-title" class="c24-picker-title"><span lang="es">{{ pick.es }}</span> <span lang="en">{{ pick.en }}</span></h1>
         <div class="c24-picker-list">
             {% for l in shell.langs %}
@@ -46,7 +46,7 @@
     <!-- connecting / loading / refused / error ("Try again") / data deleted ("Play again": signs in again) -->
     <div id="c24-activity-overlay" class="c24-activity-overlay" data-state="loading" data-step="connect" role="status" aria-live="polite">
         <div class="c24-activity-box">
-            <img src="{{ asset('images/kolo/kolo-face.webp') }}" width="255" height="256" alt="" class="c24-activity-kolo">
+            <img src="{{ asset('images/brand/kolo-hoodie.webp') }}" width="160" height="192" alt="" class="c24-activity-kolo">
             <p class="c24-activity-msg c24-step-connect" data-when="loading"><span lang="es">Conectando…</span> <span lang="en">Connecting…</span></p>
             <p class="c24-activity-msg c24-step-game" data-when="loading" data-loading-game>Cargando juego…</p>
             <p class="c24-activity-msg" data-when="denied"><span lang="es">Para jugar en Discord necesitamos tu permiso (solo tu nombre de usuario).</span> <span lang="en">To play in Discord we need your permission (only your username).</span></p>

@@ -1,4 +1,4 @@
-// Casa 24 Wordle leaderboard page: the 3 tabs (Combined, Español, English) fit in one
+// El Wordle by Casa 24 leaderboard page: the 3 tabs (EN, ESP, MIX) fit in one
 // row; if a very narrow screen ever makes the row scroll, center the active tab
 // without scrolling the page itself.
 // (A file, not an inline script: the Discord Activity's CSP blocks inline code.)
