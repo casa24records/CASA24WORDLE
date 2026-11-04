@@ -1,6 +1,6 @@
 ---
 name: casa24-deploy
-description: Put Casa 24 Wordle online — Vercel setup that already exists (pyproject entrypoint, build step, vercelignore, vercel.json caching with ?v= asset URLs and the versioned SDK folder, SDK modulepreloads in preload.py), vendored Vue/Discord SDK and the Tailwind rebuild (scripts/build_css.py), first deploy steps, env vars (Discord, SECRET_KEY, Neon DATABASE_URL, optional PUBLIC_URL), GitHub auto-deploys, Discord Developer Portal settings (redirect URIs, Activity URL mapping, Enable Activities), costs, adding a casa24records.com subdomain at GoDaddy, and troubleshooting. Vercel is the only host. Use for any hosting, domain, or deployment question. Never deploy or touch DNS without the owner's explicit go-ahead.
+description: Put El Wordle by Casa 24 (formerly Casa 24 Wordle) online — Vercel setup that already exists (pyproject entrypoint, build step, vercelignore, vercel.json caching with ?v= asset URLs and the versioned SDK folder, SDK modulepreloads in preload.py), vendored Vue/Discord SDK and the Tailwind rebuild (scripts/build_css.py), brand images, og image and favicons (scripts/brand_assets.py --rebrand), first deploy steps, env vars (Discord, SECRET_KEY, Neon DATABASE_URL, optional PUBLIC_URL), GitHub auto-deploys, Discord Developer Portal settings (redirect URIs, Activity URL mapping, Enable Activities, the pending rename/art uploads RB1–RB3), costs, adding a casa24records.com subdomain at GoDaddy, and troubleshooting. Vercel is the only host. Use for any hosting, domain, or deployment question. Never deploy or touch DNS without the owner's explicit go-ahead.
 ---
 
 # Deploy
@@ -28,7 +28,8 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
   2. everything under **`/static/vendor/discord-embedded-app-sdk-2.5.0/`**, with or without `?v=` (the SDK's modules import each other without `?v=`; the folder name is the version). A new SDK version = a new folder **and** this rule's path updated (`test_vercel_ready.py::test_vercel_json_caches_versioned_sdk`). Discord's proxy keeps these headers (it strips cache headers only from `text/html`).
 - **`asset(path)`** in `webapp/app.py` (available in every template) returns `/static/<path>?v=<first 10 characters of the file's SHA-1>`. When a file changes, its URL changes, so visitors get the new copy at once even with year-long caching. Fallbacks if a file can't be read: the deploy's git commit (`VERCEL_GIT_COMMIT_SHA`), then a hash of all of `static/`, then the start time. `asset_version(folder)` hashes a whole folder (used for `ASSET_V`, which `game.js` adds to each Kolo picture URL).
   - **Rule:** every static link in a template must use `{{ asset('…') }}`, never `url_for('static', …)` or a hand-written `/static/…` (exceptions: the `KOLO_BASE` folder prefix, and the SDK `modulepreload` links in `activity.html`, which must match the SDK's own un-versioned import URLs). `test_vercel_ready.py` fails otherwise. An unversioned URL would either never be cached long, or, if someone widened the rule, keep an old copy for a year.
-  - `og:image` uses `request.url_root.rstrip('/')` + `asset('images/kolo/kolo-hero.png')`.
+  - `og:image` / `twitter:image` use `request.url_root.rstrip('/')` + `asset('images/brand/og-image.png')` (since the 2026-11-04 rebrand; was `images/kolo/kolo-hero.png`).
+- **Brand images and favicons (rebrand 2026-11-04):** `.venv/bin/python scripts/brand_assets.py --rebrand design/rebrand-v1.1` rebuilds `webapp/static/images/brand/` (`el-wordle.webp`, `kolo-hoodie.webp`, `kolo-hoodie-full.webp`, `casa24-door.webp`, `og-image.png`) and the favicons in `webapp/static/favicon/` from `icon-1024.png`. Commit the outputs; the build only copies them. New files get new `?v=` URLs on their own. `site.webmanifest` names the app "El Wordle by Casa 24" / "El Wordle", colors `#0f1a12`. The older Kolo-pack command (`brand_assets.py "<brand pack folder>"`) also rewrites the favicons from Kolo's face: run `--rebrand` after it. Details: `casa24-branding`.
 - `json_script()` in `app.py` puts the word lists into the page as raw UTF-8 JSON (smaller than `\uXXXX` escapes for the accented Spanish words). The HTML itself is never cached long, because it holds the daily word.
 - **No CDNs since `d229fcf` (2026-10-28):** everything is served from our own origin (required inside the Discord Activity, whose CSP blocks other hosts; also faster). Sources and SHA-256 in `CREDITS.md`.
   - **Vue 3.5.13**: `webapp/static/vendor/vue.global.prod.js` (deferred, via `asset()`).
@@ -40,7 +41,7 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
   |---|---|---|
   | `DEMO_PASSWORD` | the password the owner chose for Developer view (`/demo`) | Developer view; unset → no card, `/demo` 404 |
   | `SECRET_KEY` | long random string; signs the leaderboard cookie and the Developer view session | leaderboard (required); Developer view (else derived from `DEMO_PASSWORD`) |
-  | `DISCORD_CLIENT_ID` | Discord app "Casa 24 Wordle" client ID (public: `1564412150519169067`) | leaderboard |
+  | `DISCORD_CLIENT_ID` | Discord app client ID (app named "Casa 24 Wordle" until the owner renames it) (public: `1564412150519169067`) | leaderboard |
   | `DISCORD_CLIENT_SECRET` | that app's client secret | leaderboard |
   | `DATABASE_URL` | Neon pooled connection URL, added by the Neon integration (it also adds `PG*` / `POSTGRES_*` names the app doesn't read) | leaderboard |
   | `ADMIN_DISCORD_IDS` | optional, comma-separated Discord **user** IDs that may hide names (not set yet; it's the owner's user ID, not the app ID) | hiding names |
@@ -50,13 +51,13 @@ description: Put Casa 24 Wordle online — Vercel setup that already exists (pyp
   - Env changes only apply to **new** deployments: redeploy after editing.
   - Local: the owner runs `vercel env pull .env.local --scope casa-24`; `app.py` reads `.env.local` only when not on Vercel. `.env.local` is git- and Vercel-ignored. `.env.example` lists the names.
   - Keep `CASA24_ENABLE_ALIASES` unset.
-- **Discord app redirects** (Discord Developer Portal → Casa 24 Wordle → OAuth2 → Redirects) must list `<domain>/auth/discord/callback` for **every domain people log in from**, exactly. Now:
+- **Discord app redirects** (Discord Developer Portal → the app → OAuth2 → Redirects) must list `<domain>/auth/discord/callback` for **every domain people log in from**, exactly. Now:
   - `https://casa-24-wordle.vercel.app/auth/discord/callback`
   - `https://casa24-wordle-git-leaderboard-discord-casa-24.vercel.app/auth/discord/callback`
   - `http://127.0.0.1:5050/auth/discord/callback` (local)
   - plus the placeholder `https://127.0.0.1` that Discord's Activity guide asks for (the Activity's code exchange sends no `redirect_uri`).
   - Adding a custom domain or testing another branch preview → add its callback there first. Scope is `identify` only; no bot.
-- **Discord Activity settings** (Developer Portal → Casa 24 Wordle; the owner does them; step-by-step Spanish guide `docs/discord-activity-manual.md`; code side `casa24-discord-activity`):
+- **Discord Activity settings** (Developer Portal → the app, still named "Casa 24 Wordle" until the owner renames it to "El Wordle by Casa 24" with the new icon/banners, `docs/discord-activity-checklist.md` RB1–RB3; the owner does them; step-by-step Spanish guide `docs/discord-activity-manual.md`; code side `casa24-discord-activity`):
   - App owned by the Discord Team **Casa 24** (non-distributed Activities open only for the owner and Team members).
   - Installation → **Guild Install only** (scope `applications.commands`, no `bot`), installed in the Casa 24 server.
   - Activities → Settings → Supported Platforms **Web/Desktop, iOS, Android**; Default Orientation Lock **Portrait** (phone, tablet).

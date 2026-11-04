@@ -1,6 +1,6 @@
 ---
 name: casa24-daily-word
-description: How Casa 24 Wordle picks the daily word — same word for everyone, per language, changing at midnight Panama time, with Casa 24 words on about 1 day in 5. Use when someone asks whether players get the same or different words, when the word changes, or wants to change the schedule or Casa 24 frequency.
+description: How El Wordle by Casa 24 picks the daily word — same word for everyone, per language, changing at midnight Panama time, with Casa 24 words on about 1 day in 5. Use when someone asks whether players get the same or different words, when the word changes, or wants to change the schedule or Casa 24 frequency.
 ---
 
 # Daily word

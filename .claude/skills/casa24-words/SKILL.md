@@ -1,6 +1,6 @@
 ---
 name: casa24-words
-description: Add, remove, review or validate Casa 24 Wordle words — the answer and guess-only tiers, member aliases, the bigger Spanish guess list, cross-language words, and safety rules (names, brands, offensive words). Use whenever word files under webapp/data/languages/ change.
+description: Add, remove, review or validate El Wordle by Casa 24 words — the answer and guess-only tiers, member aliases, the bigger Spanish guess list, cross-language words, and safety rules (names, brands, offensive words). Use whenever word files under webapp/data/languages/ change.
 ---
 
 # Words

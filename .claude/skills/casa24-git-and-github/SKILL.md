@@ -1,6 +1,6 @@
 ---
 name: casa24-git-and-github
-description: Commit and push Casa 24 Wordle to GitHub — the public repo casa24records/CASA24WORDLE, feature branches merged into main, main auto-deploys to Vercel production (other branches get preview URLs), which GitHub account to use, what must never be published, and history rules (no force-push without asking). Use whenever the owner says commit, push, subir, GitHub, or a push fails.
+description: Commit and push El Wordle by Casa 24 (formerly Casa 24 Wordle) to GitHub — the public repo casa24records/CASA24WORDLE, feature branches merged into main, main auto-deploys to Vercel production (other branches get preview URLs), which GitHub account to use, what must never be published, and history rules (no force-push without asking). Use whenever the owner says commit, push, subir, GitHub, or a push fails.
 ---
 
 # Git and GitHub
@@ -22,6 +22,7 @@ description: Commit and push Casa 24 Wordle to GitHub — the public repo casa24
 ## Pushing
 - The repo is public, so **anything pushed is public**:
   - Never commit secrets, `.env` files, private word aliases, or fonts without a webfont license.
+  - Never commit the designer's guide **Explained.pdf** (2026-11-04 rebrand): its screenshots show real Discord usernames. The owner keeps it outside the repo; only the cleaned assets in `design/rebrand-v1.1/` are tracked.
   - Word lists are fine: they reach the browser anyway.
 - Only push when the owner asks. "Commit" alone means commit locally.
 - **GitHub account:** this Mac has several `gh` accounts. Only **casa24records** can push.
