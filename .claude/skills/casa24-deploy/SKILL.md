@@ -39,7 +39,7 @@ description: Put El Wordle by Casa 24 (formerly Casa 24 Wordle) online — Verce
 - Environment variables (Vercel → Casa 24 → casa24-wordle → Settings → Environment Variables). All of these are set for **Production, Preview and Development** (2026-10-26). **Only the owner types secret values, in the dashboard** (an automated write of secrets from Claude was blocked; don't plan to do it). Never write values in the repo, docs or chat; names only.
   | Name | What | Needed for |
   |---|---|---|
-  | `DEMO_PASSWORD` | the password the owner chose for Developer view (`/demo`) | Developer view; unset → no card, `/demo` 404 |
+  | `DEMO_PASSWORD` | the password the owner chose for Developer view (`/demo`) | Developer view; unset → the hidden Ctrl+⌘+D shortcut does nothing, `/demo` 404 |
   | `SECRET_KEY` | long random string; signs the leaderboard cookie and the Developer view session | leaderboard (required); Developer view (else derived from `DEMO_PASSWORD`) |
   | `DISCORD_CLIENT_ID` | Discord app client ID (app named "Casa 24 Wordle" until the owner renames it) (public: `1564412150519169067`) | leaderboard |
   | `DISCORD_CLIENT_SECRET` | that app's client secret | leaderboard |
@@ -47,7 +47,7 @@ description: Put El Wordle by Casa 24 (formerly Casa 24 Wordle) online — Verce
   | `ADMIN_DISCORD_IDS` | optional, comma-separated Discord **user** IDs that may hide names (not set yet; it's the owner's user ID, not the app ID) | hiding names |
   | `PUBLIC_URL` | optional, e.g. `https://casa-24-wordle.vercel.app`: the public address used in share links (`public_url()`); unset → the address the visitor used | only if share links ever show a wrong host (e.g. `discordsays.com` inside the Activity) |
   - **The Discord Activity needs no new env vars** (it reuses `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `SECRET_KEY`, `DATABASE_URL`).
-  - If any of `SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DATABASE_URL` is missing in an environment, the leaderboard is off there (routes 404, no menu switch); the guest game still works.
+  - If any of `SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DATABASE_URL` is missing in an environment, the leaderboard is off there (routes 404, no Discord icon in the game header, `/` always opens the guest game); the guest game still works.
   - Env changes only apply to **new** deployments: redeploy after editing.
   - Local: the owner runs `vercel env pull .env.local --scope casa-24`; `app.py` reads `.env.local` only when not on Vercel. `.env.local` is git- and Vercel-ignored. `.env.example` lists the names.
   - Keep `CASA24_ENABLE_ALIASES` unset.
@@ -92,7 +92,7 @@ description: Put El Wordle by Casa 24 (formerly Casa 24 Wordle) online — Verce
 | `FileNotFoundError` for data | a relative path was added. Use `APP_DIR` |
 | App not detected | entrypoint string changed, or `app` was renamed |
 | Visitors keep an old CSS/JS/picture after a deploy | its URL's `?v=` didn't change with the file (for example a hand-written `?v=`). Link it with `asset()` |
-| No Developer view card / `/demo` is 404 on Vercel | `DEMO_PASSWORD` isn't set for that environment (Production vs Preview), or no redeploy since it was added |
+| Ctrl+⌘+D does nothing / `/demo` is 404 on Vercel | `DEMO_PASSWORD` isn't set for that environment (Production vs Preview), or no redeploy since it was added |
 | Developer view keeps asking for the password | password changed (derived cookie key), or cookies blocked |
 | Different daily word than local | language load order changed. `SUPPORTED_LANGS = ("es", "en")` in `app.py` must keep that order |
 | Discord: "Invalid OAuth2 redirect_uri" | that domain's `/auth/discord/callback` is missing from the Discord app's Redirects |

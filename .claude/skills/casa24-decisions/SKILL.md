@@ -1,6 +1,6 @@
 ---
 name: casa24-decisions
-description: Decisions the Casa 24 owner already made about El Wordle by Casa 24 (formerly Casa 24 Wordle) — scope, the 2026-11-04 rebrand (name, dark only, no Settings, landing, header door), languages, words, privacy, guest/leaderboard modes, Discord login, Discord Activity, web↔Discord sync, live view, database, branding, hosting — and why. Check this before proposing changes so settled questions are not re-asked or undone.
+description: Decisions the Casa 24 owner already made about El Wordle by Casa 24 (formerly Casa 24 Wordle) — scope, the 2026-11-04 rebrand (name, dark only, no Settings, header door; no start page: `/` opens the game, Discord at the top left), languages, words, privacy, guest/leaderboard modes, Discord login, Discord Activity, web↔Discord sync, live view, database, branding, hosting — and why. Check this before proposing changes so settled questions are not re-asked or undone.
 ---
 
 # Decisions already made (October–November 2026)
@@ -10,7 +10,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 ## Scope and working style
 - The owner is the admin at Casa 24 Records (Panama City). They are a beginner developer and watch token usage. Explain in plain language, keep changes small, commit after each step, and don't paste long outputs.
 - ~~Keep the full game with its 10 languages~~ — **superseded 2026-10-29:** the owner chose **Spanish and English only** (see "Spanish and English only" below). The old rejected 2-language stash was not reused.
-- ~~Start screen with big cards~~ — **superseded 2026-11-04** by the visual landing (see "Rebrand"). Still valid: **Start screen redesigned** (owner asked for "a better starting screen"): Kolo hero, today's puzzle number and countdown, big Español/English cards (the other-language chips/cards are gone since 2026-10-29). The original game's **External Links** section (1,264 links to other Wordle sites, which looked like "extra modes that change the colors"), the search box and the `/stats` page were **removed**. Don't bring them back.
+- ~~Start screen with big cards~~, then ~~the visual landing~~ — **both superseded 2026-11-04: no start page at all** (see "No start page"). Still valid from the old start-screen redesign: the original game's **External Links** section (1,264 links to other Wordle sites, which looked like "extra modes that change the colors"), the search box and the `/stats` page were **removed**. Don't bring them back.
 - **Languages: es and en only** (since 2026-10-29; before that the 10 of the original game).
 - **Name:** ~~"Casa 24 Wordle"~~ → **"El Wordle by Casa 24"** (short "El Wordle") since 2026-11-04 (see "Rebrand").
 
@@ -34,7 +34,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 ## Developer view for the team (decided 2026-10-26)
 - Players see it as **"Developer view" / "Vista de desarrollador"**. Internally it is still "demo": routes `/demo` and `/demo/<lang>`, env `DEMO_PASSWORD`, `demo_*` text keys, `.c24-demo*` classes, `data-demo` attributes. Don't rename those.
 - **Why:** the Casa 24 team wants to test and show the game without waiting a day for a new word.
-- ~~A "🔒 Developer view" card on the start screen~~ (**superseded 2026-11-04:** no card; the hidden shortcut **Ctrl+⌘+D** on Mac, Ctrl+Alt+Shift+D elsewhere, on the landing opens `/demo`). `/demo` is a password page. After the right password the browser keeps a signed session cookie for 30 days and plays `/demo/es` (or `/demo/en` by its URL). **It acts exactly like the real game** (owner, 2026-10-26): it opens with the real word of the day and the same end window. The only differences are two buttons: **↻ Reiniciar** (a random answer from the daily-word pool, never the same word again) and **✓ Poner la palabra** (types the current word and presses Enter, so the real win flow runs).
+- ~~A "🔒 Developer view" card on the start screen~~ (**superseded 2026-11-04:** no card; the hidden shortcut **Ctrl+⌘+D** on Mac, Ctrl+Alt+Shift+D elsewhere, on the website's game pages opens `/demo`). `/demo` is a password page. After the right password the browser keeps a signed session cookie for 30 days and plays `/demo/es` (or `/demo/en` by its URL). **It acts exactly like the real game** (owner, 2026-10-26): it opens with the real word of the day and the same end window. The only differences are two buttons: **↻ Reiniciar** (a random answer from the daily-word pool, never the same word again) and **✓ Poner la palabra** (types the current word and presses Enter, so the real win flow runs).
 - **The password lives only in the `DEMO_PASSWORD` environment variable** (Vercel settings, or the shell when running locally), because the repo is public. Never write it in code, tests, docs, skills or commit messages; call it "the password the owner chose". Without `DEMO_PASSWORD` the shortcut does nothing and `/demo` is a 404.
 - **es and en only.** Other language codes redirect to `/demo/es`.
 - **Developer view never touches player data:** no localStorage saves, no results, stats or streaks, no "last language" (`casa24_lang`). The end window is the normal one (countdown, Share, your real stats), but the developer game is not added to them.
@@ -42,7 +42,7 @@ Don't re-ask these. If a request seems to conflict with one, mention it in one s
 
 ## Guest mode + Discord leaderboard (decided 2026-10-26)
 How it works: `casa24-leaderboard`.
-- **Two modes** (es/en; all 10 languages 2026-10-28 → back to es/en 2026-10-29): guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest); ~~when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch~~ (**superseded 2026-11-04:** signed in, `/` goes straight to `/lb/<lang>`; the guest toggle was removed). (The old "other languages stay guest only" rule was **superseded 2026-10-28**.)
+- **Two modes** (es/en; all 10 languages 2026-10-28 → back to es/en 2026-10-29): guest (the old game, nothing leaves the browser) and leaderboard (all-time ranking with Discord username and points). ~~Since 2026-10-26/27 the menu shows the Discord sign-in button right away when logged out (cards play guest)~~ (**superseded 2026-11-04:** no menu; signed out, `/` opens the guest game with a "Sign in with Discord" icon at the top left); ~~when logged in the cards play the leaderboard game, with a small "Jugar como invitado (no cuenta)" switch~~ (**superseded 2026-11-04:** signed in, `/` goes straight to `/lb/<lang>`; the guest toggle was removed). (The old "other languages stay guest only" rule was **superseded 2026-10-28**.)
 - **Discord login, scope `identify` only, no bot.** Discord app "Casa 24 Wordle" (to be renamed "El Wordle by Casa 24" by the owner in the Portal, checklist RB1–RB3). We never see passwords or email.
 - **Minimal data:** Discord ID, username, Discord avatar hash (since 2026-10-27, see "Live view"), a `hidden` flag, per finished game language/date/won/attempts/points, today's guesses (2 days), per-minute counters. **Never** tokens, email or IPs. Privacy text in a small "ⓘ Privacidad" popover (see below), plus "Borrar mis datos".
 - **Database: Neon Postgres** through the Vercel Marketplace, a new separate database `casa24-wordle-db`. Not Upstash (the first plan, dropped by the owner), and not GitHub-as-a-database. The kanban project has its own Neon and Upstash: **never share or reuse them**.
@@ -56,13 +56,13 @@ How it works: `casa24-leaderboard`.
 ## Discord sign-in UI and avatar (decided 2026-10-26/27)
 How it works: `casa24-leaderboard` (login flow, avatar, UI); look: `casa24-branding`.
 - **Official Discord sign-in button:** Discord Blurple `#5865F2`, white official Discord logo (inline SVG), 48 px tall, hover `#4752C4`. A fixed brand color is an allowed exception to the tokens-only rule.
-- **On the menu the Discord button shows right away** on page load (no need to pick a mode first), and it is **server-rendered**, so nothing jumps when the page loads.
-- **Logged in: the player's Discord avatar (round) sits in the header** (top-left on the landing/`/leaderboard`, right end of the game bar). Tapping it opens a small popover: @username, "Ver leaderboard", "Cerrar sesión" (and "Borrar mis datos").
+- **The Discord sign-in shows right away** on page load and is **server-rendered**, so nothing jumps (~~on the menu~~ since 2026-11-04: a small icon at the top left of the guest game's header).
+- **Logged in: the player's Discord avatar (round) sits in the header** (top-left: on `/leaderboard` after the back arrow, and since 2026-11-04 at the top left of the game header before the brand; ~~right end of the game bar~~). Tapping it opens a small popover: @username, "Ver leaderboard", "Cerrar sesión" (and "Borrar mis datos").
 - **Own avatar in the header:** the callback passes the hash in the redirect's URL fragment `#dc=<hash>`; the page keeps it in localStorage `c24_dc_avatar` `{id, hash}`, removes the fragment with `history.replaceState`, and the browser loads the picture from `cdn.discordapp.com`. No hash → Discord's default avatar `embed/avatars/<(id>>22)%6>.png`. Cleared on logout.
 - ~~The avatar never touches our server's storage~~ — **superseded 2026-10-27** by the live view: the owner chose to store the avatar hash (see below). It is still never put in cookies or logs.
 - **Cancel on Discord is not an error:** `?error=access_denied` → `/?login=cancelled` (a gentle notice); other failures → `/?login=failed`. `prompt=none` stays.
 - **Leaderboard access is a trophy line icon (SVG)** in the top-left of the header, not an emoji and not a "Ver leaderboard" text link. The 🏆 emoji is replaced by this SVG everywhere.
-- **Less text, UI that speaks for itself:** no privacy paragraph on the menu; the full privacy text lives only in a small "ⓘ Privacidad" popover. Notices are short toasts that close themselves. The end window shows rank and points as big numbers. "Borrar mis datos" is secondary (avatar popover or a small link), never a big button.
+- **Less text, UI that speaks for itself:** no privacy paragraph on any page; the full privacy text lives only in a small "ⓘ Privacidad" popover. Notices are short toasts that close themselves. The end window shows rank and points as big numbers. "Borrar mis datos" is secondary (avatar popover or a small link), never a big button.
 - **Nothing may overlap anything at any screen size.** Check at 320, 375, 390, 844×390 (landscape), 768 and 1366 px wide (see `casa24-responsive`).
 
 ## Live view (decided 2026-10-27)
@@ -85,7 +85,7 @@ How it works: `casa24-text-and-languages`, `casa24-leaderboard`; plan and resear
 - **Old links keep working:** `/<old code>` and `/lb/<old code>` redirect (302, query kept) to es or en by the browser's language (default es); `/leaderboard?tab=<old>` shows Combinado; the APIs answer 400 `bad_lang` / `bad_tab`.
 - **Leaderboard tabs:** ~~Combinado, ES, EN~~ → **EN · ESP · MIX** since 2026-11-04. Ranking, streaks and live view only count es/en rows.
 - **Delete the old languages' rows from Neon** (owner said yes): `scripts/purge_languages.py`, dry run by default. **Checked on production 2026-10-29 (owner said "hazlo directo"): the dry run found 0 rows in other languages (only es/en existed), so nothing was deleted.** The script stays for reference.
-- Discord sign-in from the menu lands on the last language played (es/en), else the browser's preferred one.
+- Discord sign-in from the guest game lands on `/lb/<that language>`; `/` picks the last language played (`c24_lang`), else the browser's preferred one.
 
 ## Game layout (decided 2026-10-29)
 How it works: `casa24-responsive`, `casa24-branding`.
@@ -152,13 +152,22 @@ Plan: `docs/rebrand-el-wordle.md`. Look: `casa24-branding`. **The designer's gui
 - **Name "El Wordle by Casa 24"** (short "El Wordle") everywhere: titles, og/twitter tags, `site.webmanifest`, share text (`El Wordle by Casa 24 EN #5 3/6` + link + grid), legal pages, docs. The Discord Developer Portal app name, icon, description and banners are the owner's job (`docs/discord-activity-checklist.md` RB1–RB3).
 - **Dark only.** No light mode, no theme picker or toggle. Supersedes the 2026-10-26 "dark mode follows the device / can be picked" rule.
 - **Palette from the guide:** amber `#FFB800` for present (replaces orange tiles), green `#2F7A48`, lime `#EFFF5E` language button, `#32DD65` won score; Kolo orange only for "You" and counters.
-- **Header:** hoodie Kolo + El Wordle title + lime "EN ▾"; right: info, trophy, stats, **Casa 24 door** (casa24records.com; in Discord via `openExternalLink`). The door replaced Settings (and the light/dark switch on other pages).
+- **Header:** (website: Discord sign-in/avatar at the top left, see "No start page") hoodie Kolo + El Wordle title + lime "EN ▾"; right: info, trophy, stats, **Casa 24 door** (casa24records.com; in Discord via `openExternalLink`). The door replaced Settings (and the light/dark switch on other pages).
 - **Settings removed entirely** (modal, easy mode "allow any word", keyboard select, theme select). **Terms · Privacy and "Delete my data" (Discord) moved to the bottom of How to play.** Don't bring Settings back.
 - **Keyboard:** Dvorak removed. Alphabetical kept but hidden: **Ctrl+⌘+A** on Mac (Ctrl+Alt+Shift+A elsewhere) toggles QWERTY ↔ alphabetical (reload with `?layout=`, cookie `keyboard_layout_<lang>`).
 - **How to play like the PDF:** title image, "Examples", three examples (BLUNT/FARTS/DREAM in both languages for now; owner 2026-11-04: "al de español ponle los mismos que inglés por ahora"), the door, small Terms · Privacy. No rule text, no "close" button.
 - **Stats like the PDF:** date, n/6 (green when won), Next word, timer, Share; no "You won!" and no "View leaderboard". The window that opens by itself at the end also shows the random Kolo, the clean grid and rank/points (lb) or local stats (guest). **Owner: touching the stats icon, even after winning, opens the compact window.**
 - **Leaderboard:** tabs EN · ESP · MIX, SVG medals for 1–3, amber ✕.
 - **Images WebP; og image and Portal uploads PNG.** Banners (680×240, 480×280) may not fit the Portal's Cover Art sizes (16:9 and 13:11 ≥1024px): ask the designer if rejected.
-- **Landing (`/`):** signed out → a visual landing with little text (big El Wordle, full-body hoodie Kolo, one tagline, today's number + countdown, Sign in with Discord, "or play as guest" English/Español, Terms · Privacy). **Signed in on the website → `/` goes straight to `/lb/<lang>`** (cookie `c24_lang` set by the game, else the computer's language, else es); `/?menu=1` still shows the landing. Supersedes the start-screen cards, the logged-in guest toggle and the Developer view card.
-- **Developer view hidden:** no card; **Ctrl+⌘+D** (Ctrl+Alt+Shift+D elsewhere) on the landing opens `/demo` when `DEMO_PASSWORD` is set.
+- ~~**Landing (`/`):** signed out → a visual landing with little text (big El Wordle, full-body hoodie Kolo, one tagline, today's number + countdown, Sign in with Discord, "or play as guest" English/Español, Terms · Privacy). **Signed in on the website → `/` goes straight to `/lb/<lang>`** (cookie `c24_lang` set by the game, else the computer's language, else es); `/?menu=1` still shows the landing.~~ **Superseded the same day** by "No start page" below. Still valid: it replaced the start-screen cards, the logged-in guest toggle and the Developer view card.
+- **Developer view hidden:** no card; **Ctrl+⌘+D** (Ctrl+Alt+Shift+D elsewhere) on the website's game pages (~~on the landing~~) opens `/demo` when `DEMO_PASSWORD` is set.
 - **Website language window:** the lime "EN ▾" button opens the same language window as in Discord; choices link to `/lb/<code>` (signed in) or `/<code>` (guest).
+
+## No start page: straight into the game (decided 2026-11-04, after the rebrand)
+Owner: "en web debe ser como el app, entras directo como guest y arriba a la izquierda dejas lo de discord, que no haya un index page específico, que entres directo a jugar y tú decides si entrar con tu discord". How it works: `casa24-wordle`, `casa24-leaderboard`.
+- **No start page / landing on the website.** `index.html`, `index.js` and the landing CSS were deleted; `/?menu=1` is gone. Don't bring a menu back.
+- **`/` opens a game** (302 `no-store`): signed in with Discord → `/lb/<lang>`, else the guest game `/<lang>`. Language: cookie `c24_lang`, else Accept-Language, else es. Notices (`?login=failed|cancelled`, `?deleted=1`) travel along and show as toasts in the game. Logout → `/` → guest game.
+- **Discord at the top left of the game header** (website only): guest → "Sign in with Discord" icon; signed in → avatar menu (popover opens to the right). The player decides whether to sign in.
+- **Developer view:** the hidden **Ctrl+⌘+D** shortcut works on the website's game pages (never inside the Developer view game or Discord). Still no card.
+- `/leaderboard` and legal pages: back link "Menú/Menu" → **"Jugar/Play"** (to `/`, which opens the game).
+- Activity unchanged (`/` inside Discord is the shell).

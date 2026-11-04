@@ -1,6 +1,6 @@
 ---
 name: casa24-text-and-languages
-description: Change any visible text or translation in El Wordle by Casa 24 (buttons, notifications, share text, How to play examples, landing texts, leaderboard tabs EN/ESP/MIX), follow the Spanish style guide, work with accent-insensitive typing, flexible-vowel colors, the keyboards (QWERTY / QWERTY-Ñ plus a hidden alphabetical layout), or the es/en-only language list. Use when editing language_config.json, keyboards, hard-coded strings in templates/JS, or the list of languages.
+description: Change any visible text or translation in El Wordle by Casa 24 (buttons, notifications, share text, How to play examples, leaderboard tabs EN/ESP/MIX, the "Jugar/Play" back link; no landing texts since 2026-11-04), follow the Spanish style guide, work with accent-insensitive typing, flexible-vowel colors, the keyboards (QWERTY / QWERTY-Ñ plus a hidden alphabetical layout), or the es/en-only language list. Use when editing language_config.json, keyboards, hard-coded strings in templates/JS, or the list of languages.
 ---
 
 # Text, translations, accents, languages
@@ -8,14 +8,14 @@ description: Change any visible text or translation in El Wordle by Casa 24 (but
 ## Where text lives
 - **Only two languages: es and en** (since 2026-10-29). Each: `webapp/data/languages/<lang>/language_config.json`
   - `meta`: page description
-  - `text`: buttons, notifications, stats, leaderboard, landing
+  - `text`: buttons, notifications, stats, leaderboard
   - `help`: the How to play window
   - also `language_code`, `name`, `name_native`, and `accent_insensitive` (es only). The old `right_to_left` key is gone, and Settings is gone entirely (2026-11-04).
 - Templates: use `{{ t('key', 'English fallback') }}` (macro at the top of `game.html`).
 - `game.js`: use `this.text("key", "English fallback")`.
 - Missing keys fall back to the English text in the code.
-- The landing (`index.html`): the two guest cards speak their own language (Play/Jugar and "Jugada hoy"/"Played today" from `label(code, key)` in `index.js`; names are each `language_name_native`). Everything else (tagline, "or play as guest", sign-in button, privacy link and dialog, toasts, header menu labels, Terms · Privacy) uses the `L1(key, es, en)` macro: both languages are in the page, but CSS on `data-l` shows only the one matching `<html lang>` (set from Accept-Language by the server, then to the player's language by `index.js`). `aria-label`/`title` attributes stay bilingual.
-- `index.html` and `leaderboard.html` get `texts` from `app.py`, like `demo_login.html`: `index.html` the es and en `text` blocks, `leaderboard.html` es and en (`LB_TEXT_FALLBACK`). `index.html` uses the macros `tx(lang, key, fallback)` and `bi(key, es, en)` (both languages side by side); `leaderboard.html` uses `L(key, es, en)` and shows **one** language: the tab's language on ESP/EN, the browser's es/en choice on MIX (`all`). Missing keys fall back to the inline es/en text. The menu's Discord pieces stay es/en only (`data-l`). Both keep inline es/en fallbacks, so they still render if `texts` is missing. Change the JSON **and** the inline fallback together.
+- **No landing since 2026-11-04** (`index.html`/`index.js` deleted; `/` opens the game). The game's Discord pieces (header icon/avatar menu at the top left, toasts) use `t()` in `game.html`, in the game's language.
+- `leaderboard.html` gets `texts` from `app.py`, like `demo_login.html`: es and en (`LB_TEXT_FALLBACK`). It uses `L(key, es, en)` and shows **one** language: the tab's language on ESP/EN, the browser's es/en choice on MIX (`all`). Missing keys fall back to the inline es/en text, so it still renders if `texts` is missing. Change the JSON **and** the inline fallback together. Discord texts shown by `_discord.html` in both languages show only one via `data-l` (CSS follows `<html lang>`).
 
 **Rule:** never hard-code a user-visible string. Add the key to **both** es and en configs, with an English fallback in the code.
 
@@ -25,19 +25,19 @@ Current `text` keys:
 - Notifications: `notification-copied`, `notification-partial-word`, `notification-not-valid`, `notification-share-unsupported`, `notification-repeated` (same word guessed twice in one game)
 - Accessibility labels (2026-10-29, NYT-style layout): `help_label`, `stats_label` (header icon buttons), `board_label` (board `role="grid"`), `board_row` ("Fila"/"Row" + number), `keyboard_label`, `key_enter`, `key_backspace` (⇨ / ⌫ keys), `activity_invite` ("Invitar amigos"/"Invite friends" card, Discord only)
 - Stats: `stats_games`, `stats_win_percentage`, `stats_current_streak`, `stats_best_streak`
-- Landing (2026-11-04): `landing_tagline` ("Una palabra al día. Seis intentos." / "One word a day. Six tries."), `landing_or_guest` ("o juega como invitado" / "or play as guest"). `landing_new_word` ("Nueva en" / "New in") and `lb_play` ("Jugar" / "Play") are inline fallbacks only.
+- **Removed 2026-11-04 (no landing):** `landing_tagline`, `landing_or_guest`, `lb_login`, `lb_play_guest` (and earlier the Settings keys `settings`, `theme*`, `easy_mode`, `keyboard_layout`).
 - **Removed 2026-11-04** with Settings and light mode: `settings`, `keyboard_layout`, `easy_mode`, `theme`, `theme_auto`, `theme_light`, `theme_dark`. Don't add them back.
-- Developer view (internally "demo", team only; **es and en only**): `demo_restart`, `demo_fill`, `demo_title` ("Vista de desarrollador" / "Developer view"), `demo_intro`, `demo_password`, `demo_enter`, `demo_wrong_password`. The password page (`demo_login.html`) reads the es and en keys together and shows them side by side, so both files need every `demo_*` key. (There is no start-screen card any more: the landing's hidden Ctrl+⌘+D shortcut opens `/demo`.)
+- Developer view (internally "demo", team only; **es and en only**): `demo_restart`, `demo_fill`, `demo_title` ("Vista de desarrollador" / "Developer view"), `demo_intro`, `demo_password`, `demo_enter`, `demo_wrong_password`. The password page (`demo_login.html`) reads the es and en keys together and shows them side by side, so both files need every `demo_*` key. (No card: the hidden Ctrl+⌘+D shortcut on the website's game pages opens `/demo`.)
 
-- Leaderboard (Discord mode; the game reads them with `this.text`/`t()`, the menu and `/leaderboard` through `texts`):
-  - Sign-in and account: `lb_signin` (Discord button and header icon: "Entrar con Discord" / "Sign in with Discord"), `lb_account` (aria label of the avatar button), `lb_view` (popover item and trophy icon label), `lb_logout`, `lb_play_guest` (now only the aria-label of the landing's guest cards; the logged-in switch was removed 2026-11-04)
-  - Privacy dialog: `lb_privacy_title` (the small "ⓘ Privacidad" link and the dialog title), `lb_privacy` (what Discord and we see/store), `lb_avatar_note` (where your Discord picture is shown), `lb_guest_note` (guest games don't count). **Changed 2026-10-27** for the live view: `lb_privacy` now says we store ID, username, profile picture and results "para mostrar el ranking y quién está jugando hoy" and that others see only your colors; `lb_avatar_note` no longer says the photo stays in your browser. The fallback strings in `index.html` / `leaderboard.html` still have the old wording (only used if a key is missing).
+- Leaderboard (Discord mode; the game reads them with `this.text`/`t()`, `/leaderboard` through `texts`):
+  - Sign-in and account: `lb_signin` (Discord button and header icon: "Entrar con Discord" / "Sign in with Discord"), `lb_account` (aria label of the avatar button), `lb_view` (popover item and trophy icon label), `lb_logout`
+  - Privacy dialog: `lb_privacy_title` (the small "ⓘ Privacidad" link and the dialog title), `lb_privacy` (what Discord and we see/store), `lb_avatar_note` (where your Discord picture is shown), `lb_guest_note` (guest games don't count). **Changed 2026-10-27** for the live view: `lb_privacy` now says we store ID, username, profile picture and results "para mostrar el ranking y quién está jugando hoy" and that others see only your colors; `lb_avatar_note` no longer says the photo stays in your browser. The fallback strings in `leaderboard.html` match the new wording.
   - Toasts and errors: `lb_login_failed`, `lb_login_cancelled`, `lb_deleted`, `lb_dismiss` (× / Close label), `lb_error`
   - Live view (`casa24-live-view`): `lb_live_title` ("Jugando hoy" / "Playing today"), `lb_live_empty` ("Nadie más está jugando ahora"), `lb_live_now` ("en vivo" / "live", next to the dot), `lb_live_open` (aria-label of the header people button)
   - Game end window: `lb_rank_label` ("Puesto"/"Rank", under the big "#N"), `lb_points_label` / `lb_point_label` ("puntos"/"punto", under "+N"; singular when exactly 1), `lb_hint` (pointer shown after a guest game)
   - Tabs (2026-11-04, `/leaderboard` and the Discord window, order EN · ESP · MIX): `lb_tab_en` "EN", `lb_tab_es` "ESP", `lb_tab_all` "MIX" (same in both languages; was Combinado/Combined and the `name_native`s).
-  - `/leaderboard` page: `lb_title`, `lb_col_player`, `lb_col_points`, `lb_col_wins`, `lb_col_streak`, `lb_col_best`, `lb_you`, `lb_my_position`, `lb_empty`, `lb_delete`, `lb_delete_confirm`, `lb_hide`, `lb_back`
-  - Removed: `lb_rank`, `lb_points`, `lb_point_one` (the numbers are now plain "#N" / "+N" with a label). Also removed with the mode switch: `lb_mode_label`, `lb_mode_guest`, `lb_mode_lb`, `lb_logged_in_as` (`lb_login` is still used by `index.html`).
+  - `/leaderboard` page: `lb_title`, `lb_col_player`, `lb_col_points`, `lb_col_wins`, `lb_col_streak`, `lb_col_best`, `lb_you`, `lb_my_position`, `lb_empty`, `lb_delete`, `lb_delete_confirm`, `lb_hide`, `lb_back` (back link on `/leaderboard`, to `/` = the game: "Jugar" / "Play" since 2026-11-04, was "Menú" / "Menu"; legal pages use the same words inline in `legal.html`)
+  - Removed: `lb_rank`, `lb_points`, `lb_point_one` (the numbers are now plain "#N" / "+N" with a label). Also removed with the mode switch: `lb_mode_label`, `lb_mode_guest`, `lb_mode_lb`, `lb_logged_in_as`.
   - No `lb_*` key has placeholders any more (`lb_my_position` is followed by ": #N" in the template).
 - Discord Activity:
   - `activity_pick_title` ("Elige tu idioma" / "Choose your language"): the Activity shell's 2-option language picker, shown only when Discord's language can't be read (see `casa24-discord-activity`). The shell shows **es and en together** (`activity_shell()` reads them into `pick`; inline fallbacks in `app.py`).
@@ -88,7 +88,7 @@ Edit JSON with Python (`json.load`, then `json.dump(..., ensure_ascii=False, ind
   - Esc closes every window.
 
 ## Languages
-- **Only es and en** (owner, 2026-10-29). `SUPPORTED_LANGS = ("es", "en")` in `app.py` is the list (menu, leaderboard, sitemap, hreflang); the folders no longer define it.
+- **Only es and en** (owner, 2026-10-29). `SUPPORTED_LANGS = ("es", "en")` in `app.py` is the list (games, leaderboard, sitemap, hreflang); the folders no longer define it.
 - `RETIRED_LANGS` (ar, de, fr, ko, pt, ru, tr, vi): `/<code>` and `/lb/<code>` redirect 302 (query kept) to es or en by the browser's Accept-Language (default es); the APIs answer 400 `bad_lang`. Tested in `tests/test_languages.py`.
 - Other unknown codes such as `/it` redirect to `/`.
 - **Adding a language back** is a real project now (data folder, keyboard JSON, every text key, add it to `SUPPORTED_LANGS`, tests, layout check). Ask the owner first; the decision is es/en only.

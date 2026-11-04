@@ -22,11 +22,11 @@ Fix = Discord's own recommendation for non-SPA apps ("how-activities-work": nest
   - `is_activity_launch()`: `frame_id` + `instance_id` + `platform` ∈ `ACTIVITY_PLATFORMS` (`desktop`, `mobile`) → this request is **the shell**.
   - `is_activity_embed()`: `?embed=1` → the game page **inside the shell's iframe**. Its URL has **no** Discord params on purpose (like the sample): nothing in it can mistake itself for the top page or start the SDK.
   - `is_activity()` = either. Context processor `inject_activity()` gives templates `C24_ACTIVITY`, `activity_params`, `activity_client_id` (public ID only), `activity_langs` (`code`, `name_native`; es and en only). Without these params nothing changes on the web and the SDK is never requested.
-- **Routes inside the Activity:**
+- **Routes inside the Activity** (unchanged by the website's 2026-11-04 "no start page": on the web `/` redirects into the game, inside Discord it stays the shell):
   - `/` and `/activity` with launch params → `activity_shell(lang)` renders **`templates/activity.html`** directly (**no redirect**), `no-store`. `?lang=` (if valid) opens that language right away. With `embed=1` they redirect to `/lb/<lang>` instead, so the shell can never load inside its own iframe. `/activity` without Activity params → `/`.
   - `/lb/<lang>` with launch params (but not `embed=1`) → also the shell, opened on that language.
   - `/lb/<lang>?embed=1` → the game: **empty board** (`daily_word=""`, no cookie travels); after the shell's login `game.js` (`activityFirstLoad`) loads `GET /api/state`. `<html class="c24-embed">`.
-  - `/<lang>` (guest game) → `/lb/<lang>`: **no guest mode in Discord**. No Developer view, no login/logout menu.
+  - `/<lang>` (guest game) → `/lb/<lang>`: **no guest mode in Discord**. No Developer view (no Ctrl+⌘+D shortcut: `demo_key` is false in the Activity), no Discord sign-in/avatar slot in the header.
   - `/leaderboard` inside the Activity is the public table (no "you"); the game instead opens an in-page **leaderboard window** (`openBoard()`, `[data-activity-board]`) fed by `GET /api/leaderboard?tab=` (2026-11-04: trophy + tabs EN · ESP · MIX in that order, active amber, medals `dc.medal()` for 1–3, amber ✕; look: `casa24-branding`).
 - **Shell `webapp/static/activity-shell.js`** (ES module, only page that imports the SDK):
   1. Constructs `new DiscordSDK(client_id)` **once** → `ready()` → `authorize({client_id, response_type:'code', state:'', prompt:'none', scope:['identify']})` → `POST /api/activity/token {code}` (**one retry on 429**, waiting `Retry-After` clamped 1–5 s) → `authenticate({access_token})` → session **in memory only**; the token is dropped.
