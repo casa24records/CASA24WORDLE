@@ -320,16 +320,21 @@ def test_focus_order_brand_actions_board_keyboard(server, page):
     assert ring == "solid"
 
 
-def test_settings_keeps_keyboard_layout_choice_and_fits(server, page):
+def test_no_settings_and_hidden_keyboard_shortcut(server, page):
+    """Rebrand 2026-11-04: no Settings (dark only, no keyboard menu). Ctrl+⌘+A (Ctrl+Alt+Shift+A
+    elsewhere) switches QWERTY <-> alphabetical; the server remembers it in its cookie."""
     page.set_viewport_size({"width": 320, "height": 568})
-    open_game(page, server, "guest")
-    page.click("header [aria-label='Ajustes'], header .c24-header-end .c24-icon-btn:last-child")
-    page.wait_for_selector("#keyboard-layout-select", state="visible")
-    assert page.locator("#keyboard-layout-select option").count() >= 2
-    assert page.locator("#right_to_left").count() == 0
-    sel = page.locator("#keyboard-layout-select").bounding_box()
-    modal = page.locator("[aria-labelledby='settings-title']").bounding_box()
-    assert sel["x"] + sel["width"] <= modal["x"] + modal["width"] + 0.5
+    page.goto(server + "/es")  # the real page: the shortcut reloads it with ?layout=
+    page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('.key')")
+    assert page.locator("#keyboard-layout-select, [data-theme-select], [aria-labelledby='settings-title']").count() == 0
+    assert page.locator("header [data-c24-door]").get_attribute("href") == "https://www.casa24records.com"
+    assert page.locator(".c24-keyboard").get_attribute("data-layout") == "qwerty"
+    page.keyboard.press("Control+Meta+KeyA")
+    page.wait_for_url("**layout=alphabetical**")
+    page.wait_for_function("document.querySelector('.c24-keyboard[data-layout=alphabetical]')")
+    page.keyboard.press("Control+Alt+Shift+KeyA")
+    page.wait_for_url("**layout=qwerty**")
+    page.wait_for_function("document.querySelector('.c24-keyboard[data-layout=qwerty]')")
 
 
 @pytest.mark.parametrize("width", [320, 390, 768])

@@ -43,14 +43,14 @@ def test_contact_is_one_constant():
 @pytest.mark.parametrize("lang", ["es", "en"])
 def test_legal_pages_render_in_es_and_en(client, path, lang):
     html = page(client, f"{path}?lang={lang}")
-    assert f'<html lang="{lang}">' in html
+    assert f'<html lang="{lang}" data-theme="dark">' in html
     assert app.LEGAL_CONTACT_EMAIL in html and f"mailto:{app.LEGAL_CONTACT_EMAIL}" in html
     assert "Casa 24 Records" in html
     assert "2026-10-29" in html  # <time datetime>
     other = "en" if lang == "es" else "es"
     assert f'href="{path}?lang={other}"' in html  # ES / EN switch
     assert 'href="/terms?lang=' in html and 'href="/privacy?lang=' in html
-    assert "kolo-face.webp?v=" in html  # header logo
+    assert "images/brand/el-wordle.webp?v=" in html  # header logo (rebrand 2026-11-04)
 
 
 @pytest.mark.parametrize("accept, lang", [("es-PA,es;q=0.9", "es"), ("en-US", "en"), ("fr-FR", "en"),
@@ -58,10 +58,10 @@ def test_legal_pages_render_in_es_and_en(client, path, lang):
 def test_language_from_accept_language(client, accept, lang):
     for path in ("/terms", "/privacy"):
         html = page(client, path, **({"Accept-Language": accept} if accept else {}))
-        assert f'<html lang="{lang}">' in html
+        assert f'<html lang="{lang}" data-theme="dark">' in html
     # ?lang= wins over the browser
-    assert '<html lang="en">' in page(client, "/privacy?lang=en", **{"Accept-Language": "es"})
-    assert '<html lang="es">' in page(client, "/privacy?lang=xx", **{"Accept-Language": "es"})
+    assert '<html lang="en" data-theme="dark">' in page(client, "/privacy?lang=en", **{"Accept-Language": "es"})
+    assert '<html lang="es" data-theme="dark">' in page(client, "/privacy?lang=xx", **{"Accept-Language": "es"})
 
 
 def test_privacy_says_what_the_code_does(client):

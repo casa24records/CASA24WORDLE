@@ -13,17 +13,10 @@
         "notification-partial-word": "Please enter a full word ",
         "notification-not-valid": "Word is not valid",
         "notification-share-unsupported": "Sorry, your browser doesn't support sharing. Please copy the text and share it yourself.",
-        "settings": "Settings",
-        "keyboard_layout": "Keyboard layout",
-        "easy_mode": "Allow any word (easy mode)",
         "stats_games": "Games",
         "stats_win_percentage": "Win %",
         "stats_current_streak": "Current streak",
         "stats_best_streak": "Best streak",
-        "theme": "Theme",
-        "theme_auto": "Automatic",
-        "theme_light": "Light",
-        "theme_dark": "Dark",
         "result_won": "You won!",
         "result_lost": "You lost",
         "notification-repeated": "You already tried that word",
@@ -46,9 +39,9 @@
         "lb_hint": "Play for the leaderboard to join the ranking",
         "lb_guest_sync": "Sign in with Discord to continue this game on Discord and count it toward the ranking.",
         "lb_title": "Leaderboard",
-        "lb_tab_es": "Español",
-        "lb_tab_en": "English",
-        "lb_tab_all": "Combined",
+        "lb_tab_es": "ESP",
+        "lb_tab_en": "EN",
+        "lb_tab_all": "MIX",
         "lb_col_player": "Player",
         "lb_col_points": "Points",
         "lb_col_wins": "Wins",
@@ -89,7 +82,9 @@
         "stats_label": "Statistics",
         "board_label": "Game board",
         "board_row": "Row",
-        "keyboard_label": "Keyboard"
+        "keyboard_label": "Keyboard",
+        "landing_tagline": "One word a day. Six tries.",
+        "landing_or_guest": "or play as guest"
     },
     "help": {
         "title": "How to Play",
@@ -101,6 +96,9 @@
         "text_1_3": "After you guess, the tiles will change color to indicate which letters of your word are correct or almost correct.",
         "text_2_1": "is in the word and in the correct location!",
         "text_2_2": "is in the word, but not in the correct location.",
-        "text_2_3": "is not present in the word you are trying to guess."
+        "text_2_3": "is not present in the word you are trying to guess.",
+        "example_1": "blunt",
+        "example_2": "farts",
+        "example_3": "dream"
     }
 }

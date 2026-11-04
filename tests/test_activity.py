@@ -99,7 +99,8 @@ def test_activity_url_keeps_discord_query_only():
 # ---------- the web without Discord's params is unchanged ----------
 
 ACTIVITY_MARKERS = ("discord-activity.js", "discord-embedded-app-sdk", 'id="c24-activity"', "data-activity-",
-                    "activity-shell.js", "c24-shell", "c24-embed", "modulepreload", "data-lang-choice")
+                    "activity-shell.js", "c24-shell", "c24-embed", "modulepreload")
+# (the website has its own language window since the rebrand: data-web-langs, plain links)
 
 
 def test_web_pages_have_no_activity_code(lb_env, client, discord):
@@ -108,7 +109,7 @@ def test_web_pages_have_no_activity_code(lb_env, client, discord):
         html = client.get(path).get_data(as_text=True)
         assert not [m for m in ACTIVITY_MARKERS if m in html], path
     login(client, discord)
-    for path in pages + ["/lb/es", "/lb/en", "/leaderboard?tab=es"]:
+    for path in [p for p in pages if p != "/"] + ["/lb/es", "/lb/en", "/leaderboard?tab=es"]:
         r = client.get(path)
         assert r.status_code == 200, path
         html = r.get_data(as_text=True)
@@ -127,7 +128,8 @@ def test_web_redirects_and_cookie_unchanged(lb_env, client, discord):
     cookie = [h for h in r.headers.getlist("Set-Cookie") if h.startswith("c24_lb=")][0]
     assert "HttpOnly" in cookie and "SameSite=Lax" in cookie and "Max-Age=2592000" in cookie
     assert "Partitioned" not in cookie and "SameSite=None" not in cookie
-    assert client.get("/").status_code == 200  # the menu, no redirect
+    r = client.get("/", headers={"Accept-Language": "en-US"})  # signed in: straight into the game
+    assert r.status_code == 302 and r.headers["Location"].endswith("/lb/en")
     assert client.get("/es").status_code == 200
 
 
@@ -234,7 +236,7 @@ def test_activity_game_page(lb_env, client, rendered):
     html = r.get_data(as_text=True)
     assert 'type="module" src="/static/discord-activity.js?v=' in html
     assert "discord-embedded-app-sdk" not in html and "activity-shell.js" not in html
-    assert '<html lang="es" class="c24-embed">' in html
+    assert '<html lang="es" data-theme="dark" class="c24-embed">' in html
     data = json.loads(re.search(r'id="c24-activity">(.*?)</script>', html).group(1))
     assert data["lang"] == "es" and "en" in data["langs"]
     assert "fake-client-secret" not in html
@@ -250,7 +252,7 @@ def test_activity_game_page(lb_env, client, rendered):
     assert 'href="/leaderboard' not in html
     btn = re.search(r'<button[^>]*data-activity-lang-open[^>]*>', html, re.S).group(0)
     assert 'aria-label="Cambiar idioma (Español)"' in btn
-    assert re.search(r'<span class="c24-badge">es ▾</span>', html)
+    assert re.search(r'<span class="c24-badge">es<span class="c24-badge-arrow" aria-hidden="true">▾</span></span>', html)
     # the language window: Español and English, the current one marked
     assert re.findall(r'data-lang-choice="([a-z]{2})"', html) == ["es", "en"]
     assert 'dir="rtl"' not in html
@@ -261,15 +263,37 @@ def test_activity_game_page(lb_env, client, rendered):
     assert not r.headers.getlist("Set-Cookie")
 
 
-def test_activity_page_with_layout_form_keeps_query(lb_env, client):
-    multi = [c for c in app.LB_LANGS if len(app.keyboards[c]["layouts"]) > 1]
-    if not multi:
-        pytest.skip("no language with two keyboard layouts")
-    html = client.get(f"/lb/{multi[0]}?embed=1").get_data(as_text=True)
-    form = re.search(r'<form method="get"[^>]*>(.*?)</form>', html, re.S).group(1)
-    assert '<input type="hidden" name="embed" value="1">' in form  # stays in the iframe's game
-    assert "frame_id" not in form
-    assert "data-autosubmit" in form and "onchange" not in form
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_activity_leaderboard_window_tabs_and_medals(lb_env, client, lang):
+    """The in-game leaderboard window: trophy, then EN · ESP · MIX (plain text tabs, the
+    active one amber via .is-active), an amber ✕, medals for ranks 1-3 (Vue rows)."""
+    html = client.get(f"/lb/{lang}?embed=1").get_data(as_text=True)
+    win = re.search(r'<div v-show="board_open"[^>]*data-activity-board.*?</table>', html, re.S).group(0)
+    tabs = re.findall(r'<button type="button" class="c24-lb-tab" data-board-tab="([a-z]+)".*?>([^<]+)</button>', win, re.S)
+    assert tabs == [("en", "EN"), ("es", "ESP"), ("all", "MIX")], tabs
+    for code in ("en", "es", "all"):
+        assert f"'is-active': board_tab === '{code}'" in win and f"loadBoard('{code}')" in win
+    head = re.search(r'<div class="c24-board-head">(.*?)</nav>', win, re.S).group(1)
+    assert "c24-trophy" in head and '<span class="sr-only">' in head  # title kept for screen readers
+    assert re.search(r'class="c24-close c24-board-close"[^>]*\s+v-on:click="board_open = false">✕</button>', win)
+    # medals 1-3 rendered by Vue (one macro, one v-if per rank), numbers from 4
+    for rank in (1, 2, 3):
+        assert re.search(rf'v-(?:else-)?if="row.rank === {rank}"><span class="c24-medal is-{rank}"><svg', win)
+        assert f'<span class="sr-only">{rank}</span>' in win
+    assert '<template v-else>[[ row.rank ]]</template>' in win
+    # default tab: the game's language (game.js openBoard)
+    js = open(os.path.join(os.path.dirname(app.__file__), "static", "game.js"), encoding="utf-8").read()
+    assert "this.loadBoard(this.board_tab || this.config.language_code)" in js
+
+
+def test_activity_hidden_alphabetical_keyboard_keeps_query(lb_env, client):
+    """No Settings (rebrand 2026-11-04): no layout form. The hidden shortcut (Ctrl+⌘+A)
+    reloads with ?layout=, which also works inside the iframe (layout is one of the kept params)."""
+    html = client.get("/lb/es?embed=1").get_data(as_text=True)
+    assert 'data-layout="qwerty"' in html and "keyboard-layout-select" not in html and "data-autosubmit" not in html
+    html = client.get("/lb/es?embed=1&layout=alphabetical").get_data(as_text=True)
+    assert 'data-layout="alphabetical"' in html
+    assert "layout" in app.ACTIVITY_OWN_PARAMS
 
 
 def test_activity_texts_in_all_languages():
@@ -774,7 +798,7 @@ def test_browser_shell_one_sdk_for_the_whole_launch(lb_env, server, page, discor
     type_word(frame, word_en)
     assert mem.get_game(P1, "en", app.lb_today()[0])[0] == [word_en]
     # change language from the header: the window lists the 2, choosing swaps the iframe
-    assert frame.inner_text("[data-activity-lang-open] .c24-badge").strip() == "EN ▾"
+    assert frame.inner_text("[data-activity-lang-open] .c24-badge").strip() == "EN▾"
     frame.click("[data-activity-lang-open]")
     frame.wait_for_selector("[data-activity-langs]", state="visible")
     assert frame.eval_on_selector_all("[data-lang-choice]", "els => els.length") == len(app.LB_LANGS)
@@ -933,8 +957,16 @@ def test_browser_leaderboard_window_and_share(lb_env, server, page, discord, mem
     frame.click("[data-activity-board-open]")
     frame.wait_for_selector("[data-board-table] tbody tr")
     assert frame.inner_text("[data-board-table]").count("@rival") == 2
+    # three tabs EN · ESP · MIX, the game's language first active; medals for ranks 1 and 2
+    assert frame.eval_on_selector_all("[data-board-tab]", "els => els.map(e => e.textContent.trim())") == ["EN", "ESP", "MIX"]
+    assert frame.eval_on_selector("[data-board-tab=es]", "e => e.classList.contains('is-active')")
+    assert frame.locator("[data-board-table] .c24-medal.is-1 svg").count() == 1
+    assert frame.locator("[data-board-table] .c24-medal.is-2 svg").count() == 1
+    assert frame.inner_text("[data-board-table] .c24-medal.is-1 .sr-only") == "1"
     frame.click("[data-board-tab=all]")
     frame.wait_for_function("document.querySelector('[data-board-tab=all]').classList.contains('is-active')")
+    frame.click("[data-board-tab=en]")
+    frame.wait_for_function("document.querySelector('[data-board-tab=en]').classList.contains('is-active')")
     page.keyboard.press("Escape")
     assert not frame.is_visible("[data-activity-board]")
     # share: copy to the clipboard; when that fails, the text in a window (never a new window)
@@ -943,7 +975,7 @@ def test_browser_leaderboard_window_and_share(lb_env, server, page, discord, mem
     page.on("popup", lambda p: opened.append(p))
     frame.evaluate(VM + ".shareResults()")
     frame.wait_for_selector("[data-share-dialog]", state="visible")
-    assert frame.input_value("[data-share-text]").startswith("Casa 24 Wordle ES #")
+    assert frame.input_value("[data-share-text]").startswith("El Wordle by Casa 24 ES #")
     assert opened == []
 
 
@@ -997,25 +1029,27 @@ def test_browser_discord_csp(lb_env, server, page, discord, mem):
     page.keyboard.press("Escape")
     frame.click("button[data-stats-open]")
     page.keyboard.press("Escape")
-    frame.click(".c24-header-end .c24-icon-btn:last-child")  # settings
-    frame.select_option("[data-theme-select]", "dark")
+    # dark only, and Casa 24's door (replaced Settings) opens casa24records.com through the SDK
     assert frame.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"
-    page.keyboard.press("Escape")
+    assert frame.locator("[data-theme-select], [data-theme-toggle]").count() == 0
+    frame.click(".c24-header-end [data-c24-door]")
+    page.wait_for_function("window.__calls.indexOf('openExternalLink') >= 0")
+    assert page.evaluate("window.__args.openExternalLink.url") == "https://www.casa24records.com/"
     frame.click("[data-activity-board-open]")
     frame.wait_for_selector("[data-board-table], [data-board-empty]")
     page.keyboard.press("Escape")
     frame.click("[data-activity-lang-open]")
     frame.click("[data-lang-choice=en]")
     frame = wait_ready(page, "en")
-    # a keyboard layout change: a GET form inside the iframe (keeps embed=1)
+    # the hidden keyboard switch (Ctrl+⌘+A; no Settings since the rebrand) reloads the
+    # iframe's game with ?layout= (keeps embed=1, never the Discord params)
     multi = [c for c in app.LB_LANGS if len(app.keyboards[c]["layouts"]) > 1]
     if multi:
         frame.click("[data-activity-lang-open]")
         frame.click(f"[data-lang-choice={multi[0]}]")
         frame = wait_ready(page, multi[0])
-        frame.click(".c24-header-end .c24-icon-btn:last-child")
         other = [k for k in app.keyboards[multi[0]]["layouts"] if k != app.keyboards[multi[0]]["default"]][0]
-        frame.select_option("#keyboard-layout-select", other)
+        frame.locator("body").press("Control+Meta+KeyA")
         frame.wait_for_url(f"**layout={other}**")
         assert "embed=1" in frame.url and "frame_id" not in frame.url
         frame.wait_for_function("document.documentElement.getAttribute('data-activity') === 'ready'"
@@ -1407,7 +1441,7 @@ def test_browser_settings_legal_links_and_delete_my_data(lb_env, server, page, d
     frame = wait_ready(page)
     shell_url = page.url
     assert mem.get_player(P1) is not None
-    frame.evaluate(VM + ".show_options_modal = true")
+    frame.click("button[data-help-open]")  # Terms / Privacy / Delete my data: bottom of How to play
     frame.wait_for_selector("[data-legal-links] a[href*='/privacy']", state="visible")
     frame.click("[data-legal-links] a[href*='/privacy']")
     page.wait_for_function("window.__calls.indexOf('openExternalLink') >= 0")

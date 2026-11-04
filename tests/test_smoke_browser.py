@@ -215,7 +215,10 @@ def test_kolo_after_win(server, page):
     type_word(page, today)
     src = kolo_src(page)
     assert "/kolo/win/" in src and src.split("?v=")[0].endswith(".webp"), src
-    assert page.locator(".c24-result").inner_text().strip() == "You won!"
+    # the end window (Explained.pdf): date, green score, Kolo + clean grid; no "You won!" line
+    assert page.locator("[data-stats-score]").inner_text().strip() == "1/6"
+    assert "is-won" in page.locator("[data-stats-score]").get_attribute("class")
+    assert page.locator(".c24-result").count() == 0
     assert page.locator(KOLO_IMG).count() == 1
     assert_clean_result_grid(page, 1)
     saved = page.evaluate("JSON.parse(localStorage.getItem('en') || '{}').kolo_image")
@@ -241,7 +244,8 @@ def test_kolo_after_loss(server, page):
         wait_reveal(page, n)
     src = kolo_src(page)
     assert "/kolo/lose/" in src and src.split("?v=")[0].endswith(".webp"), src
-    assert page.locator(".c24-result").inner_text().strip() == "Perdiste"
+    assert page.locator("[data-stats-score]").inner_text().strip() == "X/6"
+    assert "is-won" not in page.locator("[data-stats-score]").get_attribute("class")
     assert page.locator(KOLO_IMG).count() == 1
     assert_clean_result_grid(page, 6)
     assert errors == []
@@ -301,3 +305,60 @@ def test_repeated_word_rejected_without_accents(server, page):
     wait_reveal(page)
     type_word(page, fold(accented))  # resolves to the same word again
     assert_repeat_rejected(page)
+
+
+# ---------------------------------------------------------------- rebrand (2026-11-04, Explained.pdf)
+
+def test_stats_icon_after_a_win_shows_the_compact_window(server, page):
+    """The end window (opened by itself) has Kolo and the grid; the header icon afterwards
+    opens the compact window of the guide: date, green n/6, next word, Share."""
+    today = app.Language("en", app.language_codes_5words["en"]).daily_word
+    page.goto(f"{server}/en")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    type_word(page, today)
+    kolo_src(page)
+    page.keyboard.press("Escape")
+    page.click("[data-stats-open]")
+    page.wait_for_selector("[data-stats-score]", state="visible")
+    assert page.locator("[data-stats-score]").inner_text().strip() == "1/6"
+    assert "is-won" in page.locator("[data-stats-score]").get_attribute("class")
+    assert page.locator("img.c24-kolo").count() == 0 and page.locator("#emoji_board").count() == 0
+    assert page.locator("#copy_button").is_visible()
+    title = page.locator("#stats-title").inner_text()
+    assert title.split(" · ")[0].strip().upper() == title.split(" · ")[0].strip()  # uppercase date
+    assert "2" in title and "," in title
+
+
+def test_help_is_like_the_guide(server, page):
+    page.goto(f"{server}/en")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    page.click("[data-help-open]")
+    help_box = page.locator("#HelpModal")
+    help_box.wait_for(state="visible")
+    assert help_box.locator("#help-title img").get_attribute("alt") == "El Wordle by Casa 24"
+    words = help_box.locator(".c24-example").evaluate_all(
+        "els => els.map(e => [...e.children].map(c => c.textContent.trim()).join(''))")
+    assert words == ["blunt", "farts", "dream"]
+    assert help_box.locator(".c24-example .correct").inner_text().strip().lower() == "b"
+    assert help_box.locator(".c24-example .semicorrect").inner_text().strip().lower() == "r"
+    assert help_box.locator(".c24-example .incorrect").inner_text().strip().lower() == "m"
+    door = help_box.locator("[data-c24-door]")
+    assert door.get_attribute("href") == "https://www.casa24records.com" and door.get_attribute("target") == "_blank"
+    assert help_box.locator("[data-legal-links] a").count() == 2
+    assert "how to play" in help_box.inner_text().lower() or help_box.locator(".sr-only").count()
+
+
+def test_header_door_and_language_window_on_the_web(server, page):
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    assert page.locator("header img.c24-titler").get_attribute("alt") == "El Wordle by Casa 24"
+    assert page.locator("header .c24-badge").inner_text().replace(" ", "") == "ES▾"
+    assert page.locator("header [data-c24-door]").get_attribute("href") == "https://www.casa24records.com"
+    page.click("[data-lang-open]")
+    page.wait_for_selector("[data-web-langs]", state="visible")
+    links = page.locator("[data-web-langs] a[data-lang-choice]")
+    assert [links.nth(i).get_attribute("href") for i in range(links.count())] == ["/es", "/en"]
+    assert "c24_lang=es" in page.evaluate("document.cookie")
+    page.click("[data-web-langs] a[data-lang-choice=en]")
+    page.wait_for_url("**/en")
+    assert "c24_lang=en" in page.evaluate("document.cookie")

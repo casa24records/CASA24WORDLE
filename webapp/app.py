@@ -301,7 +301,10 @@ def activity_shell(lang=None):
 def inject_activity():
     activity = is_activity()
     ctx = {"C24_ACTIVITY": activity, "activity_params": activity_params() if activity else [],
-           "activity_langs": []}
+           "activity_langs": [],
+           # the header's language window on the website ("EN ▾", rebrand 2026-11-04)
+           "game_langs": [{"code": c, "name_native": language_configs[c]["name_native"]}
+                          for c in LB_LANGS if c in language_configs]}
     if activity:
         # the public app ID for the SDK (never the secret) and the language window's list
         ctx["activity_client_id"] = discord_auth.client_id()
@@ -599,14 +602,32 @@ def index():
         if is_activity_embed():
             return _no_store(redirect(activity_url(f"/lb/{lang if lang in LB_LANGS else 'es'}")))
         return activity_shell(lang)
+    # website, signed in with Discord: straight into the leaderboard game (owner,
+    # 2026-11-04). /?menu=1 still shows the landing; never for Developer view sessions.
+    if (lb_enabled() and not is_activity() and request.args.get("menu") != "1"
+            and not _demo_logged_in() and request.cookies.get(LB_COOKIE) and lb_current_user()):
+        return _no_store(redirect(f"/lb/{landing_lang()}"))
     return render_template(
         "index.html",
         languages=languages,
         language_codes=language_codes,
         todays_idx=get_todays_idx(),
         demo_enabled=demo_enabled(),
+        ui=landing_lang(),
         texts={lang: language_configs[lang]["text"] for lang in DEMO_LANGS},
     )
+
+
+LANG_COOKIE = "c24_lang"  # the game header's language window sets it (es/en)
+
+
+def landing_lang():
+    """es/en for the signed-in redirect from "/": the c24_lang cookie if valid,
+    else the computer's language (Accept-Language), else Spanish."""
+    saved = request.cookies.get(LANG_COOKIE)
+    if saved in LB_LANGS:
+        return saved
+    return request.accept_languages.best_match(list(LB_LANGS)) or "es"
 
 
 @app.route("/activity")

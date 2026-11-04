@@ -244,7 +244,9 @@ def test_8_guest_web_pages_write_nothing(lb_env, client, discord, mem):
     # logged in: guest pages still write nothing
     login(client, discord)
     before = repr(mem.dump())
-    for path in paths:
+    # (signed in, "/" sends you to /lb/<lang> since 2026-11-04; /?menu=1 is the landing)
+    assert client.get("/").status_code == 302
+    for path in ["/?menu=1"] + paths[1:]:
         assert client.get(path).status_code == 200, path
     assert repr(mem.dump()) == before
 

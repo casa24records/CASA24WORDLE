@@ -82,7 +82,7 @@ def test_spanish_alphabetical_setting(server, page, how):
     keys = [c for c in page.evaluate(KEYS_JS) if c not in ("⇨", "⌫")]
     assert len(keys) == 27 and set(keys) == ES_LETTERS
     assert keys[:3] == ["a", "b", "c"] and keys.index("ñ") == keys.index("n") + 1
-    assert page.locator("#keyboard-layout-select").input_value() == "alphabetical"
+    assert page.locator(".c24-keyboard").get_attribute("data-layout") == "alphabetical"
     press_key(page, "ñ")
     assert row0(page) == "ñ"
     assert errors == []
@@ -190,7 +190,7 @@ def test_share_fires_once_per_tap(server, page, stub):
     page.wait_for_timeout(300)
     shares = page.evaluate("window.__shares")
     assert len(shares) == 1, shares
-    assert shares[0].startswith("Casa 24 Wordle EN #") and "1/6" in shares[0]
+    assert shares[0].startswith("El Wordle by Casa 24 EN #") and "1/6" in shares[0]
     assert "🟩🟩🟩🟩🟩" in shares[0]
     button.click()
     page.wait_for_timeout(300)

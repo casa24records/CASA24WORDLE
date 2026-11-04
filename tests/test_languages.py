@@ -130,7 +130,7 @@ def test_api_refuses_old_language(lb_env, client, discord):
 
 def test_leaderboard_has_three_tabs(lb_env, client, rendered):
     html = client.get("/leaderboard").get_data(as_text=True)
-    assert re.findall(r'data-tab="([a-z]+)"', html) == ["all", "es", "en"]
+    assert re.findall(r'data-tab="([a-z]+)"', html) == ["en", "es", "all"]  # EN · ESP · MIX (rebrand 2026-11-04)
     client.get("/leaderboard?tab=de")
     assert rendered[-1][1]["tab"] == "all"
 

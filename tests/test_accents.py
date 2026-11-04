@@ -59,13 +59,12 @@ def test_english_keyboard_unchanged():
     rows = {k: ["".join(r) for r in v["rows"]] for k, v in kb["layouts"].items()}
     assert rows == {
         "qwerty": ["qwertyuiop", "asdfghjkl", "⇨zxcvbnm⌫"],
-        "dvorak": ["pyfgcrl", "aoeuidhtns", "⇨qjkxbmwvz⌫"],
         "alphabetical": ["abcdefghij", "klmnopqrst", "⇨uvwxyz⌫"],
     }
     path = os.path.join(LANG_DIR, "en", "en_keyboard.json")
     with open(path, "rb") as f:
         assert hashlib.sha256(f.read()).hexdigest() == (
-            "2889db5e9d33a938e5f2b6d14775e24808727fead3d365d7b7e828e93f25279b")
+            "524a2499b1f482917977270a1777e4a7b1ea5da0b3b1c29f59c8a7adf3bb727c")  # Dvorak removed 2026-11-04
 
 
 # ---------------------------------------------------------------- fold

@@ -16,6 +16,7 @@ import pytest
 from werkzeug.serving import make_server
 
 import app
+from lb_testlib import client as lb_client, discord, lb_env, login, mem, today  # noqa: F401 (fixtures)
 
 LB_ENV = ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "SECRET_KEY",
           "DATABASE_URL")
@@ -109,13 +110,15 @@ def test_menu_logged_out_shows_discord_button():
     assert "c24-chip" not in html and "Más idiomas" not in html and "more-languages" not in html
 
 
-def test_menu_logged_in_shows_avatar_menu_and_guest_toggle():
-    html = render_menu(lb_enabled=True, lb_user=ME)
+def test_menu_logged_in_shows_avatar_menu_and_play_button():
+    # signed in, the landing shows only through /?menu=1: one Play button back into the game
+    html = render_menu("/?menu=1", lb_enabled=True, lb_user=ME, ui="en")
     assert "@kolo_fan" in html
     assert "data-dc-toggle" in html and DEFAULT_AVATAR in html
     assert 'data-dc-id="100000000000000001"' in html
     assert re.search(r'<form method="post" action="/auth/logout" data-dc-clear>', html)
-    assert "data-guest-toggle" in html
+    assert 'href="/lb/en" class="c24-land-go" data-lb-play' in html
+    assert "data-guest-toggle" not in html  # the old guest switch is gone
     assert "c24-dc-btn" not in main_view(html)  # no big sign-in button
     assert '"username":"kolo_fan"' in html  # handed to index.js
     assert '<script type="application/json" id="c24-dc-me">"100000000000000001"</script>' in html  # handed to the avatar script
@@ -183,7 +186,7 @@ def test_leaderboard_page_table_and_me():
     assert "no vemos tu contraseña" in html
 
 
-# what app.py hands the page (lb_tabs): "all" (Combinado), then es, en
+# what app.py hands the page (lb_tabs): "all" (MIX), then es, en; shown as EN · ESP · MIX
 LB_TABS_ALL = [{"code": "all", "name_native": None}] + [
     {"code": c, "name_native": app.languages[c]["language_name_native"]} for c in app.language_codes]
 
@@ -192,27 +195,57 @@ def test_leaderboard_page_three_tabs():
     html = render("leaderboard.html", "/leaderboard?tab=en", tab="en", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
                   is_admin=False, lb_user=None, lb_enabled=True)
     tabs = re.findall(r'data-tab="([a-z]+)"', html)
-    assert tabs == ["all", "es", "en"]
+    assert tabs == ["en", "es", "all"]  # designer's order: EN · ESP · MIX
     assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="en"', html)
     assert 'href="/leaderboard?tab=es"' in html and "Español" in html and "English" in html
     assert "next=/leaderboard%3Ftab%3Den" in html  # sign-in comes back to this tab
-    assert '<html lang="en">' in html and 'dir="rtl"' not in html
+    assert '<html lang="en" data-theme="dark">' in html and 'dir="rtl"' not in html
     # page text: the tab's language when its texts are passed
     es = render("leaderboard.html", "/leaderboard?tab=es", tab="es", lb_tabs=LB_TABS_ALL, rows=[], me_row=None,
                 is_admin=False, lb_user=None, lb_enabled=True, texts={"es": {"lb_title": "Clasificación"}, "en": {}})
-    assert '<html lang="es">' in es and "Clasificación" in es
-    # unknown or removed tab → Combinado; no `tabs` from the backend → all/es/en
+    assert '<html lang="es" data-theme="dark">' in es and "Clasificación" in es
+    # unknown or removed tab → MIX; no `tabs` from the backend → en/es/all
     for old in ("xx", "de", "ar"):
         bad = render("leaderboard.html", f"/leaderboard?tab={old}", tab=old, lb_tabs=LB_TABS_ALL, rows=[],
                      me_row=None, is_admin=False, lb_user=None, lb_enabled=True)
         assert re.search(r'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="all"', bad)
     old = render("leaderboard.html", "/leaderboard?tab=es", tab="es", rows=[], me_row=None,
                  is_admin=False, lb_user=None, lb_enabled=True)
-    assert re.findall(r'data-tab="([a-z]+)"', old) == ["all", "es", "en"]
-    # a list without "all" still gets the Combinado tab, first
+    assert re.findall(r'data-tab="([a-z]+)"', old) == ["en", "es", "all"]
+    # a list without "all" still gets the MIX tab, last
     no_all = render("leaderboard.html", "/leaderboard", tab="all", tabs=LB_TABS_ALL[1:], rows=[], me_row=None,
                     is_admin=False, lb_user=None, lb_enabled=True)
-    assert re.findall(r'data-tab="([a-z]+)"', no_all)[0] == "all" and "Combinado" in no_all
+    assert re.findall(r'data-tab="([a-z]+)"', no_all) == ["en", "es", "all"] and ">MIX</a>" in no_all
+
+
+def test_leaderboard_page_tabs_en_esp_mix_and_header_row():
+    for ui, tab in (("es", "es"), ("en", "en"), ("es", "all")):
+        html = render("leaderboard.html", f"/leaderboard?tab={tab}", tab=tab, lb_tabs=LB_TABS_ALL, rows=[],
+                      me_row=None, is_admin=False, lb_user=None, lb_enabled=True,
+                      texts={c: app.language_configs[c]["text"] for c in ("es", "en")})
+        labels = re.findall(r'data-tab="([a-z]+)"[^>]*>([^<]+)</a>', html)
+        assert labels == [("en", "EN"), ("es", "ESP"), ("all", "MIX")], labels
+        assert len(re.findall(r'class="c24-lb-tab is-active"', html)) == 1
+        assert re.search(rf'class="c24-lb-tab is-active"\s+aria-current="page" data-tab="{tab}"', html)
+        # one header row: trophy, then the tabs; the title stays for screen readers
+        head = re.search(r'<div class="c24-lb-head">(.*?)</nav>', html, re.S).group(1)
+        assert "c24-trophy" in head and 'class="sr-only"' in head and "data-lb-tabs" in head
+
+
+def test_leaderboard_page_medals_for_top_three():
+    rows = [row(r, str(r), f"p{r}", 50 - r) for r in range(1, 6)]
+    html = render("leaderboard.html", "/leaderboard?tab=es", tab="es", rows=rows, me_row=None,
+                  is_admin=False, lb_user=None, lb_enabled=True)
+    cells = re.findall(r'<td class="c24-lb-n">(.*?)</td>', html, re.S)
+    assert len(cells) == 5
+    for rank in (1, 2, 3):
+        cell = cells[rank - 1]
+        assert f'class="c24-medal is-{rank}"' in cell and "<svg" in cell and 'aria-hidden="true"' in cell
+        assert f'<span class="sr-only">{rank}</span>' in cell  # the rank, for screen readers
+    assert cells[3] == "4" and cells[4] == "5"  # numbers from 4
+    assert html.count("c24-medal is-") == 3
+    # rank header: visually empty, "#" for screen readers; PLAYER · POINTS · WINS · STREAK
+    assert '<th scope="col" class="c24-lb-n"><span class="sr-only">#</span></th>' in html
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])
@@ -254,6 +287,61 @@ def test_menu_route_shows_choice_when_enabled(lb_on):
         pytest.skip("backend leaderboard routes not there yet")
     html = app.app.test_client().get("/").get_data(as_text=True)
     assert "data-lb-menu" in html and 'href="/leaderboard"' in html
+
+
+# ---------- "/" on the website: signed in → the game, signed out → the landing (2026-11-04) ----------
+
+def test_signed_out_root_is_the_landing(lb_env, lb_client, monkeypatch):
+    monkeypatch.delenv("DEMO_PASSWORD", raising=False)
+    r = lb_client.get("/")
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "data-dc-login" in html and "Sign in with Discord" in html and "Entrar con Discord" in html
+    assert "kolo-hoodie-full.webp" in html and "el-wordle.webp" in html
+    assert 'v-for="lang in menuLanguages"' in html and ":href=\"'/' + lang.language_code\"" in html  # guest es/en
+    assert "Developer view" not in html and "data-demo" not in html and 'href="/demo' not in html
+    assert "light" not in main_view(html).lower()  # dark only: no light/dark switch or mention
+
+
+@pytest.mark.parametrize("cookie,accept,expected", [
+    (None, "en-US,en;q=0.9", "en"),
+    (None, "es-PA,es;q=0.9", "es"),
+    (None, "fr-FR", "es"),          # neither: Spanish
+    ("en", "es-PA", "en"),          # the header language window's choice wins
+    ("es", "en-US", "es"),
+    ("ko", "en-US", "en"),          # not a leaderboard language: ignored
+])
+def test_signed_in_root_goes_to_the_game(lb_env, lb_client, discord, cookie, accept, expected):
+    login(lb_client, discord)
+    if cookie:
+        lb_client.set_cookie("c24_lang", cookie)
+    r = lb_client.get("/", headers={"Accept-Language": accept})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/lb/" + expected)
+    assert r.headers["Cache-Control"] == "no-store"
+
+
+def test_signed_in_menu_escape_hatch_and_logout(lb_env, lb_client, discord):
+    login(lb_client, discord)
+    r = lb_client.get("/?menu=1")
+    assert r.status_code == 200 and "data-lb-play" in r.get_data(as_text=True)
+    # log out lands on "/", which is the landing again (signed out)
+    r = lb_client.post("/auth/logout", headers={"Origin": "http://localhost"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")
+    r = lb_client.get("/")
+    assert r.status_code == 200 and "data-dc-login" in r.get_data(as_text=True)
+
+
+def test_signed_in_root_no_redirect_for_developer_view(lb_env, lb_client, discord, monkeypatch):
+    monkeypatch.setenv("DEMO_PASSWORD", "fake-pw-for-tests")
+    login(lb_client, discord)
+    assert lb_client.post("/demo", data={"password": "fake-pw-for-tests"}).status_code == 302
+    assert lb_client.get("/").status_code == 200
+
+
+def test_root_without_leaderboard_never_redirects(lb_off):
+    c = app.app.test_client()
+    c.set_cookie("c24_lb", "anything")
+    assert c.get("/").status_code == 200
 
 
 # ---------- browser ----------
@@ -312,16 +400,17 @@ def test_menu_logged_out_cards_and_button(server, page):
     assert not page.is_visible("#c24-privacy")
 
 
-def test_menu_logged_in_cards_and_guest_toggle(server, page):
+def test_menu_logged_in_play_button_and_guest_cards(server, page):
     open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
-    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/lb/es"
-    page.click(".c24-guest-toggle")
-    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"
-    assert page.evaluate("localStorage.getItem('casa24_mode')") == "guest"
+    page.evaluate("document.cookie = 'c24_lang=en; path=/'")
     page.reload()
     page.wait_for_function("document.querySelector('#app') && window.Vue && document.querySelector('[data-lang=es]')")
+    assert page.get_attribute("[data-lb-play]", "href") == "/lb/en"  # the language window's choice
+    assert page.inner_text("[data-lb-play]").strip().lower() == "play"  # one language
+    # the two cards are always the guest games
+    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"
     assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/en"
-    assert page.is_checked("[data-guest-toggle]")
+    assert page.locator("[data-guest-toggle]").count() == 0
 
 
 def card_info(page):
@@ -331,13 +420,15 @@ def card_info(page):
         trophy: !!e.querySelector('[data-lb-status] .c24-trophy')}))""")
 
 
-def test_menu_two_big_cards_then_developer_view(server, page):
+def test_menu_two_guest_cards_no_developer_card(server, page):
     page.set_viewport_size({"width": 390, "height": 844})
     open_menu(server, page, render_menu(lb_enabled=True, lb_user=None, demo_enabled=True))
     cards = card_info(page)
-    assert [c["lang"] for c in cards[:2]] in (["es", "en"], ["en", "es"])
-    assert cards[-1]["lang"] is None and "c24-play-demo" in cards[-1]["cls"]  # Developer view last
-    assert len(cards) == 3 and page.locator(".c24-chips, .c24-chip").count() == 0
+    assert [c["lang"] for c in cards] in (["es", "en"], ["en", "es"])
+    assert len(cards) == 2 and page.locator(".c24-chips, .c24-chip, .c24-play-demo, [data-demo]").count() == 0
+    assert page.locator("text=Developer view").count() == 0
+    # the whole landing fits a phone screen: no scrolling
+    assert page.evaluate("document.documentElement.scrollHeight") <= 844
     # both language cards are links to the guest game when logged out, no dir=rtl anywhere
     assert all(c["href"] == "/" + c["lang"] for c in cards[:2])
     assert all(c["dir"] is None for c in cards)
@@ -347,15 +438,24 @@ def test_menu_two_big_cards_then_developer_view(server, page):
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
 
 
-def test_menu_logged_in_every_card_goes_to_leaderboard(server, page):
-    open_menu(server, page, render_menu(lb_enabled=True, lb_user=ME))
-    cards = card_info(page)
-    assert len(cards) == 2
-    for c in cards:
-        assert c["href"] == "/lb/" + c["lang"] and c["trophy"], c
-    page.click(".c24-guest-toggle")
-    assert page.get_attribute("a.c24-play[data-lang=en]", "href") == "/en"
-    assert page.get_attribute("a.c24-play[data-lang=es]", "href") == "/es"
+DEMO_COMBOS = {"mac": "Control+Meta+KeyD", "other": "Control+Alt+Shift+KeyD"}
+
+
+@pytest.mark.parametrize("combo", DEMO_COMBOS)
+@pytest.mark.parametrize("enabled", [True, False])
+def test_menu_secret_key_opens_developer_view(server, page, combo, enabled):
+    page.route(server + "/demo", lambda r: r.fulfill(body="<p id=demo-page>demo</p>", content_type="text/html"))
+    open_menu(server, page, render_menu(lb_enabled=True, lb_user=None, demo_enabled=enabled))
+    page.keyboard.press("Control+KeyD")  # not enough on its own
+    page.keyboard.press("Meta+KeyD")
+    page.wait_for_timeout(150)
+    assert page.evaluate("location.pathname") == "/menu-lb"
+    page.keyboard.press(DEMO_COMBOS[combo])
+    if enabled:
+        page.wait_for_url(server + "/demo")
+    else:
+        page.wait_for_timeout(300)
+        assert page.evaluate("location.pathname") == "/menu-lb"
 
 
 def test_menu_sign_in_goes_to_last_language_played(server, page):

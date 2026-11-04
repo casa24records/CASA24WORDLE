@@ -55,8 +55,11 @@ def test_disabled_hides_everything(disabled, client):
     assert client.get("/demo/es").status_code == 404
 
 
-def test_enabled_shows_card(enabled, client):
-    assert "data-demo" in client.get("/").get_data(as_text=True)
+def test_enabled_hidden_key_not_card(enabled, client):
+    # no Developer view card any more (2026-11-04): only the flag for the secret key combo
+    html = client.get("/").get_data(as_text=True)
+    assert 'data-demo-key="1"' in html
+    assert "Developer view" not in html and "data-demo>" not in html and 'href="/demo' not in html
     r = client.get("/demo")
     assert r.status_code == 200
     assert 'name="password"' in r.get_data(as_text=True)
@@ -216,8 +219,9 @@ def test_demo_in_browser_saves_nothing(enabled, server, page):
     )
     before = storage(page)
 
-    # the Developer view card leads to the login form (not logged in yet)
-    page.click("[data-demo] a[href='/demo/es']")
+    # the secret key combo on the start screen leads to the login form (not logged in yet)
+    page.wait_for_function("window.Vue && document.querySelector('.c24-play')")
+    page.keyboard.press("Control+Meta+KeyD")
     page.wait_for_url("**/demo")
     page.fill("#demo-password", FAKE_PASSWORD)
     page.click("button[type=submit]")
@@ -228,7 +232,7 @@ def test_demo_in_browser_saves_nothing(enabled, server, page):
     assert first == todays("es")  # first open: the real word of the day
     page.click(".c24-demo-bar [data-demo-fill]")
     page.wait_for_function(
-        "document.querySelector('.c24-result') && document.querySelector('.c24-result').innerText.includes('¡Ganaste!')",
+        "document.querySelector('.c24-stats.is-end [data-stats-score].is-won')",  # the won end window (rebrand)
         timeout=8000,
     )
     page.wait_for_timeout(300)
@@ -236,7 +240,7 @@ def test_demo_in_browser_saves_nothing(enabled, server, page):
 
     # the end window is the real one (countdown, share, stats)
     page.wait_for_selector("#copy_button", state="visible", timeout=8000)
-    assert page.locator(".c24-result:visible").inner_text().strip() == "¡Ganaste!"
+    assert page.locator("[data-stats-score]:visible").get_attribute("class").split().count("is-won") == 1
     # restart: a different word (the bar button stays usable with the end window open)
     if page.locator(".c24-close:visible").count():
         page.locator(".c24-close:visible").first.click()
@@ -244,13 +248,15 @@ def test_demo_in_browser_saves_nothing(enabled, server, page):
     page.wait_for_url(re.compile(r".*/demo/es\?skip=.*"))
     wait_game(page)
     assert page.evaluate("todays_word") != first
-    assert page.locator(".c24-result").count() == 0
+    assert page.locator(".c24-stats.is-end").count() == 0
     assert storage(page) == before
 
-    # English from the start screen card
+    # English: the combo again (other systems' version), then /demo/en
     page.goto(server + "/")
-    page.click("[data-demo] a[href='/demo/en']")
-    page.wait_for_url("**/demo/en")
+    page.wait_for_function("window.Vue && document.querySelector('.c24-play')")
+    page.keyboard.press("Control+Alt+Shift+KeyD")
+    page.wait_for_url("**/demo/es")  # already signed in: /demo goes straight to the game
+    page.goto(server + "/demo/en")
     wait_game(page)
     assert page.evaluate("todays_word") in pool("en")
     assert storage(page) == before

@@ -1,7 +1,10 @@
-// Casa 24 Wordle start screen.
-// Two big cards, Español and English (last of the two played first, else the
-// browser language); both follow the guest / leaderboard mode. Also
-// today's puzzle number with a countdown to midnight Panama time, and stats.
+// El Wordle by Casa 24 landing (rebrand 2026-11-04).
+// Signed-in players never get here on the website ("/" redirects them to /lb/<lang>,
+// unless /?menu=1). The page: Sign in with Discord (or, signed in, one Play button
+// to the leaderboard game), and the two guest games, Español and English (the
+// player's language first). Also today's puzzle number with a countdown to midnight
+// Panama time, and stats. Developer view has no card: Ctrl+Cmd+D on a Mac
+// (Ctrl+Alt+Shift+D elsewhere) opens /demo when <main data-demo-key> is there.
 
 function panamaDay(date) {
     // calendar day in Panama (UTC-5, no daylight saving), e.g. "2026-10-25"
@@ -12,8 +15,11 @@ function readStorage(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
 }
 
-function writeStorage(key, value) {
-    try { localStorage.setItem(key, value); } catch (e) { }
+function readCookie(name) {
+    try {
+        var m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+        return m ? decodeURIComponent(m[1]) : null;
+    } catch (e) { return null; }
 }
 
 function readJson(id) {
@@ -41,13 +47,14 @@ const app = Vue.createApp({
             total_stats: {},
             countdown: "",
             lb: lb_info,
-            // where the Español/English cards go: signed in with Discord → "lb" (the
-            // leaderboard game) unless the player switched on "play as guest"; else "guest"
-            mode: lb_info.enabled && lb_info.user && readStorage("casa24_mode") !== "guest" ? "lb" : "guest",
         }
     },
     computed: {
         preferredLanguage() {
+            // the header language window's choice (c24_lang cookie), else the last
+            // language played, else the browser's
+            var chosen = readCookie("c24_lang");
+            if (chosen === "es" || chosen === "en") return chosen;
             var saved = readStorage("casa24_lang");
             if (saved === "es" || saved === "en") return saved;
             var browser = (navigator.language || "es").toLowerCase();
@@ -62,7 +69,7 @@ const app = Vue.createApp({
             return this.primaryLanguages;
         },
         loginLanguage() {
-            // where the Discord sign-in lands: the last language played, else the browser's
+            // where the Discord sign-in (or the signed-in Play button) lands
             return this.preferredLanguage;
         },
         status() {
@@ -104,22 +111,15 @@ const app = Vue.createApp({
             var links = document.querySelectorAll("[data-dc-login]");
             for (var i = 0; i < links.length; i++) links[i].setAttribute("href", href);
         }
+        var play = document.querySelector("[data-lb-play]");
+        if (play) play.setAttribute("href", "/lb/" + this.loginLanguage);
     },
     methods: {
-        setMode(mode) {
-            this.mode = mode === "lb" && this.lb.user ? "lb" : "guest";
-            writeStorage("casa24_mode", this.mode);
-        },
         label(code, key) {
             // each card speaks its own language
             var es = code === "es";
             if (key === "played") return es ? "Jugada hoy" : "Played today";
             return es ? "Jugar" : "Play";
-        },
-        playHref(code) {
-            // guest: /en; leaderboard (signed in): /lb/en
-            if (this.mode !== "lb" || !this.lb.enabled || !this.lb.user) return "/" + code;
-            return "/lb/" + code;
         },
         tick() {
             // time left until midnight in Panama, as "11h 48m 03s"
@@ -130,6 +130,14 @@ const app = Vue.createApp({
             this.countdown = h + "h " + (m < 10 ? "0" : "") + m + "m " + (sec < 10 ? "0" : "") + sec + "s";
         },
         keyDown(event) {
+            // hidden Developer view: Ctrl+Cmd+D (Mac) or Ctrl+Alt+Shift+D, like the
+            // game's Ctrl+Cmd+A alphabetical keyboard; only when the server allows /demo
+            if (event.code === "KeyD" && event.ctrlKey && (event.metaKey || (event.altKey && event.shiftKey))
+                    && document.querySelector("main[data-demo-key]")) {
+                event.preventDefault();
+                window.location.assign("/demo");
+                return;
+            }
             if (event.key === "Escape") {
                 this.showStatsModal = false;
                 this.showAboutModal = false;
