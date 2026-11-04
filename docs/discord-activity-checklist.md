@@ -1,4 +1,4 @@
-# Checklist: Casa 24 Wordle como Discord Activity
+# Checklist: El Wordle by Casa 24 como Discord Activity
 
 > Revisado el **2026-10-28** contra la documentación oficial de Discord (`docs.discord.com/developers/...`), el código del SDK `@discord/embedded-app-sdk` 2.5.0 (npm) y los ejemplos oficiales.
 > Complementa a la skill `casa24-discord-activity` (el plan original ya está implementado y se borró). Contexto fijo: Flask en Vercel, una sola app "Casa 24 Wordle", `main` = producción, solo `identify`, Guild Install, sin modo invitado dentro de Discord, **login automático** (sin botón), el servidor manda en la partida.
@@ -145,6 +145,22 @@ Formato de cada punto: **Qué** · **Por qué** (cita + URL) · **Cómo lo cumpl
   - **Por qué:** [DOC] "Launching a non-distributed Activity is limited to you or members of the developer team" (building-an-activity, Step 2). Para Discovery: "we require your team owner to complete identity and application verification" (https://docs.discord.com/developers/discovery/enabling-discovery).
   - **Cómo:** pasar la app a un Team de Discord. [NO VERIFICADO] si un miembro normal del servidor puede abrirla solo con Guild Install, sin verificación. El artículo de ayuda "How Can Users Discover and Play My Activity" devuelve 403 a lectores automáticos.
   - **Verificar:** manual, Fase 4: una cuenta que no es del Team intenta abrirla.
+
+### 2026-11-04 · Rebrand: El Wordle by Casa 24 — Developer Portal uploads (manual, owner)
+
+Estas imágenes se suben a mano en el Portal; **no las sirve el código** (el código usa `webapp/static/images/brand/` y los favicons; plan en `docs/rebrand-el-wordle.md`). Archivos en `design/rebrand-v1.1/`.
+
+- [ ] **RB1. General Information.** Portal → app → General Information:
+  - **App Icon:** `icon-1024.png` (1024×1024).
+  - **Name:** `El Wordle by Casa 24`.
+  - **Description** (sugerencia):
+    - ES: "El Wordle diario de Casa 24 Records: adivina la palabra en 6 intentos, en español o inglés, y compite con tus amigos."
+    - EN: "Casa 24 Records' daily Wordle: guess the word in 6 tries, in Spanish or English, and compete with friends."
+- [ ] **RB2. Activities → Art Assets / Activity Shelf.**
+  - **Cover / banner:** `banner-680x240.png` (680×240).
+  - **Banner alternativo:** `banner-alt-480x280.png` (480×280).
+  - Ojo: R13 cita Cover Art 16:9 y 13:11 de ≥1024 px. Si el Portal pide otro tamaño exacto, **no recortar a mano**: pedirlo al diseñador.
+- [ ] **RB3. Después de subir.** Abrir la Activity desde el App Launcher y comprobar nombre, icono y portada. Si la app ya está (o se pide) en Discovery, el cambio de nombre **puede requerir una nueva revisión** [NO VERIFICADO].
 
 ---
 

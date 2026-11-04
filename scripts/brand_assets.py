@@ -2,6 +2,11 @@
 
 Usage:
     .venv/bin/python scripts/brand_assets.py "/path/to/brand pack"
+    .venv/bin/python scripts/brand_assets.py --rebrand design/rebrand-v1.1
+
+The --rebrand path ("El Wordle by Casa 24", 2026-11-04) is separate: see
+rebrand() below. It writes images/brand/ and replaces the favicons; it does
+not touch the Kolo images.
 
 The brand pack folder must contain KOLO/ with the PNGs named below. Change
 the IMAGES, WIN and LOSE tables to use different Kolo art. Outputs go to
@@ -13,6 +18,7 @@ match KOLO_WIN and KOLO_LOSE in game.js (tests/test_kolo.py checks this).
 """
 
 import os
+import shutil
 import sys
 
 from PIL import Image
@@ -103,7 +109,62 @@ def main(pack):
     print("favicons updated")
 
 
+# --rebrand: output in images/brand/ -> (source in the rebrand folder, height, WebP quality)
+REBRAND_IMAGES = {
+    "el-wordle.webp": ("el-wordle-titler.png", 160, 90),        # header title
+    "kolo-hoodie.webp": ("hoodie-kolo-cropped.png", 192, 85),   # header mascot
+    "kolo-hoodie-full.webp": ("hoodie-kolo.png", 420, 85),      # full-body Kolo
+    "casa24-door.webp": ("casa24-door-white.png", 96, 90),      # header link to casa24records.com
+}
+REBRAND_OG = ("banner-680x240.png", "og-image.png")  # og:image / twitter:image (PNG for crawlers)
+REBRAND_ICON = "icon-1024.png"  # Activity icon (opaque) -> favicons
+
+
+def rebrand(src_dir):
+    """Build the "El Wordle by Casa 24" assets from design/rebrand-v1.1/.
+
+    Writes webapp/static/images/brand/{el-wordle,kolo-hoodie,kolo-hoodie-full,
+    casa24-door}.webp
+    (trimmed to their alpha bbox, resized to a fixed height, alpha kept),
+    images/brand/og-image.png, and replaces the favicons (same names as
+    main()) with downscales of icon-1024.png. Portal art (icon/banners) is
+    uploaded by hand, see docs/discord-activity-checklist.md.
+    """
+    from PIL import features
+    if not features.check("webp"):
+        sys.exit("This Pillow build has no WebP support")
+    out_dir = os.path.join(STATIC, "images", "brand")
+    os.makedirs(out_dir, exist_ok=True)
+    for out, (src, height, quality) in REBRAND_IMAGES.items():
+        im = load(os.path.join(src_dir, src))
+        width = max(1, round(im.width * height / im.height))
+        im = im.resize((width, height), Image.LANCZOS)
+        path = os.path.join(out_dir, out)
+        im.save(path, "WEBP", quality=quality, method=6, exact=False)
+        print(f"brand/{out}: {im.size} {os.path.getsize(path)} B")
+
+    src, out = REBRAND_OG
+    path = os.path.join(out_dir, out)
+    Image.open(os.path.join(src_dir, src)).convert("RGB").save(path, optimize=True)
+    if os.path.getsize(path) > os.path.getsize(os.path.join(src_dir, src)):
+        shutil.copyfile(os.path.join(src_dir, src), path)  # designer's file was already smaller
+    print(f"brand/{out}: {os.path.getsize(path)} B")
+
+    icon = Image.open(os.path.join(src_dir, REBRAND_ICON)).convert("RGB")
+    fav = os.path.join(STATIC, "favicon")
+    for size, name in FAVICONS:
+        path = os.path.join(fav, name)
+        icon.resize((size, size), Image.LANCZOS).save(path, optimize=True)
+        print(f"favicon/{name}: {os.path.getsize(path)} B")
+    path = os.path.join(fav, "favicon.ico")
+    icon.resize((256, 256), Image.LANCZOS).save(path, sizes=[(16, 16), (32, 32), (48, 48)])
+    print(f"favicon/favicon.ico: {os.path.getsize(path)} B")
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) == 3 and sys.argv[1] == "--rebrand":
+        rebrand(sys.argv[2])
+    elif len(sys.argv) == 2 and not sys.argv[1].startswith("-"):
+        main(sys.argv[1])
+    else:
         sys.exit(__doc__)
-    main(sys.argv[1])
