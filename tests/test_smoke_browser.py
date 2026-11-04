@@ -362,3 +362,14 @@ def test_header_door_and_language_window_on_the_web(server, page):
     page.click("[data-web-langs] a[data-lang-choice=en]")
     page.wait_for_url("**/en")
     assert "c24_lang=en" in page.evaluate("document.cookie")
+
+
+def test_spanish_help_uses_the_same_examples_for_now(server, page):
+    """Owner 2026-11-04: Spanish shows BLUNT / FARTS / DREAM too (with the Spanish lines)."""
+    page.goto(f"{server}/es")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    page.click("[data-help-open]")
+    words = page.locator("#HelpModal .c24-example").evaluate_all(
+        "els => els.map(e => [...e.children].map(c => c.textContent.trim()).join(''))")
+    assert words == ["blunt", "farts", "dream"]
+    assert "está en la palabra y en el lugar correcto" in page.locator("#HelpModal").inner_text()

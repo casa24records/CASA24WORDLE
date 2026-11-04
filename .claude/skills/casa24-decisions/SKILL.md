@@ -155,7 +155,7 @@ Plan: `docs/rebrand-el-wordle.md`. Look: `casa24-branding`. **The designer's gui
 - **Header:** hoodie Kolo + El Wordle title + lime "EN ▾"; right: info, trophy, stats, **Casa 24 door** (casa24records.com; in Discord via `openExternalLink`). The door replaced Settings (and the light/dark switch on other pages).
 - **Settings removed entirely** (modal, easy mode "allow any word", keyboard select, theme select). **Terms · Privacy and "Delete my data" (Discord) moved to the bottom of How to play.** Don't bring Settings back.
 - **Keyboard:** Dvorak removed. Alphabetical kept but hidden: **Ctrl+⌘+A** on Mac (Ctrl+Alt+Shift+A elsewhere) toggles QWERTY ↔ alphabetical (reload with `?layout=`, cookie `keyboard_layout_<lang>`).
-- **How to play like the PDF:** title image, "Examples", three examples (EN BLUNT/FARTS/DREAM; ES keeps its first three answers), the door, small Terms · Privacy. No rule text, no "close" button.
+- **How to play like the PDF:** title image, "Examples", three examples (BLUNT/FARTS/DREAM in both languages for now; owner 2026-11-04: "al de español ponle los mismos que inglés por ahora"), the door, small Terms · Privacy. No rule text, no "close" button.
 - **Stats like the PDF:** date, n/6 (green when won), Next word, timer, Share; no "You won!" and no "View leaderboard". The window that opens by itself at the end also shows the random Kolo, the clean grid and rank/points (lb) or local stats (guest). **Owner: touching the stats icon, even after winning, opens the compact window.**
 - **Leaderboard:** tabs EN · ESP · MIX, SVG medals for 1–3, amber ✕.
 - **Images WebP; og image and Portal uploads PNG.** Banners (680×240, 480×280) may not fit the Portal's Cover Art sizes (16:9 and 13:11 ≥1024px): ask the designer if rejected.

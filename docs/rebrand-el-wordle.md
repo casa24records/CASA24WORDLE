@@ -32,7 +32,7 @@ Rebrand "Casa 24 Wordle" → "El Wordle by Casa 24". **Explained.pdf es la refer
 - Se quitan tipo de teclado y modo fácil.
 - Ámbar `#FFB800`.
 - Medallas SVG 1/2/3.
-- How to play igual que el PDF (EN: BLUNT/FARTS/DREAM; ES conserva sus ejemplos).
+- How to play igual que el PDF (BLUNT/FARTS/DREAM en inglés y, por ahora, también en español).
 - Imágenes WebP; Portal en PNG.
 - Stats como el PDF (fecha, n/6 verde si ganaste, Next word, timer, Share; sin "You won!" ni "View leaderboard"), y al terminar además Kolo al azar + grid limpio.
 

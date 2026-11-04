@@ -46,7 +46,7 @@ Current `text` keys:
   - The shell's "Conectando…", permission and error texts are hard-coded es + en side by side in `templates/activity.html` (the language isn't known yet).
 
 - `next_word`, `no_attempts` and `share` are read in `game.html` **without** a fallback, so they must exist in es and en.
-- `help` block (`title`, `title_2`, `text_1_1_1` … `text_2_3`, `close`; en also `example_1`..`example_3`). **How to play since 2026-11-04 (Explained.pdf):** El Wordle image (`title` is sr-only), `title_2` ("Examples"), three example words with one colored letter each and `text_2_1`..`text_2_3` under them, the door, Terms · Privacy. Example words: `help.example_1..3` (en: `blunt`, `farts`, `dream`), else the first three answers (es has no `example_*` keys). The rule texts `text_1_*` are no longer shown; `close` is only the ✕ aria-label.
+- `help` block (`title`, `title_2`, `text_1_1_1` … `text_2_3`, `close`; `example_1`..`example_3` in es and en). **How to play since 2026-11-04 (Explained.pdf):** El Wordle image (`title` is sr-only), `title_2` ("Examples"), three example words with one colored letter each and `text_2_1`..`text_2_3` under them, the door, Terms · Privacy. Example words: `help.example_1..3` (`blunt`, `farts`, `dream` in both languages for now, owner 2026-11-04; Spanish words can replace them later), else the first three answers. The rule texts `text_1_*` are no longer shown; `close` is only the ✕ aria-label.
 - **Share text** (`shareResults()` in `game.js`, not translated): `El Wordle by Casa 24 EN #5 3/6` + link + emoji grid.
 - History: from 2026-10-28 to 2026-10-29 every key was also translated into 8 more languages (superseded: those languages were removed).
 
