@@ -1,4 +1,4 @@
-# Deploying Casa 24 Wordle
+# Deploying El Wordle by Casa 24
 
 **Status:** not deployed. No domain yet. Everything below is ready for when we want it online.
 

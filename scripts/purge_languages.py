@@ -1,4 +1,4 @@
-"""Delete leaderboard rows of the languages Casa 24 Wordle no longer has.
+"""Delete leaderboard rows of the languages El Wordle by Casa 24 no longer has.
 
 Since 2026-10-29 the game is only Spanish (es) and English (en). Rows with any
 other `lang` in wordle_results and wordle_games no longer count anywhere (store.py

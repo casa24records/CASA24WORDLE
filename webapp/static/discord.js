@@ -1,4 +1,4 @@
-// Casa 24 Wordle: Discord pieces of every page (loaded in <head> by dc.script() in
+// El Wordle by Casa 24: Discord pieces of every page (loaded in <head> by dc.script() in
 // _discord.html, only when the leaderboard is on). Handles the #dc=<avatar hash>
 // fragment left by the web login (kept in localStorage "c24_dc_avatar", this browser
 // only) and fills every img[data-dc-avatar]; the header avatar menu; the privacy

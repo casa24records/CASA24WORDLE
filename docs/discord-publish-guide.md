@@ -1,4 +1,4 @@
-# Guía: hacer pública la Activity de Casa 24 Wordle en Discord
+# Guía: hacer pública la Activity de El Wordle by Casa 24 en Discord
 
 > Escrita el **2026-10-29** para el dueño. Sigue los pasos en orden.
 > Completa la **Parte E** de `docs/discord-activity-manual.md`; los detalles técnicos están en `docs/discord-activity-checklist.md`.
@@ -7,7 +7,7 @@
 > **Nunca** pegues en el chat tu documento de identidad, tu selfie, contraseñas, el Client Secret ni otros secretos. Todo eso se sube **solo** dentro de Discord o de Stripe.
 
 Datos fijos:
-- App: **Casa 24 Wordle**, Client ID `1564412150519169067` (es público).
+- App: **El Wordle by Casa 24**, Client ID `1564412150519169067` (es público).
 - Dueña de la app: el Developer Team **Casa 24**.
 - Web: https://casa-24-wordle.vercel.app
 - Términos: https://casa-24-wordle.vercel.app/terms
@@ -79,12 +79,12 @@ Para las imágenes puedes usar a Kolo y los colores de marca (skill `casa24-bran
 
 Úsalo **mientras** esperas la verificación, o si el servidor es pequeño.
 
-1. Portal → **Casa 24 Wordle** → menú izquierdo **App Testers**.
+1. Portal → **El Wordle by Casa 24** → menú izquierdo **App Testers**.
 2. Escribe el **nombre de usuario** de cada persona y envía la invitación. Discord permite **hasta 50 App Testers**.
 3. Cada persona tiene que **revisar su correo y aceptar la invitación**.
 4. Tienen que jugar en un servidor de **menos de 25 miembros** (o en un DM). Si el servidor de Casa 24 tiene 25 o más miembros, **este camino no sirve allí**.
 
-**Qué deberías ver si salió bien:** el tester ve "Casa 24 Wordle" en el App Launcher del servidor pequeño y puede jugar. Seguirá viendo la marca de "sin verificar" o de desarrollo.
+**Qué deberías ver si salió bien:** el tester ve "El Wordle by Casa 24" en el App Launcher del servidor pequeño y puede jugar. Seguirá viendo la marca de "sin verificar" o de desarrollo.
 
 [NO VERIFICADO] Si los App Testers necesitan **Developer Mode** encendido. Pruébalo con uno.
 
@@ -93,7 +93,7 @@ Para las imágenes puedes usar a Kolo y los colores de marca (skill `casa24-bran
 ## 3. Antes de verificar: revisar la app en el Portal (sin revisión, inmediato)
 
 **General Information**:
-1. **Name**: `Casa 24 Wordle`.
+1. **Name**: `El Wordle by Casa 24`.
 2. **App Icon**: sube el ícono.
 3. **Description**: la descripción corta del punto 1.
 4. **Tags**: añade las etiquetas.
@@ -132,7 +132,7 @@ Antes de pegar las URLs, ábrelas en el navegador y comprueba que cargan (las es
 
 ## 4. App Verification: abrir el checklist
 
-1. Portal → **Casa 24 Wordle** → menú izquierdo **App Verification**.
+1. Portal → **El Wordle by Casa 24** → menú izquierdo **App Verification**.
 2. Verás un **checklist**. Cada punto pasa a **verde** cuando se cumple.
 3. Según la ayuda de Discord ("How Do I Get My App Verified?", leída en resultados de búsqueda), los requisitos son:
    - que la **persona dueña del Team** verifique su **identidad** a través de **Stripe**;
@@ -174,7 +174,7 @@ Vuelve a **App Verification** y comprueba que **todos** los puntos están en ver
 ## 8. Probar con alguien que NO sea del Team
 
 Cuando el Portal diga que la app está **verificada**:
-1. Pide a un miembro normal del servidor de Casa 24 (que no esté en el Team ni sea App Tester, y sin Developer Mode) que abra el **App Launcher** en un canal del servidor y busque **Casa 24 Wordle**.
+1. Pide a un miembro normal del servidor de Casa 24 (que no esté en el Team ni sea App Tester, y sin Developer Mode) que abra el **App Launcher** en un canal del servidor y busque **El Wordle by Casa 24**.
 2. Debería poder abrirla, ver el modal **Authorize** una vez y jugar.
 3. Para que también la abran en otros servidores, alguien con permiso **Manage Server** puede instalarla allí con el **Install Link** (necesita **Public Bot** activado, ver el Paso 3).
 
@@ -186,7 +186,7 @@ Cuando el Portal diga que la app está **verificada**:
 
 Esto hace que la app salga en el **App Directory** y en las secciones del **App Launcher**, para que gente de **otros servidores** la encuentre buscando.
 
-1. Portal → **Casa 24 Wordle** → **Discovery** → **Discovery Status**.
+1. Portal → **El Wordle by Casa 24** → **Discovery** → **Discovery Status**.
 2. Allí ves los **requisitos para calificar** (qualification criteria). Según la documentación "Enabling Discovery", el primero es: "we require your team owner to complete identity and application verification". Por eso Discovery va **después** de los Pasos 4–7.
 3. Cumple los demás puntos que muestre. Según la ayuda de Discord, para el App Directory hace falta además un **support server** y una **descripción**.
 
@@ -209,7 +209,7 @@ Pulsa **Save Changes**.
 1. Vuelve a **Discovery Status** y pulsa el botón para activar Discovery (**Enable Discovery**).
 2. Documentación oficial: "Once you enable Discovery, it may take up to **24 hours** for your app to appear in the App Directory and App Launcher."
 
-**Qué deberías ver si salió bien:** al buscar "Casa 24 Wordle" en el App Directory (https://discord.com/discovery/applications), aparece la ficha.
+**Qué deberías ver si salió bien:** al buscar "El Wordle by Casa 24" en el App Directory (https://discord.com/discovery/applications), aparece la ficha.
 
 ---
 

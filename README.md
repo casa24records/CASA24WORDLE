@@ -1,4 +1,4 @@
-# Casa 24 Wordle
+# El Wordle by Casa 24
 
 Casa 24 Records' daily word game in Spanish and English, with Casa 24's own words added to both.
 

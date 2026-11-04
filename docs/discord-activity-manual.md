@@ -1,11 +1,11 @@
-# Manual: encender Casa 24 Wordle dentro de Discord (Activity)
+# Manual: encender El Wordle by Casa 24 dentro de Discord (Activity)
 
 > Escrito el **2026-10-28** para el dueño. Un paso a la vez, en orden.
 > Detalle técnico y fuentes: `docs/discord-activity-checklist.md` y la skill `casa24-discord-activity`.
 > Los nombres de botones están en **inglés**, como aparecen en el Discord Developer Portal y en Vercel. Si tu Discord está en español, el nombre puede variar un poco (por ejemplo "Configuración de usuario" en vez de "User Settings").
 
 Datos fijos:
-- App de Discord: **Casa 24 Wordle**, Client ID `1564412150519169067` (es público, no es un secreto).
+- App de Discord: **El Wordle by Casa 24**, Client ID `1564412150519169067` (es público, no es un secreto).
 - Vercel: equipo **Casa 24**, proyecto **casa24-wordle**, producción **https://casa-24-wordle.vercel.app**. Lo que se sube a `main` se publica solo.
 - Portal de Discord: **https://discord.com/developers/applications**
 
@@ -39,7 +39,7 @@ No es peligroso, solo confuso. Por eso: todo lo demás ahora, el push, y despué
 ## Parte A — Antes del push (seguro)
 
 ### Paso 0. Lo que necesitas
-- La cuenta de Discord que es **dueña** de la app "Casa 24 Wordle".
+- La cuenta de Discord que es **dueña** de la app "El Wordle by Casa 24".
 - **Autenticación en dos pasos (2FA)** activada en esa cuenta: Discord → **User Settings → My Account → Enable Two-Factor Auth**. Los Teams y la verificación la piden [NO VERIFICADO si es obligatoria para crear el Team; si el Portal la pide, actívala].
 - Permiso **Manage Server** (Administrar servidor) en el servidor de Casa 24, para instalar la app ahí.
 - Discord de escritorio (Mac/Windows) y Discord en el teléfono.
@@ -64,7 +64,7 @@ Mientras la Activity no esté "distribuida", **solo tú y los miembros del Team*
 ---
 
 ### Paso 2. Pasar la app al Team
-1. Portal → **Applications** → **Casa 24 Wordle** → **General Information**.
+1. Portal → **Applications** → **El Wordle by Casa 24** → **General Information**.
 2. Baja hasta el final de la página y pulsa **Transfer App to Team**.
 3. Elige **Casa 24** y confirma.
 
@@ -74,13 +74,13 @@ Ojo:
 
 **¿Puedo hacerlo ya?** Sí.
 
-**Qué deberías ver si salió bien:** en **Applications**, "Casa 24 Wordle" aparece bajo el Team "Casa 24". En **General Information**, el **Application ID** sigue siendo `1564412150519169067`.
+**Qué deberías ver si salió bien:** en **Applications**, "El Wordle by Casa 24" aparece bajo el Team "Casa 24". En **General Information**, el **Application ID** sigue siendo `1564412150519169067`.
 
 ---
 
 ### Paso 3. Revisar la app
-En **Casa 24 Wordle**:
-1. **General Information**: nombre "Casa 24 Wordle", el ícono de Kolo y una descripción corta. (El ícono y la descripción se ven en el App Launcher.)
+En **El Wordle by Casa 24**:
+1. **General Information**: nombre "El Wordle by Casa 24", el ícono de Kolo y una descripción corta. (El ícono y la descripción se ven en el App Launcher.)
 2. **OAuth2**: el **Client ID** es `1564412150519169067`. **No** pulses **Reset Secret** (rompería el login de la web hasta cambiarlo en Vercel).
 3. **Bot**: no hace falta nada. No usamos bot.
 
@@ -129,7 +129,7 @@ Queremos que la app se instale en **servidores** (Guild Install), no que cada us
 
 **¿Puedo hacerlo ya?** Sí. Mientras Activities esté apagado, la app instalada no muestra nada a los miembros.
 
-**Qué deberías ver si salió bien:** un mensaje "Authorized" o "Success". En Discord: **Server Settings → Integrations** muestra "Casa 24 Wordle".
+**Qué deberías ver si salió bien:** un mensaje "Authorized" o "Success". En Discord: **Server Settings → Integrations** muestra "El Wordle by Casa 24".
 
 ---
 
@@ -221,8 +221,8 @@ Al encenderlo, Discord crea solo un comando llamado **Launch** (el "Entry Point"
 ### Paso 13. Abrirla en el escritorio
 1. Cierra y vuelve a abrir Discord (para que vea los cambios).
 2. Entra al servidor de Casa 24.
-3. **En un canal de voz:** únete al canal y pulsa el botón del cohete (**Activities**, en la barra de controles de la llamada). Elige **Casa 24 Wordle**.
-4. **En un canal de texto:** pulsa el ícono de apps / cohete en la barra donde escribes mensajes (**App Launcher**) y elige **Casa 24 Wordle**.
+3. **En un canal de voz:** únete al canal y pulsa el botón del cohete (**Activities**, en la barra de controles de la llamada). Elige **El Wordle by Casa 24**.
+4. **En un canal de texto:** pulsa el ícono de apps / cohete en la barra donde escribes mensajes (**App Launcher**) y elige **El Wordle by Casa 24**.
 
 **¿Puedo hacerlo ya?** Después del Paso 12.
 
@@ -254,7 +254,7 @@ Si alguien pulsa **Cancel**: verá "Para jugar en Discord necesitamos tu permiso
 ### Paso 15. Abrirla en el teléfono
 1. Cierra Discord por completo y vuelve a abrirlo.
 2. Entra a un **canal de voz** del servidor de Casa 24.
-3. Toca el cohete (**Activities**) y elige **Casa 24 Wordle**.
+3. Toca el cohete (**Activities**) y elige **El Wordle by Casa 24**.
 4. Prueba también en un canal de texto (ícono de apps junto a donde escribes).
 
 **Qué deberías ver si salió bien:**
@@ -306,7 +306,7 @@ Si lo que falla es **la web** (no Discord), eso no se arregla en el Portal: en *
 
 ### Paso 17. Probar con un miembro de Casa 24 que NO esté en el Team
 1. Pide a alguien del servidor de Casa 24 que **no** esté en el Team (ni tenga Developer Mode) que abra el App Launcher en un canal del servidor.
-2. ¿Aparece **Casa 24 Wordle**? ¿Puede abrirla y jugar?
+2. ¿Aparece **El Wordle by Casa 24**? ¿Puede abrirla y jugar?
 
 **Qué deberías ver si salió bien:** puede abrirla, sale el modal **Authorize** una vez, y su resultado aparece en `/leaderboard`.
 
@@ -315,7 +315,7 @@ Si lo que falla es **la web** (no Discord), eso no se arregla en el Portal: en *
 ### Paso 18. Si no puede: verificación y Discovery
 Solo si el Paso 17 falla.
 
-1. **App Verification:** Portal → **Casa 24 Wordle** → **App Verification** (o **Verification**). Sigue los pasos que muestre.
+1. **App Verification:** Portal → **El Wordle by Casa 24** → **App Verification** (o **Verification**). Sigue los pasos que muestre.
    - Discord pide que **el dueño del Team verifique su identidad**. Ten a mano, **para subirlos tú directamente en Discord** (nunca en el chat):
      - un documento oficial con foto (cédula o pasaporte);
      - tu teléfono con cámara para la selfie, si la piden;
@@ -360,7 +360,7 @@ Para ver errores:
 
 | Lo que ves | Causa probable | Qué hacer |
 |---|---|---|
-| Casa 24 Wordle **no aparece** en el App Launcher | **Enable Activities** apagado; Developer Mode apagado; no eres del Team y aún no está distribuida; en el móvil falta marcar iOS/Android; Discord no se ha reiniciado | Revisa los Pasos 7, 8, 12 y 17. Cierra Discord del todo y vuelve a abrirlo |
+| El Wordle by Casa 24 **no aparece** en el App Launcher | **Enable Activities** apagado; Developer Mode apagado; no eres del Team y aún no está distribuida; en el móvil falta marcar iOS/Android; Discord no se ha reiniciado | Revisa los Pasos 7, 8, 12 y 17. Cierra Discord del todo y vuelve a abrirlo |
 | **Pantalla en blanco** | Falta el URL Mapping o está mal escrito (con `https://` o `/` al final); el push aún no se hizo; un archivo bloqueado por la CSP | Revisa el Paso 11. Mira la Console: si dice `Refused to…` o `blocked:csp`, mándame esa línea |
 | Se queda en **"Conectando…"** o sale "No pudimos conectar con Discord" | Discord no respondió al "saludo" en 10 segundos (red lenta, Discord viejo), el canje con nuestro servidor tardó más de 15 s, o **falta un archivo del SDK en el deploy** | Pulsa **Intentar de nuevo**. Si no, cierra y vuelve a abrir la Activity y actualiza Discord. Si se repite, mándame los logs |
 | Se queda **siempre** en "Conectando…" (a todos, en todos los dispositivos) | Un archivo de `/static/vendor/` da **404** en Vercel (pasó una vez con los archivos `lib/` del SDK, que no se habían subido) | Revisa los logs de Vercel (`vercel logs` o Vercel → casa24-wordle → **Logs**) buscando **404** en rutas `/static/vendor/…`. Mándame la ruta: es un arreglo de código |

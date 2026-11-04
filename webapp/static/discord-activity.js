@@ -1,4 +1,4 @@
-// Casa 24 Wordle inside Discord: the game page's side (an ES module that game.html
+// El Wordle by Casa 24 inside Discord: the game page's side (an ES module that game.html
 // loads ONLY inside the Activity, as /lb/<lang>?embed=1; the web never loads it).
 // The game runs in the Activity shell's same-origin <iframe> (templates/
 // activity.html + static/activity-shell.js). This file does NOT load the Discord
