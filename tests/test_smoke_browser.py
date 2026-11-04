@@ -373,3 +373,29 @@ def test_spanish_help_uses_the_same_examples_for_now(server, page):
         "els => els.map(e => [...e.children].map(c => c.textContent.trim()).join(''))")
     assert words == ["blunt", "farts", "dream"]
     assert "está en la palabra y en el lugar correcto" in page.locator("#HelpModal").inner_text()
+
+
+def test_language_window_text_centered_and_mix_tab_green(server, page):
+    """Owner 2026-11-04: the website's language buttons center their text; on the
+    leaderboard the active MIX tab is green (#32DD65) like the guide, EN/ESP amber."""
+    page.goto(f"{server}/en")
+    page.wait_for_function("document.querySelector('#app') && window.Vue")
+    page.click("[data-lang-open]")
+    link = page.locator("[data-web-langs] a[data-lang-choice=es]")
+    link.wait_for(state="visible")
+    box = link.bounding_box()
+    text = link.evaluate("e => { const r = document.createRange(); r.selectNodeContents(e);"
+                         " const b = r.getBoundingClientRect(); return {y: b.y, h: b.height}; }")
+    assert abs((text["y"] + text["h"] / 2) - (box["y"] + box["height"] / 2)) <= 2
+    import flask
+    tabs = [{"code": c, "name_native": app.language_configs[c]["name_native"]} for c in ("en", "es")] + [
+        {"code": "all", "name_native": None}]
+    for tab, rgb in (("all", "rgb(50, 221, 101)"), ("es", "rgb(255, 184, 0)")):
+        with app.app.test_request_context(f"/leaderboard?tab={tab}"):
+            html = flask.render_template("leaderboard.html", tab=tab, lb_tabs=tabs, rows=[], me_row=None,
+                                         is_admin=False, lb_user=None, lb_enabled=True)
+        body = html
+        page.route(server + "/board", lambda r: r.fulfill(body=body, content_type="text/html"))
+        page.goto(server + "/board")
+        assert page.locator(f".c24-lb-tab.is-active[data-tab={tab}]").evaluate("e => getComputedStyle(e).color") == rgb
+        page.unroute(server + "/board")

@@ -1612,6 +1612,10 @@ body.c24-shell { background: var(--c24-bg); color: var(--c24-text); }
     margin-bottom: auto;
 }
 .c24-picker-btn, .c24-lang-choice {
+    display: flex;            /* the website's choices are links: center their text too */
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
     min-height: 48px;
     padding: 0 0.75rem;
     border: 2px solid var(--c24-line-strong, #999);
@@ -1821,6 +1825,8 @@ button.c24-lb-link { background: transparent; border: 0; font: inherit; font-wei
     color: var(--c24-text); text-decoration: none; cursor: pointer;
 }
 .c24-lb-head .c24-lb-tab.is-active, .c24-board-head .c24-lb-tab.is-active { background: transparent; color: var(--c24-lb-on); }
+/* MIX (all languages) is green in the guide; EN and ESP amber */
+.c24-lb-head .c24-lb-tab[data-tab="all"], .c24-board-head .c24-lb-tab[data-board-tab="all"] { --c24-lb-on: var(--c24-win); }
 .c24-lb-head .c24-lb-tab:focus-visible, .c24-board-head .c24-lb-tab:focus-visible { outline: 2px solid var(--c24-lb-on); outline-offset: 2px; }
 @media (hover: hover) {
     .c24-lb-head .c24-lb-tab:not(.is-active):hover, .c24-board-head .c24-lb-tab:not(.is-active):hover { background: transparent; color: var(--c24-lb-on); }
