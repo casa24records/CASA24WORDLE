@@ -142,3 +142,18 @@ def test_every_static_url_is_versioned():
         # KOLO_BASE is a folder prefix; game.js adds ?v=ASSET_V to each Kolo URL
         bad = [u for u in urls if "?v=" not in u and not u.endswith("/kolo/")]
         assert not bad, (path, bad)
+
+
+def test_root_favicon_is_the_el_wordle_icon():
+    """Browsers and search engines ask for /favicon.ico and /apple-touch-icon.png on their
+    own: they get the El Wordle icon (from design/rebrand-v1.1/icon-1024.png), not a redirect."""
+    sys.path.insert(0, os.path.join(ROOT, "webapp"))
+    import app
+    client = app.app.test_client()
+    for path, name in (("/favicon.ico", "favicon.ico"), ("/apple-touch-icon.png", "apple-touch-icon.png")):
+        r = client.get(path)
+        assert r.status_code == 200, path
+        with open(os.path.join(ROOT, "webapp", "static", "favicon", name), "rb") as f:
+            assert r.data == f.read()
+    html = client.get("/es").get_data(as_text=True)
+    assert 'rel="icon" type="image/png" sizes="192x192" href="/static/favicon/android-chrome-192x192.png?v=' in html

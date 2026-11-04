@@ -1,4 +1,5 @@
 from flask import (
+    send_from_directory,
     Flask,
     jsonify,
     render_template,
@@ -693,6 +694,17 @@ def privacy_page():
 
 
 # sitemap
+@app.route("/favicon.ico")
+@app.route("/apple-touch-icon.png")
+def root_icons():
+    # browsers, bookmarks and search engines ask for these at the site root by themselves
+    # (without reading our <link> tags): serve the El Wordle icon there too, instead of
+    # the catch-all redirect to "/" (which handed them HTML, so they kept the old icon)
+    name = "favicon.ico" if request.path == "/favicon.ico" else "apple-touch-icon.png"
+    response = send_from_directory(os.path.join(app.static_folder, "favicon"), name, max_age=86400)
+    return response
+
+
 @app.route("/sitemap.xml")
 def site_map():
     response = make_response(
